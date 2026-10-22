@@ -48,8 +48,8 @@ test('C1. PUBLIC_ROOMS_ENABLED 한 줄, PUBLIC_ACK_VERSION = public_ack_version(
   assert.ok(PUBLIC_SQL.includes("check (public_key ~ '^[a-km-np-z2-9]{10}$')"));
 });
 
-test('C2. APP_VERSION은 v0.2.0-261022-<소문자 16진수 5자>', () => {
-  assert.match(constValue('APP_VERSION'), /^'v0\.2\.0-261022-[0-9a-f]{5}'$/);
+test('C2. APP_VERSION은 v0.2.1-261022-<소문자 16진수 5자>', () => {
+  assert.match(constValue('APP_VERSION'), /^'v0\.2\.1-261022-[0-9a-f]{5}'$/);
 });
 
 test('C3. 읽기 전용 구간·VISIT_ACTIONS에 초대 코드·코드 복사·코드 다시 만들기·찜 단추가 없음, VISIT_ACTIONS는 설계 §4.2 목록', () => {
@@ -109,5 +109,28 @@ test('서버와 같은 규칙: 못 쓰는 글자(BAD_TEXT_RE)·닉네임 비교(
     'https://evil.example/', 'https://naver.me.evil.example/', 'https://www.google.com/search?q=1', 'https://a:b@naver.me/x',
     'https://naver.me:444/x', 'javascript:alert(1)', 'not a url', '', null]) {
     assert.equal(publicMapUrl(u), mapUrl(u), String(u));
+  }
+});
+
+test('사진 주소(imgUrl): 서버가 넘겨주는 /api/public/img/… 만 받고, Supabase 서명 주소·다른 https는 버림 (업로드 시각이 헤더로 드러나서)', () => {
+  const reLine = /\nconst PUBLIC_IMG_RE = [^\n]+;\n/.exec(HTML);
+  assert.ok(reLine, 'PUBLIC_IMG_RE 한 줄');
+  const SITE = 'https://places.example.com';
+  const imgUrl = new Function('location', `${reLine[0]}${fnSource('imgUrl')}\nreturn imgUrl;`)({ origin: SITE });
+  const P = '00000000-0000-4000-a000-000000000001';
+  const U = '0f8fad5b-d9cb-469f-a165-70867728950e';
+  const mac = 'Ab_-'.repeat(10) + 'xyz';
+  const thumb = `/api/public/img/1792658000.${mac}/${P}/t/${U}.jpg`;
+  for (const ok of [thumb, `/api/public/img/1792658000.${mac}/${P}/${'a'.repeat(32)}.jpg`, 'http://localhost:5173/p.jpg', 'data:image/jpeg;base64,AAAA']) {
+    assert.equal(imgUrl(ok), ok.startsWith('http') ? new URL(ok).href : ok, ok);
+  }
+  // 서버는 사이트 주소를 붙여 줌(예전 탭 호환): 같은 사이트면 경로만 씀
+  assert.equal(imgUrl(`${SITE}${thumb}`), thumb);
+  for (const bad of [`https://abcdefghijklmnopqrst.supabase.co/storage/v1/object/sign/place-photos/${P}/t/${U}.jpg?token=x`,
+    'https://evil.example/p.jpg', `https://evil.example${thumb}`, `//evil.example${thumb}`, `${SITE}${thumb}?x=1`, `${SITE}${thumb}#x`,
+    `https://user@places.example.com${thumb}`, `http://places.example.com${thumb}`,
+    `/api/public/img/1792658000.${mac}/${P}/t/../../x.jpg`, `/api/public/img/1792658000.${mac.slice(1)}/${P}/t/${U}.jpg`,
+    `${thumb}?x=1`, 'javascript:alert(1)', 'data:image/svg+xml;base64,AAAA', '', null]) {
+    assert.equal(imgUrl(bad), '', String(bad));
   }
 });

@@ -52,8 +52,9 @@ globalThis.fetch = async (url, init = {}) => {
         places: [{ id: PLACE, name: '멘야', category: '맛집', address: null, map_url: null, status: 'visited', shared_note: null, added_month: '2026-09',
           added_by: 'm1', favorite: true, visits: [], photo_count: 1, photos: [{ path: PLACE + '/0f8fad5b-d9cb-469f-a165-70867728950e.jpg', thumb: PLACE + '/t/0f8fad5b-d9cb-469f-a165-70867728950e.jpg' }] }] });
     }
-    case 'POST /storage/v1/object/sign/place-photos':
-      return json(200, JSON.parse(init.body).paths.map((p) => ({ path: p, signedURL: '/object/sign/place-photos/' + p + '?token=x', error: null })));
+    case 'GET /storage/v1/object/authenticated/place-photos/' + PLACE + '/t/0f8fad5b-d9cb-469f-a165-70867728950e.jpg':
+      if (!admin) return json(401, {});
+      return new Response('thumb-bytes', { status: 200, headers: { 'content-type': 'image/jpeg', 'last-modified': 'Sat, 05 Sep 2026 10:11:12 GMT', etag: '"e1"' } });
     default: return json(404, { message: 'no route ' + route });
   }
 };
@@ -181,7 +182,20 @@ test('server: secret key 확인 뒤 PUBLIC_ROOMS=on이면 화면 상수 true + �
     const room = await req(s.port, `/api/public/rooms/${KEY}`, { headers: auth });
     assert.equal(room.status, 200);
     const j = JSON.parse(room.body);
-    assert.ok(j.places[0].photos[0].thumb_url.startsWith(`${SUPA}/storage/v1/object/sign/place-photos/`));
+    const thumb = j.places[0].photos[0].thumb_url;
+    // 사이트 주소(PUBLIC_ORIGIN)를 붙여 줌: 배포 전에 열어 둔 v0.2.0 탭도 https 주소라 받음
+    assert.match(thumb, /^https:\/\/places\.example\.com\/api\/public\/img\/\d{10}\.[A-Za-z0-9_-]{43}\/0{8}-0{4}-4000-a000-0{11}1\/t\/0f8fad5b-d9cb-469f-a165-70867728950e\.jpg$/);
+    // 사진은 서버가 받아 넘김: 로그인 토큰 없이 받고, 저장소의 Last-Modified·ETag(업로드 시각)는 버림
+    const imgPath = new URL(thumb).pathname;
+    const img = await req(s.port, imgPath);
+    assert.equal(img.status, 200);
+    assert.equal(img.body, 'thumb-bytes');
+    assert.equal(img.headers['content-type'], 'image/jpeg');
+    assert.equal(img.headers['last-modified'], undefined);
+    assert.equal(img.headers.etag, undefined);
+    assert.equal(img.headers['cache-control'], 'private, max-age=3600');
+    assert.equal(img.headers['x-robots-tag'], 'noindex, nofollow');
+    assert.equal((await req(s.port, imgPath.replace(/\.[A-Za-z0-9_-]{43}\//, `.${'A'.repeat(43)}/`))).status, 404, '서명이 틀리면 404');
     for (const r of [list, room]) {
       assert.ok(!r.body.includes(INVITE), '초대 코드 없음');
       assert.ok(!r.body.includes('invite_code') && !r.body.includes('favorite'));

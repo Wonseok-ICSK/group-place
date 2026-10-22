@@ -155,27 +155,39 @@ function ipKey(ip) {
 // 1시간 동안 IP마다 perIp번, 전체 total번. 받아 준 시도만 기록하므로 기록은 최대 total개.
 // 받아 주면 { ok: true, refund() }: refund는 그 한 번을 기록에서 뺀다(성공, 코드를 맞혀 본 것이 아닌 실패용)
 function createLimiter({ perIp = LIMITS.perIp, total = LIMITS.total, windowMs = LIMITS.windowMs, now = Date.now } = {}) {
-  const byIp = new Map();
-  let all = [];
+  const byIp = new Map(); // 키 → 받아 준 시각들(오래된 것부터)
+  const all = []; // 전체 시각들. total이 Infinity면 쌓지 않음
+  const keepAll = Number.isFinite(total);
+  let sweptAt = -Infinity;
   const drop = (list, t) => {
     const i = list ? list.indexOf(t) : -1;
     if (i >= 0) list.splice(i, 1);
   };
+  // 창이 지난 기록을 앞에서부터 덜어냄 (목록은 시각 순)
+  const trim = (list, t) => {
+    let i = 0;
+    while (i < list.length && t - list[i] >= windowMs) i++;
+    if (i) list.splice(0, i);
+  };
+  // 호출마다 모든 키를 훑지 않는다(키가 많으면 요청마다 느려져 서버가 멈춤): 내 키와 전체만 덜고, 다른 키는 1초에 한 번만 정리
   return function take(key) {
     const t = now();
-    const fresh = (list) => list.filter((x) => t - x < windowMs);
-    all = fresh(all);
-    for (const [k, list] of byIp) {
-      const f = fresh(list);
-      if (f.length) byIp.set(k, f); else byIp.delete(k);
+    if (keepAll) trim(all, t);
+    if (t - sweptAt >= 1000 || t < sweptAt) {
+      sweptAt = t;
+      for (const [k, list] of byIp) {
+        trim(list, t);
+        if (!list.length) byIp.delete(k);
+      }
     }
     const wait = (list) => Math.max(1, Math.ceil((list[0] + windowMs - t) / 1000));
     const mine = byIp.get(key) || [];
+    trim(mine, t);
     if (mine.length >= perIp) return { ok: false, scope: 'ip', retryAfter: wait(mine) };
-    if (all.length >= total) return { ok: false, scope: 'global', retryAfter: wait(all) };
+    if (keepAll && all.length >= total) return { ok: false, scope: 'global', retryAfter: wait(all) };
     mine.push(t);
     byIp.set(key, mine);
-    all.push(t);
+    if (keepAll) all.push(t);
     let counted = true;
     return {
       ok: true,

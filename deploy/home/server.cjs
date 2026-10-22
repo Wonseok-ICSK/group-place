@@ -111,7 +111,7 @@ const api = signupOff ? null : createSignupApi({
 let signupReady = false;
 // 공개 방 API: PUBLIC_ROOMS=on이고 secret key가 있을 때만 만든다(없으면 /api/public/*는 404). 로그인 없이 보기는 늘 끔
 const publicApi = PUBLIC.rooms && api ? createPublicApi({
-  supabaseUrl: SUPABASE_URL, publishableKey: SUPABASE_KEY, secretKey: SECRET_KEY,
+  supabaseUrl: SUPABASE_URL, publishableKey: SUPABASE_KEY, secretKey: SECRET_KEY, publicOrigin: PUBLIC_ORIGIN,
   photos: PUBLIC.photos, allowAnonymous: false, stateDir: PUBLIC.stateDir, isReady: () => publicReady,
 }) : null;
 let publicReady = false;

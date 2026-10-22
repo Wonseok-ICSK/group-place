@@ -1,14 +1,17 @@
 // 친구용 홈 서버: 공개 방 둘러보기 API (docs/public-rooms-design.md §3).
 //   GET /api/public/rooms                               둘러보기 목록 → { v: 1, rooms: [...] }
 //   GET /api/public/rooms/<공개 키>                      방 하나(읽기 전용) → { v: 1, key, name, …, places: [...] }
-//   GET /api/public/rooms/<공개 키>/thumbs?place=        장소 하나의 썸네일(최대 3장) 서명 URL → { v: 1, thumbs: [url|null], photos_paused }
-//   GET /api/public/rooms/<공개 키>/photo?place=&i=0-2   큰 사진 하나의 10분 서명 URL → { url }
+//   GET /api/public/rooms/<공개 키>/thumbs?place=        장소 하나의 썸네일(최대 3장) 사진 주소 → { v: 1, thumbs: [url|null], photos_paused }
+//   GET /api/public/rooms/<공개 키>/photo?place=&i=0-2   큰 사진 하나의 10분 사진 주소 → { url }
+//   GET /api/public/img/<만료 초>.<서명>/<저장소 경로>     사진 바이트(이 서버가 위 주소에 서명해 줌. <img>라 로그인 토큰 없이)
 // 지금은 로그인한 사람만 본다(Authorization: Bearer <로그인 토큰>). allowAnonymous는 나중(§10)을 위한 자리이고
 // server.cjs는 늘 false로 만든다. DB는 secret key로 public_room_list·public_room_view(public.sql)만 부른다.
 // 지키는 것:
 //   - 응답은 허용 목록으로 키를 하나씩 옮겨 담는다(pickListItem·pickRoom). SQL이 실수로 초대 코드·찜·uuid를 넣어도 나가지 않는다.
 //     지도 링크는 아는 지도 주소(네이버·구글·카카오)만, 사진은 무작위 파일 이름(업로드 시각이 없는 것)만 내보낸다.
-//   - 저장소 경로는 화면에 보내지 않고 서명 URL만 보낸다(썸네일 1시간, 큰 사진 10분). 방 응답에는 장소마다 대표 썸네일 하나만,
+//   - 사진은 Supabase 서명 URL을 주지 않고 이 서버가 받아서 넘긴다(/api/public/img). Storage 응답의 Last-Modified·ETag에
+//     업로드 시각이 초까지 드러나서, 내용 종류·길이만 다시 붙인다. 주소는 HMAC 서명(secret key에서 만든 키)과 만료가 있는
+//     이 서버 주소이고(썸네일 1시간, 큰 사진 10분), 저장소에는 secret key로 받는다. 방 응답에는 장소마다 대표 썸네일 하나만,
 //     나머지 썸네일은 상세를 열 때 /thumbs로.
 //   - 사진 한도(하루·사람마다·월 추정 바이트)를 파일에 저장해 다시 시작해도 이어서 센다. 같은 사람이 같은 썸네일을 그날 다시 보면
 //     세지 않는다. 사람과 경로는 날마다 바뀌는 salt의 해시로만 남긴다.
@@ -28,7 +31,7 @@ const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const MEMBER_RE = /^m[1-5]$/;
 const COLOR_RE = /^(#[0-9a-f]{6}|[a-z]{1,20})$/; // 팔레트 id 또는 #rrggbb (colors.sql couple_members_color_check)
 // 사진 경로: '<장소 uuid>/[t/]<randomUUID 또는 16바이트 16진수>.jpg'(화면 photoId()가 만드는 이름)만.
-// v0.1.2 화면이 만들던 '<장소>/<Date.now()>-<i>.jpg'는 서명 URL에 업로드 시각이 드러나므로 내보내지 않음(회색 자리)
+// v0.1.2 화면이 만들던 '<장소>/<Date.now()>-<i>.jpg'는 사진 주소에 업로드 시각이 드러나므로 내보내지 않음(회색 자리)
 const PATH_RE = /^[0-9a-f-]{36}\/(t\/)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})\.jpg$/;
 // 지도 링크로 받는 곳: 네이버 지도·플레이스, 구글 지도, 카카오맵. 그 밖의 주소는 null(화면은 네이버 지도 검색 링크로)
 const MAP_HOST_RE = /^(naver\.me|(m\.)?map\.naver\.com|(m\.|pcmap\.)?place\.naver\.com|maps\.app\.goo\.gl|kko\.to|(place\.|m\.)?map\.kakao\.com)$/;
@@ -36,6 +39,8 @@ const GOOGLE_HOST_RE = /^(www\.|maps\.)?google\.(com|[a-z]{2}|co\.[a-z]{2}|com\.
 const ACTIVE = new Set(['week', 'month', 'older']); // 마지막 활동: 7일 안·31일 안·그 전 (날짜 수는 보내지 않음)
 const STATUSES = new Set(['want_to_go', 'visited']);
 const BUCKET = 'place-photos';
+const IMG_RE = /^\/api\/public\/img\/(\d{10})\.([A-Za-z0-9_-]{43})\/(.{1,200})$/; // 만료(유닉스 초).HMAC-SHA256(base64url)/경로
+const IMG_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']); // 버킷이 받는 종류(schema.sql)
 const MAX_PLACES = 300;
 const MAX_PHOTOS = 3;
 const BUDGET_FILE = 'public-budget.json';
@@ -46,10 +51,17 @@ const DEFAULTS = {
   cacheChars: 8 * 1024 * 1024, // 캐시 합계(JSON 글자 수 + 항목마다 키 길이 + 128)
   cacheEntries: 2000, // 캐시 항목 수 (없는 방 결과가 쌓여도 이 이상은 두지 않음)
   tokenCacheMax: 500,
-  rate: { list: 20, room: 30, thumbs: 60, photo: 20, total: 300, windowMs: 60_000 },
+  // img는 사진 바이트(방 하나에 썸네일이 수십 장이라 따로, 전체 몫 total과도 따로): IP마다 img, 모두 합쳐 imgTotal
+  rate: { list: 20, room: 30, thumbs: 60, photo: 20, total: 300, img: 600, imgTotal: 3000, windowMs: 60_000 },
   // 월 1GB에서 거꾸로(아이디어 문서 8장): 썸네일 25KB·큰 사진 200KB로 셈. anonThumbs는 로그인 없는 사람의 하루 썸네일(기본 0 = 사진 없음)
   budget: { dayThumbs: 800, dayLarge: 60, userThumbs: 200, userLarge: 20, monthBytes: 1_000_000_000, thumbBytes: 25_000, largeBytes: 200_000, anonThumbs: 0 },
-  sign: { thumbSec: 3600, largeSec: 600, reuseMs: 30 * 60_000, batch: 100, cacheMax: 5000 },
+  sign: { thumbSec: 3600, largeSec: 600, reuseMs: 30 * 60_000, cacheMax: 5000 },
+  // 사진 넘기기: 크기 상한은 public.sql과 같음(썸네일 150KB·큰 사진 2MB). 메모리 캐시는 썸네일 10분·큰 사진 2분(지운 사진이 오래 남지 않게).
+  // 저장소에서 동시에 받는 것은 maxFetches개까지(버퍼가 한꺼번에 쌓여 MemoryMax를 넘지 않게), 나머지는 maxWaiting개까지 줄 서고 그 뒤는 503
+  img: {
+    thumbMax: 150_000, largeMax: 2_000_000, cacheBytes: 16 * 1024 * 1024, cacheEntries: 2000, cacheMs: 10 * 60_000,
+    largeCacheBytes: 32 * 1024 * 1024, largeCacheMs: 2 * 60_000, maxFetches: 8, maxWaiting: 300, timeoutMs: 15_000,
+  },
   jsonWarnBytes: 200 * 1024 * 1024,
   saveEveryMs: 60_000,
 };
@@ -381,16 +393,19 @@ function createBudget({ dir = '', now = Date.now, log = console.log, limits = DE
 
 // ---------- API ----------
 function createPublicApi({
-  supabaseUrl, publishableKey, secretKey, fetchImpl = fetch, now = Date.now, log = console.log,
+  supabaseUrl, publishableKey, secretKey, publicOrigin = '', fetchImpl = fetch, now = Date.now, log = console.log,
   photos = true, allowAnonymous = false, isReady = () => true, stateDir = '',
-  ttl = {}, rate = {}, budget: budgetLimits = {}, sign: signOpts = {}, cacheChars = DEFAULTS.cacheChars,
+  ttl = {}, rate = {}, budget: budgetLimits = {}, sign: signOpts = {}, img: imgOpts = {}, cacheChars = DEFAULTS.cacheChars,
   cacheEntries = DEFAULTS.cacheEntries, jsonWarnBytes = DEFAULTS.jsonWarnBytes, saveEveryMs = DEFAULTS.saveEveryMs,
 }) {
   if (!supabaseUrl || !publishableKey || !secretKey) throw new Error('createPublicApi: 설정이 비어 있어요');
   const T = { ...DEFAULTS.ttl, ...ttl };
   const R = { ...DEFAULTS.rate, ...rate };
   const S = { ...DEFAULTS.sign, ...signOpts };
+  const I = { ...DEFAULTS.img, ...imgOpts };
   const admin = adminHeaders(secretKey);
+  // 사진 주소 서명 키: secret key에서 따로 뽑음(다시 시작해도 같은 주소가 그대로 맞고, secret key 자체는 주소에 안 들어감)
+  const imgKey = crypto.createHmac('sha256', secretKey).update('group-place public img v1').digest();
   const rest = (p) => `${supabaseUrl}/rest/v1/${p}`;
   const budget = createBudget({ dir: stateDir, now, log, limits: budgetLimits });
   const timer = saveEveryMs > 0 ? setInterval(() => budget.save(), saveEveryMs) : null;
@@ -405,18 +420,27 @@ function createPublicApi({
       user: createLimiter({ perIp: R[kind], total: Infinity, windowMs: R.windowMs, now }),
     };
   }
+  // 사진: IP 몫은 서명 확인 전에, 전체 몫은 서명·만료가 맞은 요청만(위조 주소로 모두의 사진을 막지 못하게)
+  const imgIpLim = createLimiter({ perIp: R.img, total: Infinity, windowMs: R.windowMs, now });
+  const imgAllLim = createLimiter({ perIp: Infinity, total: R.imgTotal, windowMs: R.windowMs, now });
 
   const cache = createLru(cacheChars, cacheEntries);
   const inflight = new Map();
   const tokens = new Map(); // sha256(토큰) → { uid, exp }
   const thumbCache = new Map(); // 썸네일 경로 → { url, exp }
+  const imgCache = createLru(I.cacheBytes, I.cacheEntries); // 썸네일 경로 → { status: 200, type, body }
+  const largeCache = createLru(I.largeCacheBytes, I.cacheEntries); // 큰 사진 경로 → 같은 모양
+  const imgInflight = new Map(); // 경로 → 받는 중인 Promise (같은 사진을 동시에 여러 번 받지 않게)
+  let fetching = 0;
+  const waiting = [];
   let jsonDay = '';
   let jsonBytes = 0;
   let jsonWarned = false;
 
   function send(res, status, body, extra = {}, head = false) {
     const text = JSON.stringify(body);
-    res.writeHead(status, { ...HEADERS, 'cache-control': status === 200 ? 'private, max-age=60' : 'no-store', ...extra });
+    // vary: 로그인 토큰을 붙여 받은 응답을 같은 브라우저가 토큰 없는 요청에 다시 쓰지 않게
+    res.writeHead(status, { ...HEADERS, 'cache-control': status === 200 ? 'private, max-age=60' : 'no-store', vary: 'Authorization', ...extra });
     res.end(head ? undefined : text);
     if (head) return;
     // 하루 보낸 JSON 바이트: 200MB를 넘으면 경고 한 번 (세다가 실패해도 응답은 이미 보냄)
@@ -480,31 +504,24 @@ function createPublicApi({
     return room;
   });
 
-  const signedUrl = (rel) => (typeof rel === 'string' && rel.startsWith('/object/sign/') ? `${supabaseUrl}/storage/v1${rel}` : null);
-  // 썸네일 서명 (1시간). 30분 이상 남은 URL은 다시 씀. → Map(경로 → URL), 못 한 경로는 빠짐
-  async function signThumbs(paths) {
+  // 사진 주소: /api/public/img/<만료 초>.<HMAC>/<경로>. 만료와 경로를 같이 서명해서 하나라도 바꾸면 맞지 않음.
+  // 파일이 있고 크기가 상한 안인 경로만 public_room_view가 주므로(public.sql) 저장소에 묻지 않고 여기서 서명한다
+  const imgMac = (exp, p) => crypto.createHmac('sha256', imgKey).update(`${exp}|${p}`).digest('base64url');
+  // 사이트 주소를 앞에 붙임: 배포 전에 열어 둔 v0.2.0 탭(https 주소만 받음)에서도 보이게. 새 화면은 같은 사이트 주소만 받음
+  const origin = String(publicOrigin || '').replace(/\/+$/, '');
+  const imgUrl = (p, exp) => `${origin}/api/public/img/${exp}.${imgMac(exp, p)}/${p}`;
+  // 썸네일 주소 (1시간). 30분 이상 남은 주소는 다시 씀(같은 주소라 브라우저 캐시가 그대로 맞음). → Map(경로 → 주소)
+  function signThumbs(paths) {
     const out = new Map();
     const t = now();
-    const need = [];
     for (const p of paths) {
-      const hit = thumbCache.get(p);
-      if (hit && hit.exp - t >= S.reuseMs) out.set(p, hit.url);
-      else if (!need.includes(p)) need.push(p);
-    }
-    for (let i = 0; i < need.length; i += S.batch) {
-      const part = need.slice(i, i + S.batch);
-      let r;
-      try {
-        r = await call(fetchImpl, `${supabaseUrl}/storage/v1/object/sign/${BUCKET}`, { method: 'POST', headers: admin, body: { expiresIn: S.thumbSec, paths: part } });
-      } catch { r = null; }
-      if (!r || !r.ok || !Array.isArray(r.json)) { log('public sign fail'); continue; }
-      for (const x of r.json) {
-        if (!x || typeof x.path !== 'string' || !part.includes(x.path) || x.error) continue;
-        const url = signedUrl(x.signedURL || x.signedUrl);
-        if (!url) continue;
-        out.set(x.path, url);
-        thumbCache.set(x.path, { url, exp: t + S.thumbSec * 1000 });
+      let hit = thumbCache.get(p);
+      if (!hit || hit.exp - t < S.reuseMs) {
+        const exp = Math.floor(t / 1000) + S.thumbSec;
+        hit = { url: imgUrl(p, exp), exp: exp * 1000 };
+        thumbCache.set(p, hit);
       }
+      out.set(p, hit.url);
     }
     if (thumbCache.size > S.cacheMax) {
       for (const [k, v] of thumbCache) if (v.exp - t < S.reuseMs) thumbCache.delete(k);
@@ -512,13 +529,82 @@ function createPublicApi({
     }
     return out;
   }
-  async function signLarge(p) {
+  const signLarge = (p) => imgUrl(p, Math.floor(now() / 1000) + S.largeSec);
+
+  // 저장소에서 사진 하나 받기(secret key) → { status: 200, type, body } | { status: 404 | 502 }
+  async function fetchImage(p, max) {
     const enc = p.split('/').map(encodeURIComponent).join('/');
     let r;
     try {
-      r = await call(fetchImpl, `${supabaseUrl}/storage/v1/object/sign/${BUCKET}/${enc}`, { method: 'POST', headers: admin, body: { expiresIn: S.largeSec } });
-    } catch { return null; }
-    return r.ok && r.json ? signedUrl(r.json.signedURL || r.json.signedUrl) : null;
+      r = await fetchImpl(`${supabaseUrl}/storage/v1/object/authenticated/${BUCKET}/${enc}`, { headers: { ...admin }, redirect: 'error', signal: AbortSignal.timeout(I.timeoutMs) });
+    } catch { return { status: 502 }; }
+    const skip = () => { try { if (r.body && r.body.cancel) r.body.cancel().catch(() => {}); } catch { /* 그대로 */ } };
+    // 없는 파일: Storage는 400(본문 statusCode 404)이나 404로 답함. 너무 큰 파일도 공개하지 않는 것이라 404
+    if (r.status === 400 || r.status === 404) { skip(); return { status: 404 }; }
+    if (!r.ok) { skip(); return { status: 502 }; }
+    const type = String(r.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    if (!IMG_TYPES.has(type)) { skip(); return { status: 502 }; }
+    if (Number(r.headers.get('content-length') || 0) > max) { skip(); return { status: 404 }; }
+    let body;
+    try { body = Buffer.from(await r.arrayBuffer()); } catch { return { status: 502 }; }
+    return body.length && body.length <= max ? { status: 200, type, body } : { status: 404 };
+  }
+  // 저장소에서 동시에 받는 수를 maxFetches로 묶음. 자리가 없으면 줄 서고(끝난 요청이 자리를 바로 넘김), 줄도 차면 { status: 503 }
+  async function withFetchSlot(job) {
+    if (fetching < I.maxFetches) fetching++;
+    else if (waiting.length >= I.maxWaiting) return { status: 503 };
+    else await new Promise((resolve) => waiting.push(resolve));
+    try { return await job(); } finally {
+      const next = waiting.shift();
+      if (next) next(); else fetching--;
+    }
+  }
+  // 사진 하나: 메모리 캐시(썸네일 10분·큰 사진 2분) → 같은 경로를 받는 중이면 그것을 같이 기다림 → 자리를 얻어 저장소에서 받기
+  async function loadImage(p) {
+    const thumb = /^[^/]+\/t\//.test(p);
+    const lru = thumb ? imgCache : largeCache;
+    const hit = lru.get(p, now());
+    if (hit) return hit;
+    if (imgInflight.has(p)) return imgInflight.get(p);
+    const job = (async () => {
+      const got = await withFetchSlot(() => fetchImage(p, thumb ? I.thumbMax : I.largeMax));
+      if (got.status === 200) lru.set(p, got, got.body.length + p.length + 128, now() + (thumb ? I.cacheMs : I.largeCacheMs));
+      return got;
+    })();
+    imgInflight.set(p, job);
+    try { return await job; } finally { imgInflight.delete(p); }
+  }
+  // 사진 바이트: IP 횟수 → 서명·만료 확인 → 전체 횟수 → 저장소에서 받아 종류·길이·캐시만 붙여 넘김(Last-Modified·ETag 같은 저장소 헤더는 버림).
+  // <img>라 로그인 토큰이 없다(주소는 로그인한 사람에게만 서명해 줌). 다 된 요청은 로그를 남기지 않음(방 하나에 수십 장)
+  async function handleImage(req, res, m) {
+    if (req.method !== 'GET') return send(res, 405, { error: PMSG.method }, { allow: 'GET' });
+    if (!isReady()) return send(res, 503, { error: PMSG.down }, { 'retry-after': '60' });
+    if (!photos) return send(res, 503, { error: PMSG.photosOff });
+    const gi = imgIpLim(ipKey(clientIp(req)));
+    if (!gi.ok) { log('public img limited:ip'); return send(res, 429, { error: PMSG.tooMany }, { 'retry-after': String(gi.retryAfter) }); }
+    const exp = Number(m[1]);
+    const p = m[3];
+    const want = Buffer.from(imgMac(exp, p));
+    const got = Buffer.from(m[2]);
+    if (!PATH_RE.test(p) || got.length !== want.length || !crypto.timingSafeEqual(got, want)) { log('public img 404'); return send(res, 404, { error: PMSG.photoGone }); }
+    if (exp <= Math.floor(now() / 1000)) { log('public img expired'); return send(res, 404, { error: PMSG.photoGone }); }
+    const ga = imgAllLim('all');
+    if (!ga.ok) { log('public img limited:global'); return send(res, 429, { error: PMSG.tooMany }, { 'retry-after': String(ga.retryAfter) }); }
+    const img = await loadImage(p);
+    if (img.status !== 200) {
+      const gone = img.status === 404;
+      const busy = img.status === 503;
+      log(`public img ${gone ? '404' : busy ? 'busy' : 'fail'}`);
+      return send(res, img.status, { error: gone ? PMSG.photoGone : busy ? PMSG.tooMany : PMSG.down }, busy ? { 'retry-after': '5' } : {});
+    }
+    // max-age는 주소 수명 전체(같은 주소는 같은 사진이라, 주소가 만료된 뒤 화면을 다시 그려도 브라우저 캐시로 보이게)
+    const maxAge = /^[^/]+\/t\//.test(p) ? S.thumbSec : S.largeSec;
+    res.writeHead(200, {
+      'content-type': img.type, 'content-length': img.body.length, 'cache-control': `private, max-age=${maxAge}`,
+      'x-content-type-options': 'nosniff', 'x-robots-tag': 'noindex, nofollow', 'referrer-policy': 'no-referrer',
+      'cross-origin-resource-policy': 'same-origin', 'content-security-policy': "default-src 'none'; sandbox",
+    });
+    res.end(img.body);
   }
 
   // 썸네일 서명과 세기: 이 사람이 오늘 이미 받은 썸네일은 세지 않고 다시 주고, 처음 받는 것은 남은 한도만큼만(순서대로).
@@ -530,7 +616,7 @@ function createPublicApi({
     const fresh = paths.filter((p) => !budget.isSeen(uid, p));
     const take = new Set(fresh.slice(0, budget.thumbsAllowed(uid)));
     const toSign = paths.filter((p) => take.has(p) || !fresh.includes(p));
-    const urls = toSign.length ? await signThumbs(toSign) : new Map();
+    const urls = toSign.length ? signThumbs(toSign) : new Map();
     budget.addThumbs(uid, [...take].filter((p) => urls.has(p)));
     return { urls, paused: take.size < fresh.length };
   }
@@ -544,6 +630,8 @@ function createPublicApi({
 
   async function handle(req, res) {
     const url = new URL(req.url || '/', 'http://localhost');
+    const im = IMG_RE.exec(url.pathname);
+    if (im) return handleImage(req, res, im);
     const route = ROUTE_RE.exec(url.pathname);
     const kind = !route ? '' : !route[1] ? 'list' : route[2] === '/photo' ? 'photo' : route[2] === '/thumbs' ? 'thumbs' : 'room';
     const head = req.method === 'HEAD';
@@ -623,11 +711,9 @@ function createPublicApi({
         log('public photo budget');
         return send(res, 429, { error: month ? PMSG.budgetMonth : PMSG.budgetDay, budget: true }, { 'retry-after': String(wait) });
       }
-      const signed = await signLarge(ph.path);
-      if (!signed) { log('public photo fail:sign'); return send(res, 502, { error: PMSG.down }); }
       budget.addLarge(uid);
       log('public photo ok');
-      return send(res, 200, { url: signed });
+      return send(res, 200, { url: signLarge(ph.path) });
     } catch {
       log(`public ${kind} fail:db`);
       return send(res, 502, { error: PMSG.down });
@@ -646,7 +732,7 @@ function createPublicApi({
     flush: () => budget.save(),
     close() { if (timer) clearInterval(timer); budget.save(); },
     budget,
-    clearCache() { cache.clear(); tokens.clear(); thumbCache.clear(); },
+    clearCache() { cache.clear(); tokens.clear(); thumbCache.clear(); imgCache.clear(); largeCache.clear(); },
   };
 }
 

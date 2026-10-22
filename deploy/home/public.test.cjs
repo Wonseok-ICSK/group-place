@@ -27,6 +27,11 @@ const placeId = (n) => `00000000-0000-4000-a000-${String(n).padStart(12, '0')}`;
 const fname = (i, j) => `${String(i).padStart(4, '0')}${String(j).padStart(4, '0')}`.padEnd(32, 'a');
 const photoOf = (i, j) => `${placeId(i)}/${fname(i, j)}.jpg`;
 const thumbOf = (i, j) => `${placeId(i)}/t/${fname(i, j)}.jpg`;
+const UPLOADED = 'Sat, 05 Sep 2026 10:11:12 GMT'; // 가짜 Storage의 Last-Modified(업로드 시각): 공개 응답에 나오면 안 됨
+// 서버가 주는 사진 주소: /api/public/img/<만료 초>.<HMAC 43자>/<경로>
+const IMG_URL_RE = /^\/api\/public\/img\/(\d{10})\.([A-Za-z0-9_-]{43})\/(.+)$/;
+const imgPath = (u) => (IMG_URL_RE.exec(String(u || '')) || [])[3] || null;
+const imgExp = (u) => Number((IMG_URL_RE.exec(String(u || '')) || [])[1] || 0);
 
 // 공개 방 JSON (public_room_view 모양). SQL이 실수로 넣었다고 치는 키(초대 코드·uuid·찜·이메일)를 섞어 둔다
 function makeRoom({ key = KEY, places = 2, photosPer = 2, thumbs = true, leak = true } = {}) {
@@ -71,7 +76,7 @@ function fakeRes() {
 
 // ---------- 가짜 Supabase ----------
 function fakeSupabase({ over = {} } = {}) {
-  const db = { users: new Set([U1, U2]), rooms: new Map([[KEY, makeRoom()]]), list: [listRow(KEY)], seq: 0 };
+  const db = { users: new Set([U1, U2]), rooms: new Map([[KEY, makeRoom()]]), list: [listRow(KEY)], missing: new Set() };
   const calls = [];
   const isAdmin = (h) => h.apikey === SECRET && h.authorization === `Bearer ${SECRET}`;
   const deny = { status: 401, body: { message: 'Invalid API key' } };
@@ -85,14 +90,13 @@ function fakeSupabase({ over = {} } = {}) {
     },
     'POST /rest/v1/rpc/public_room_list': (c) => (isAdmin(c.headers) ? { status: 200, body: db.list } : deny),
     'POST /rest/v1/rpc/public_room_view': (c) => (isAdmin(c.headers) ? { status: 200, body: db.rooms.get(c.body.p_key) ?? null } : deny),
-    'POST /storage/v1/object/sign/place-photos': (c) => {
+    // 사진 바이트: Storage처럼 Last-Modified(업로드 시각)·ETag를 붙여 줌 → 서버가 버려야 함. 없는 파일은 Storage처럼 400
+    'GET /storage/v1/object/authenticated/place-photos/:path': (c) => {
       if (!isAdmin(c.headers)) return deny;
-      db.seq++;
-      return { status: 200, body: c.body.paths.map((p) => ({ error: null, path: p, signedURL: `/object/sign/place-photos/${p}?token=t${db.seq}` })) };
-    },
-    'POST /storage/v1/object/sign/place-photos/:path': (c) => {
-      if (!isAdmin(c.headers)) return deny;
-      return { status: 200, body: { signedURL: `${c.path.replace('/storage/v1', '')}?token=big${c.body.expiresIn}` } };
+      const p = decodeURIComponent(c.path.slice('/storage/v1/object/authenticated/place-photos/'.length));
+      if (db.missing.has(p)) return { status: 400, body: { statusCode: '404', error: 'not_found', message: 'Object not found' } };
+      const bytes = Buffer.from(`jpeg:${p}`);
+      return { status: 200, bytes, headers: { 'content-type': 'image/jpeg', 'content-length': String(bytes.length), 'last-modified': UPLOADED, etag: '"e1"', 'cache-control': 'max-age=3600' } };
     },
   };
   async function fetchImpl(url, init = {}) {
@@ -103,13 +107,20 @@ function fakeSupabase({ over = {} } = {}) {
     const c = { method, path: u.pathname + u.search, headers: init.headers || {}, body: init.body ? JSON.parse(init.body) : undefined };
     calls.push(c);
     let key = `${method} ${u.pathname}`;
-    if (u.pathname.startsWith('/storage/v1/object/sign/place-photos/')) key = 'POST /storage/v1/object/sign/place-photos/:path';
+    if (u.pathname.startsWith('/storage/v1/object/authenticated/place-photos/')) key = `${method} /storage/v1/object/authenticated/place-photos/:path`;
     const h = over[key] || routes[key];
     if (!h) return respond({ status: 404, body: { message: 'no route' } });
     return respond(await h(c, db));
   }
   function respond(out) {
-    return { ok: out.status >= 200 && out.status < 300, status: out.status, text: async () => (out.body === undefined ? '' : JSON.stringify(out.body)) };
+    const h = Object.fromEntries(Object.entries(out.headers || {}).map(([k, v]) => [k.toLowerCase(), String(v)]));
+    const bytes = out.bytes !== undefined ? Buffer.from(out.bytes) : Buffer.from(out.body === undefined ? '' : JSON.stringify(out.body));
+    return {
+      ok: out.status >= 200 && out.status < 300, status: out.status,
+      headers: { get: (k) => h[String(k).toLowerCase()] ?? null },
+      text: async () => bytes.toString(),
+      arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length),
+    };
   }
   const count = (prefix) => calls.filter((c) => `${c.method} ${c.path}`.startsWith(prefix)).length;
   return { db, calls, fetchImpl, count };
@@ -195,6 +206,7 @@ test('S3 방 120초·목록 60초 캐시, 지나면 다시 부름. 헤더 privat
   const r = await get(ROOM_URL);
   assert.equal(r.status, 200);
   assert.equal(r.headers['cache-control'], 'private, max-age=60');
+  assert.equal(r.headers.vary, 'Authorization');
   assert.equal(r.headers['x-robots-tag'], 'noindex, nofollow');
   assert.equal(r.headers['content-type'], 'application/json; charset=utf-8');
   assert.equal(r.headers['x-content-type-options'], 'nosniff');
@@ -229,7 +241,7 @@ test('S3 방 120초·목록 60초 캐시, 지나면 다시 부름. 헤더 privat
 
 test('준비 전(secret key 확인 전)은 503 + retry-after, HEAD는 본문 없이', async () => {
   let ready = false;
-  const { get, sb } = setup({ opts: { isReady: () => ready } });
+  const { get, sb, api } = setup({ opts: { isReady: () => ready } });
   const r = await get('/api/public/rooms');
   assert.equal(r.status, 503);
   assert.equal(r.headers['retry-after'], '60');
@@ -240,7 +252,7 @@ test('준비 전(secret key 확인 전)은 503 + retry-after, HEAD는 본문 없
   assert.equal(h.text, '');
   const hv = await get(ROOM_URL, { method: 'HEAD' });
   assert.equal(hv.status, 200);
-  assert.equal(sb.count('POST /storage'), 0, 'HEAD는 사진을 서명하지 않음');
+  assert.equal(api.budget.snapshot().thumbs, 0, 'HEAD는 사진 주소를 주지 않음(한도 안 씀)');
 });
 
 // ---------- S4 횟수 제한 ----------
@@ -285,38 +297,215 @@ test('S4 전체 제한: 공개 API 합쳐 분당 300, 301번째 429', async () =
   assert.equal(r.status, 429);
 });
 
-// ---------- S5 썸네일 서명 ----------
-test('S5 썸네일: 방 응답은 장소마다 대표 하나만, 한 번에 묶어 서명(100개씩), 30분 이상 남은 URL은 다시 씀, 응답에 저장소 경로 키가 없음', async () => {
+// ---------- S5 썸네일 주소 ----------
+test('S5 썸네일: 방 응답은 장소마다 대표 하나만, 이 서버의 1시간 서명 주소(저장소에 묻지 않음), 30분 이상 남은 주소는 다시 씀, 응답에 저장소 경로 키가 없음', async () => {
   const { get, sb, t } = setup({ opts: { budget: { userThumbs: 1000, dayThumbs: 1000 } } });
   sb.db.rooms.set(KEY, makeRoom({ places: 120, photosPer: 3 })); // 대표 썸네일 120개 (2·3번째는 상세에서)
   const r = await get(ROOM_URL);
   assert.equal(r.status, 200);
-  const signs = sb.calls.filter((c) => c.path === '/storage/v1/object/sign/place-photos');
-  assert.deepEqual(signs.map((c) => c.body.paths.length), [100, 20]);
-  assert.ok(signs.every((c) => c.body.expiresIn === 3600 && c.headers.apikey === SECRET));
-  assert.ok(signs.flatMap((c) => c.body.paths).every((x, i) => x === thumbOf(i + 1, 0)), '대표(첫) 썸네일만 서명');
+  assert.equal(sb.count('POST /storage') + sb.count('GET /storage'), 0, '서명은 서버 안에서');
   const urls = r.json.places.map((p) => p.photos[0].thumb_url);
   assert.equal(urls.length, 120);
-  assert.ok(urls.every((u) => u.startsWith(`${SUPA}/storage/v1/object/sign/place-photos/`) && u.includes('/t/')));
+  assert.ok(urls.every((u, i) => imgPath(u) === thumbOf(i + 1, 0)), '대표(첫) 썸네일만, 이 서버 주소로');
+  assert.ok(urls.every((u) => imgExp(u) === Math.floor(T0 / 1000) + 3600));
+  assert.ok(!r.text.includes(SUPA) && !r.text.includes('/storage/v1/'), 'Supabase 주소는 보내지 않음');
   assert.ok(r.json.places.every((p) => p.photos.length === 3 && p.photos[1].thumb_url === null && p.photos[2].thumb_url === null));
   assert.equal(r.json.photos_paused, false);
   for (const p of r.json.places) for (const ph of p.photos) assert.deepEqual(keys(ph), ['thumb_url']);
   assert.ok(!/"(path|thumb)"/.test(r.text));
   assert.ok(!r.text.includes(photoOf(1, 0)), '큰 사진 경로는 보내지 않음');
-  // 31분 뒤(방 캐시는 지남): 남은 시간 29분이라 다시 서명. 그 전(10분 뒤)은 다시 씀
-  const n = signs.length;
+  // 10분 뒤(방 캐시는 지남): 같은 주소(브라우저 캐시가 맞게). 31분 뒤: 남은 시간 29분이라 새 주소
   t.now += 10 * 60_000;
-  await get(ROOM_URL, { token: tokenOf(U2) });
-  assert.equal(sb.calls.filter((c) => c.path === '/storage/v1/object/sign/place-photos').length, n, '서명 다시 씀');
+  const r2 = await get(ROOM_URL, { token: tokenOf(U2) });
+  assert.deepEqual(r2.json.places.map((p) => p.photos[0].thumb_url), urls, '주소 다시 씀');
   t.now += 21 * 60_000;
-  await get(ROOM_URL, { token: tokenOf(U2) });
-  assert.equal(sb.calls.filter((c) => c.path === '/storage/v1/object/sign/place-photos').length, n + 2);
-  // 서명이 실패하면 썸네일만 null (글은 그대로)
-  const bad = setup({ over: { 'POST /storage/v1/object/sign/place-photos': () => ({ status: 500, body: {} }) } });
-  const b = await bad.get(ROOM_URL);
-  assert.equal(b.status, 200);
-  assert.ok(b.json.places.every((p) => p.photos.every((ph) => ph.thumb_url === null)));
-  assert.ok(bad.logs.includes('public sign fail'));
+  const r3 = await get(ROOM_URL, { token: tokenOf(U2) });
+  const urls3 = r3.json.places.map((p) => p.photos[0].thumb_url);
+  assert.ok(urls3.every((u, i) => u !== urls[i] && imgPath(u) === thumbOf(i + 1, 0) && imgExp(u) === Math.floor(t.now / 1000) + 3600));
+});
+
+// ---------- S5b 사진 넘기기 (/api/public/img) ----------
+test('S5b 사진: 서명 주소로 받으면 내용 종류·길이만 붙여 넘김(Last-Modified·ETag 없음), 로그인 토큰 없이, secret key로 저장소에서 받음', async () => {
+  const { get, sb, api, t } = setup();
+  const room = await get(ROOM_URL);
+  const thumb = room.json.places[0].photos[0].thumb_url;
+  const r = await get(thumb, { token: '' }); // <img>는 Authorization을 못 보냄
+  assert.equal(r.status, 200);
+  assert.equal(r.text, `jpeg:${thumbOf(1, 0)}`);
+  assert.equal(r.headers['content-type'], 'image/jpeg');
+  assert.equal(r.headers['content-length'], Buffer.byteLength(`jpeg:${thumbOf(1, 0)}`));
+  assert.equal(r.headers['cache-control'], 'private, max-age=3600');
+  assert.equal(r.headers['x-content-type-options'], 'nosniff');
+  assert.equal(r.headers['cross-origin-resource-policy'], 'same-origin');
+  assert.equal(r.headers['x-robots-tag'], 'noindex, nofollow');
+  for (const h of ['last-modified', 'etag', 'vary', 'date', 'age']) assert.equal(r.headers[h], undefined, `${h} 없음`);
+  assert.ok(!JSON.stringify(r.headers).includes('2026'), '업로드 시각이 헤더 어디에도 없음');
+  const fetched = sb.calls.filter((c) => c.path.startsWith('/storage/v1/object/authenticated/place-photos/'));
+  assert.equal(fetched.length, 1);
+  assert.equal(fetched[0].path, `/storage/v1/object/authenticated/place-photos/${thumbOf(1, 0)}`);
+  assert.equal(fetched[0].headers.apikey, SECRET);
+  // 썸네일은 10분 메모리 캐시: 다시 받아도 저장소에 한 번만. 한도는 주소를 줄 때만 셈(사진 받기로는 안 셈)
+  const before = api.budget.snapshot();
+  await get(thumb, { token: '' });
+  assert.equal(sb.calls.filter((c) => c.path.startsWith('/storage/v1/object/authenticated/')).length, 1);
+  assert.deepEqual(api.budget.snapshot(), before);
+  // 큰 사진: 메모리에 2분, max-age는 주소 수명 10분
+  const big = await get(`${ROOM_URL}/photo?place=${placeId(1)}&i=0`);
+  const b1 = await get(big.json.url, { token: '' });
+  assert.equal(b1.status, 200);
+  assert.equal(b1.headers['cache-control'], 'private, max-age=600');
+  assert.equal(b1.headers['last-modified'], undefined);
+  await get(big.json.url, { token: '' });
+  const bigFetches = () => sb.calls.filter((c) => c.path === `/storage/v1/object/authenticated/place-photos/${photoOf(1, 0)}`).length;
+  assert.equal(bigFetches(), 1, '2분 안에는 다시 받지 않음');
+  t.now += 121_000;
+  assert.equal((await get(big.json.url, { token: '' })).status, 200);
+  assert.equal(bigFetches(), 2);
+  // max-age는 남은 시간이 아니라 주소 수명 전체(주소가 만료된 뒤 화면을 다시 그려도 브라우저 캐시로 보이게)
+  t.now += 29 * 60_000;
+  assert.equal((await get(thumb, { token: '' })).headers['cache-control'], 'private, max-age=3600');
+  // HEAD·POST는 405
+  const h = await get(thumb, { method: 'HEAD' });
+  assert.equal(h.status, 405);
+  assert.equal(h.headers.allow, 'GET');
+});
+
+test('S5c 사진 주소 확인: 서명·경로를 바꾸면 404, 만료 지나면 404, 없는 파일 404, 큰 파일·이상한 종류는 안 넘김, 사진 끔 503, IP 횟수 제한', async () => {
+  const { get, sb, t, logs } = setup({ opts: { rate: { img: 5 } } });
+  const room = await get(ROOM_URL);
+  const thumb = room.json.places[0].photos[0].thumb_url;
+  const other = room.json.places[1].photos[0].thumb_url;
+  const [, exp, mac] = IMG_URL_RE.exec(thumb);
+  const flip = (s) => (s[0] === 'A' ? 'B' : 'A') + s.slice(1);
+  const bad = [
+    `/api/public/img/${exp}.${flip(mac)}/${thumbOf(1, 0)}`, // 서명 바꿈
+    `/api/public/img/${Number(exp) + 3600}.${mac}/${thumbOf(1, 0)}`, // 만료를 늘림
+    `/api/public/img/${exp}.${mac}/${thumbOf(2, 0)}`, // 같은 서명으로 다른 사진
+    `/api/public/img/${exp}.${mac}/${photoOf(1, 0)}`, // 썸네일 서명으로 큰 사진
+    `/api/public/img/${exp}.${mac}/..%2F..%2Fetc%2Fpasswd`,
+  ];
+  for (const u of bad) {
+    const r = await get(u, { token: '' });
+    assert.equal(r.status, 404, u);
+    assert.equal(r.json.error, P.PMSG.photoGone);
+  }
+  assert.equal(sb.count('GET /storage'), 0, '서명이 틀리면 저장소에 안 감');
+  assert.ok(logs.includes('public img 404'));
+  // 형식이 아예 다른 주소는 그냥 404
+  assert.equal((await get('/api/public/img/123', { token: '' })).status, 404);
+  // IP 횟수: 5번(위 5번)을 썼으니 같은 IP는 429, 다른 IP는 됨
+  const lim = await get(thumb, { token: '' });
+  assert.equal(lim.status, 429);
+  assert.ok(Number(lim.headers['retry-after']) > 0);
+  assert.equal((await get(thumb, { token: '', ip: '198.51.100.9' })).status, 200);
+  // 만료: 1시간 지나면 404 (저장소에 안 감)
+  const n = sb.count('GET /storage');
+  t.now += 3601_000;
+  const ex = await get(other, { token: '', ip: '198.51.100.10' });
+  assert.equal(ex.status, 404);
+  assert.ok(logs.includes('public img expired'));
+  assert.equal(sb.count('GET /storage'), n);
+
+  // 없는 파일 404, 저장소 오류 502, 큰 파일·이상한 종류 안 넘김
+  const s2 = setup();
+  const room2 = await s2.get(ROOM_URL);
+  const [u1, u2] = room2.json.places.map((p) => p.photos[0].thumb_url);
+  s2.sb.db.missing.add(thumbOf(1, 0));
+  assert.equal((await s2.get(u1, { token: '' })).status, 404);
+  const down = setup({ over: { 'GET /storage/v1/object/authenticated/place-photos/:path': () => ({ status: 500, body: {} }) } });
+  const d = await down.get((await down.get(ROOM_URL)).json.places[0].photos[0].thumb_url, { token: '' });
+  assert.equal(d.status, 502);
+  assert.equal(d.json.error, P.PMSG.down);
+  const huge = setup({ over: { 'GET /storage/v1/object/authenticated/place-photos/:path': () => ({ status: 200, bytes: Buffer.alloc(150_001), headers: { 'content-type': 'image/jpeg' } }) } });
+  assert.equal((await huge.get((await huge.get(ROOM_URL)).json.places[0].photos[0].thumb_url, { token: '' })).status, 404, '썸네일 150KB 넘음');
+  const svg = setup({ over: { 'GET /storage/v1/object/authenticated/place-photos/:path': () => ({ status: 200, bytes: Buffer.from('<svg/>'), headers: { 'content-type': 'image/svg+xml' } }) } });
+  assert.equal((await svg.get((await svg.get(ROOM_URL)).json.places[0].photos[0].thumb_url, { token: '' })).status, 502, '사진 종류만');
+  assert.equal((await s2.get(u2, { token: '' })).status, 200);
+  // 사진 끔이면 주소가 맞아도 503
+  const off = setup({ opts: { photos: false } });
+  const o = await off.get(u2, { token: '' });
+  assert.equal(o.status, 503);
+  assert.equal(o.json.error, P.PMSG.photosOff);
+});
+
+test('횟수 제한기: 키가 수만 개여도 요청 한 번이 빠름(모든 키를 훑지 않음), 키·전체 한도와 창, refund는 그대로', () => {
+  const { createLimiter } = require('./signup.cjs');
+  const t = { now: T0 };
+  const lim = createLimiter({ perIp: 2, total: Infinity, windowMs: 60_000, now: () => t.now });
+  for (let i = 0; i < 30_000; i++) assert.ok(lim(`k${i}`).ok);
+  const start = process.hrtime.bigint();
+  for (let i = 0; i < 3000; i++) lim(`x${i}`);
+  const ms = Number(process.hrtime.bigint() - start) / 1e6;
+  assert.ok(ms < 1000, `3000번에 ${ms.toFixed(0)}ms (예전처럼 매번 전체를 훑으면 수 초)`);
+  assert.ok(lim('k1').ok);
+  const no = lim('k1');
+  assert.equal(no.ok, false);
+  assert.equal(no.scope, 'ip');
+  assert.equal(no.retryAfter, 60);
+  t.now += 30_000;
+  assert.equal(lim('k1').ok, false);
+  t.now += 30_000; // 창(60초)이 지남
+  assert.ok(lim('k1').ok);
+  // 전체 한도 + refund
+  const g = createLimiter({ perIp: 10, total: 2, windowMs: 60_000, now: () => t.now });
+  const a = g('a');
+  assert.ok(a.ok && g('b').ok);
+  assert.equal(g('c').scope, 'global');
+  a.refund();
+  a.refund(); // 두 번 돌려줘도 한 번만
+  assert.ok(g('c').ok);
+  assert.equal(g('d').ok, false);
+  t.now += 60_000;
+  assert.ok(g('d').ok);
+});
+
+test('S5d 사진: 위조 주소는 전체 몫을 안 씀, 같은 사진을 동시에 받으면 저장소에 한 번, 동시에 받는 수 상한·줄이 차면 503, 사이트 주소를 붙임', async () => {
+  // 위조 요청이 많아도(IP마다 따로) 전체 몫(imgTotal)은 서명·만료가 맞은 요청만 셈
+  const a = setup({ opts: { rate: { img: 1000, imgTotal: 3 } } });
+  const good = (await a.get(ROOM_URL)).json.places[0].photos[0].thumb_url;
+  const [, exp] = IMG_URL_RE.exec(good);
+  for (let i = 0; i < 20; i++) {
+    assert.equal((await a.get(`/api/public/img/${exp}.${'A'.repeat(43)}/${thumbOf(1, 0)}`, { token: '', ip: `10.3.0.${i}` })).status, 404);
+  }
+  for (let i = 0; i < 3; i++) assert.equal((await a.get(good, { token: '', ip: `10.4.0.${i}` })).status, 200, '위조 20번 뒤에도 됨');
+  const full = await a.get(good, { token: '', ip: '10.4.0.9' });
+  assert.equal(full.status, 429, '서명이 맞은 요청은 전체 몫을 씀');
+  assert.ok(a.logs.includes('public img limited:global'));
+
+  // 같은 큰 사진을 동시에 50번: 저장소에는 한 번(버퍼도 하나)
+  let open = null;
+  const gate = new Promise((r) => { open = r; });
+  const slow = async () => { await gate; return { status: 200, bytes: Buffer.alloc(1000), headers: { 'content-type': 'image/jpeg' } }; };
+  const b = setup({ over: { 'GET /storage/v1/object/authenticated/place-photos/:path': slow } });
+  await b.get(ROOM_URL);
+  const big = (await b.get(`${ROOM_URL}/photo?place=${placeId(1)}&i=0`)).json.url;
+  const many = Array.from({ length: 50 }, (_, i) => b.get(big, { token: '', ip: `10.5.0.${i}` }));
+  open();
+  assert.ok((await Promise.all(many)).every((r) => r.status === 200));
+  assert.equal(b.sb.count('GET /storage'), 1);
+
+  // 서로 다른 사진 4장: 동시에 2장까지 받고 1장은 줄, 넷째는 바로 503(retry-after)
+  let open2 = null;
+  const gate2 = new Promise((r) => { open2 = r; });
+  const slow2 = async () => { await gate2; return { status: 200, bytes: Buffer.alloc(1000), headers: { 'content-type': 'image/jpeg' } }; };
+  const c = setup({ opts: { img: { maxFetches: 2, maxWaiting: 1 } }, over: { 'GET /storage/v1/object/authenticated/place-photos/:path': slow2 } });
+  c.sb.db.rooms.set(KEY, makeRoom({ places: 4, photosPer: 1 }));
+  const urls = (await c.get(ROOM_URL)).json.places.map((p) => p.photos[0].thumb_url);
+  const ps = urls.map((u, i) => c.get(u, { token: '', ip: `10.6.0.${i}` }));
+  const fourth = await ps[3];
+  assert.equal(fourth.status, 503);
+  assert.equal(fourth.headers['retry-after'], '5');
+  assert.equal(c.sb.count('GET /storage'), 2, '줄 선 셋째는 아직 안 받음');
+  open2();
+  assert.deepEqual((await Promise.all(ps.slice(0, 3))).map((r) => r.status), [200, 200, 200]);
+  assert.equal(c.sb.count('GET /storage'), 3);
+  assert.ok(c.logs.includes('public img busy'));
+
+  // 사이트 주소를 붙이면 https://<사이트>/api/public/img/…, 받는 길은 같음
+  const d = setup({ opts: { publicOrigin: 'https://places.example.com/' } });
+  const du = (await d.get(ROOM_URL)).json.places[0].photos[0].thumb_url;
+  assert.ok(du.startsWith('https://places.example.com/api/public/img/'), du);
+  assert.equal((await d.get(new URL(du).pathname, { token: '' })).status, 200);
 });
 
 // ---------- S6 허용 목록 ----------
@@ -453,7 +642,7 @@ test('S7 월 추정 바이트 한도, 큰 사진 사람마다 한도(429 budget 
   const ol = await off.get(url);
   assert.equal(ol.status, 503);
   assert.equal(ol.json.error, P.PMSG.photosOff);
-  assert.equal(off.sb.count('POST /storage'), 0);
+  assert.ok(!o.text.includes('/api/public/img/') && !ol.text.includes('/api/public/img/'));
 });
 
 test('S7 하루 큰 사진 전체 한도', async () => {
@@ -577,16 +766,17 @@ test('S8 깨진 파일은 로그 한 줄 + 그날은 반만 남은 것으로 시
 });
 
 // ---------- S9 큰 사진 ----------
-test('S9 큰 사진: 캐시한 방에서 경로를 찾아 10분 서명, 없는 장소·범위 밖 404, 형식 틀리면 400', async () => {
-  const { get, sb } = setup();
+test('S9 큰 사진: 캐시한 방에서 경로를 찾아 10분 서명 주소, 없는 장소·범위 밖 404, 형식 틀리면 400', async () => {
+  const { get, sb, api } = setup();
   await get(ROOM_URL);
   const r = await get(`${ROOM_URL}/photo?place=${placeId(2)}&i=1`);
   assert.equal(r.status, 200);
   assert.deepEqual(keys(r.json), ['url']);
-  assert.equal(r.json.url, `${SUPA}/storage/v1/object/sign/place-photos/${photoOf(2, 1)}?token=big600`);
+  assert.equal(imgPath(r.json.url), photoOf(2, 1));
+  assert.equal(imgExp(r.json.url), Math.floor(T0 / 1000) + 600);
   assert.equal(sb.count('POST /rest/v1/rpc/public_room_view'), 1, '캐시한 방에서 찾음');
-  const sign = sb.calls.find((c) => c.path === `/storage/v1/object/sign/place-photos/${photoOf(2, 1)}`);
-  assert.deepEqual(sign.body, { expiresIn: 600 });
+  assert.equal(sb.count('POST /storage') + sb.count('GET /storage'), 0, '주소를 줄 때는 저장소에 안 감');
+  assert.equal(api.budget.snapshot().large, 1);
   assert.equal((await get(`${ROOM_URL}/photo?place=${placeId(9)}&i=0`)).status, 404);
   const outOfRange = await get(`${ROOM_URL}/photo?place=${placeId(1)}&i=2`);
   assert.equal(outOfRange.status, 404);
@@ -595,10 +785,7 @@ test('S9 큰 사진: 캐시한 방에서 경로를 찾아 10분 서명, 없는 �
     assert.equal((await get(`${ROOM_URL}/photo?${q}`)).status, 400, q);
   }
   assert.equal((await get(`/api/public/rooms/${KEY2}/photo?place=${placeId(1)}&i=0`)).status, 404, '없는 방');
-  // 서명 실패 502, 한도는 쓰지 않음
-  const bad = setup({ over: { 'POST /storage/v1/object/sign/place-photos/:path': () => ({ status: 500, body: {} }) } });
-  assert.equal((await bad.get(`${ROOM_URL}/photo?place=${placeId(1)}&i=0`)).status, 502);
-  assert.equal(bad.api.budget.snapshot().large, 0);
+  assert.equal(api.budget.snapshot().large, 1, '못 준 것은 세지 않음');
 });
 
 // ---------- S10 로그인 없이 (나중을 위한 자리) ----------
@@ -610,7 +797,7 @@ test('S10 allowAnonymous: 토큰 없이 목록·방(IP 제한만, 썸네일 없�
   assert.equal(r.status, 200);
   assert.ok(r.json.places.every((p) => p.photos.every((ph) => ph.thumb_url === null)));
   assert.equal(r.json.photos_paused, true);
-  assert.equal(sb.count('POST /storage'), 0);
+  assert.ok(!r.text.includes('/api/public/img/'));
   assert.equal(sb.count('GET /auth'), 0);
   const p = await get(`${ROOM_URL}/photo?place=${placeId(1)}&i=0`, { token: '' });
   assert.equal(p.status, 401);
@@ -667,7 +854,7 @@ test('썸네일 /thumbs: 상세를 열 때 그 장소의 3장, 대표는 다시 
   assert.equal(r.status, 200);
   assert.deepEqual(keys(r.json), ['photos_paused', 'thumbs', 'v']);
   assert.equal(r.json.thumbs.length, 3);
-  assert.ok(r.json.thumbs.every((u) => u && u.includes('/t/')));
+  assert.deepEqual(r.json.thumbs.map(imgPath), [0, 1, 2].map((j) => thumbOf(1, j)));
   assert.equal(r.json.photos_paused, false);
   assert.equal(r.headers['cache-control'], 'private, max-age=60');
   assert.equal(api.budget.snapshot().thumbs, 4, '대표는 이미 셌으니 2·3번째만');
@@ -691,7 +878,6 @@ test('썸네일 /thumbs: 상세를 열 때 그 장소의 3장, 대표는 다시 
   const off = setup({ opts: { photos: false } });
   const o = await off.get(url);
   assert.deepEqual(o.json, { v: 1, thumbs: [null, null], photos_paused: true });
-  assert.equal(off.sb.count('POST /storage'), 0);
 });
 
 test('사진 파일 이름이 무작위가 아니면(업로드 시각 Date.now) 서명하지 않음, 큰 사진 경로에 썸네일 폴더를 넣어도 버림', async () => {
@@ -705,14 +891,14 @@ test('사진 파일 이름이 무작위가 아니면(업로드 시각 Date.now) 
   assert.ok(!r.text.includes('1729580000000'));
   assert.equal((await get(`${ROOM_URL}/photo?place=${placeId(1)}&i=0`)).status, 404);
   assert.equal((await get(`${ROOM_URL}/photo?place=${placeId(2)}&i=0`)).status, 404);
-  assert.equal(sb.count('POST /storage'), 0);
+  assert.ok(!r.text.includes('/api/public/img/'));
   // randomUUID 모양 이름은 됨
   const uuidName = '0f8fad5b-d9cb-469f-a165-70867728950e';
   room.places[0].photos = [{ path: `${placeId(1)}/${uuidName}.jpg`, thumb: `${placeId(1)}/t/${uuidName}.jpg` }];
   const ok = setup();
   ok.sb.db.rooms.set(KEY, room);
   const o = await ok.get(ROOM_URL);
-  assert.ok(o.json.places[0].photos[0].thumb_url.includes(`/t/${uuidName}.jpg`));
+  assert.equal(imgPath(o.json.places[0].photos[0].thumb_url), `${placeId(1)}/t/${uuidName}.jpg`);
 });
 
 test('지도 링크는 아는 지도 주소만(네이버·구글·카카오), https로', async () => {

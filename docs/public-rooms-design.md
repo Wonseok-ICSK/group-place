@@ -326,8 +326,9 @@ RLS·표 권한은 넓히지 않는다. 이유(아이디어 문서 6장 그대�
 | `GET\|HEAD /r/<key>` (`^/r/[a-km-np-z2-9]{10}$`) | 지금 index.html(`/`과 같은 버퍼), `cache-control: no-cache`. 스위치와 상관없이 낸다(화면이 꺼짐 안내). 형식이 다른 `/r/...`은 404 |
 | `GET /api/public/rooms` | 목록 |
 | `GET /api/public/rooms/<key>` | 방 하나 (썸네일은 장소마다 대표 하나만) |
-| `GET /api/public/rooms/<key>/thumbs?place=<uuid>` | 장소 하나의 썸네일 서명 URL(최대 3장). 상세를 열 때 (GET만) |
-| `GET /api/public/rooms/<key>/photo?place=<uuid>&i=<0\|1\|2>` | 큰 사진 서명 URL 하나 (GET만) |
+| `GET /api/public/rooms/<key>/thumbs?place=<uuid>` | 장소 하나의 썸네일 사진 주소(최대 3장). 상세를 열 때 (GET만) |
+| `GET /api/public/rooms/<key>/photo?place=<uuid>&i=<0\|1\|2>` | 큰 사진 주소 하나 (GET만) |
+| `GET /api/public/img/<만료 초>.<서명>/<경로>` | 사진 바이트 (v0.2.1, 위 두 API가 준 주소). `<img>`라 로그인 토큰 없이, GET만. §3.6 |
 | 그 밖의 `/api/public/...`, GET 아닌 요청 | 404 / 405 JSON |
 
 모든 응답(정적 파일 포함)에 `x-robots-tag: noindex, nofollow`를 더한다(`SECURITY` 헤더). OG 태그는 지금처럼 일반 카드뿐(방 이름·사진을 넣지 않음).
@@ -372,7 +373,7 @@ RLS·표 권한은 넓히지 않는다. 이유(아이디어 문서 6장 그대�
   "categories": ["…"],
   "places": [{ "id", "name", "category", "address", "map_url", "status", "shared_note", "added_month", "added_by",
                "visits": [{ "month", "reviews": [{ "by", "rating", "body" }] }],
-               "photo_count", "photos": [{ "thumb_url": "<서명 URL>" | null }] }] }
+               "photo_count", "photos": [{ "thumb_url": "<사진 주소>" | null }] }] }
 ```
 - 서버는 SQL 결과를 **키 하나씩 새 객체로 옮겨 담는다**(`pickRoom`, `pickListItem`). 위에 없는 키는 SQL이 실수로 넣어도 버리고, 형식이 틀린 값(예: `m` 번호가 `^m[1-5]$`가 아님, 색이 팔레트 id·`#rrggbb`가 아님)은 그 값을 null로.
 - `photos`의 `path`·`thumb`(저장소 경로)는 화면에 보내지 않는다. **방 응답에는 장소마다 첫(대표) 썸네일만** `thumb_url`을 넣고 2·3번째는 늘 `null`
@@ -381,14 +382,14 @@ RLS·표 권한은 넓히지 않는다. 이유(아이디어 문서 6장 그대�
   `maps.app.goo.gl`, `goo.gl/maps…`, `google.<도메인>/maps…`·`maps.google.<도메인>`, `kko.to`, `map.kakao.com`·`place.map.kakao.com`·`m.map.kakao.com`.
   http·https만, 사용자 정보·포트가 있으면 안 됨, 2000자까지, https로 바꿔 보냄. 그 밖은 `null`(화면은 "네이버 지도에서 검색" 링크).
   개인 방은 멤버끼리 믿지만 공개 방은 모르는 사람에게 보이므로, 낚시 주소가 "네이버 지도에서 보기"로 보이거나 "내 방에 담기"로 남의 방에 들어가지 않게 한다. 화면 `publicMapUrl`도 같은 규칙(시험이 비교).
-- **사진 경로**는 `'<장소 uuid>/[t/]<randomUUID 또는 16진수 32자>.jpg'`만 서명한다. v0.1.2 화면(새로고침 안 한 탭)이 만드는 `'<장소>/<Date.now()>-<i>.jpg'`는 서명 URL에 업로드 시각이 드러나므로
+- **사진 경로**는 `'<장소 uuid>/[t/]<randomUUID 또는 16진수 32자>.jpg'`만 내보낸다. v0.1.2 화면(새로고침 안 한 탭)이 만드는 `'<장소>/<Date.now()>-<i>.jpg'`는 사진 주소에 업로드 시각이 드러나므로
   `null`(회색 자리), 큰 사진은 404. 큰 사진 경로에 `t/`가 있거나 썸네일 경로에 없으면 버린다.
 
-**`GET /api/public/rooms/<key>/thumbs?place=<uuid>`** → 200 `{ "v": 1, "thumbs": ["<서명 URL>" | null, …], "photos_paused": false }`
+**`GET /api/public/rooms/<key>/thumbs?place=<uuid>`** → 200 `{ "v": 1, "thumbs": ["<사진 주소>" | null, …], "photos_paused": false }`
 - `thumbs`는 그 장소 `photos`와 같은 길이(최대 3). 없는 방 404 `{ error: '이 공개 방을 찾을 수 없어요.' }`, 없는 장소 404 `{ error: '사진을 찾을 수 없어요.' }`.
 - 대표 썸네일은 방 응답에서 이미 셌으므로 다시 세지 않는다(§3.6). 한도가 차면 남은 것은 `null` + `photos_paused: true`.
 
-**`GET /api/public/rooms/<key>/photo?place=<uuid>&i=<n>`** → 200 `{ "url": "<10분 서명 URL>" }`
+**`GET /api/public/rooms/<key>/photo?place=<uuid>&i=<n>`** → 200 `{ "url": "<10분 사진 주소>" }`
 - 캐시한 방 JSON(없으면 RPC)에서 그 장소의 `photos[i].path`를 찾는다. 없으면 404 `{ error: '사진을 찾을 수 없어요.' }`.
 - 하루 한도가 찼으면 429 `{ error: '오늘은 사진 보기가 멈췄어요. 내일 다시 보여요.', budget: true }`(`Retry-After`는 KST 자정까지),
   월 추정 바이트가 찼으면 429 `{ error: '이번 달은 사진 보기가 멈췄어요. 다음 달에 다시 보여요.', budget: true }`(`Retry-After`는 다음 달 1일 0시 KST까지).
@@ -401,15 +402,26 @@ RLS·표 권한은 넓히지 않는다. 이유(아이디어 문서 6장 그대�
 - **캐시**(메모리 LRU): 방 JSON(서버 내부 모양, 경로 포함) 120초, 목록 60초, `null`(없는 방)도 120초. 크기는 항목마다 JSON 글자 수 + 키 길이 + 128로 세어
   합계 약 8MB, 그리고 **항목 2,000개까지**(로그인한 사람이 없는 키를 계속 물어도 없는 방 결과가 쌓이지 않게). 넘으면 오래 안 쓴 것부터 버림.
   관리자 숨기기는 `public.sh`가 서비스를 다시 시작해 비운다. SQL Editor로 바꾸면 최대 2분 뒤 반영.
-- **썸네일 서명**: `POST {SUPABASE_URL}/storage/v1/object/sign/place-photos` 본문 `{ "expiresIn": 3600, "paths": [...] }`(secret key). 응답의 `signedURL`(상대 경로) 앞에 `{SUPABASE_URL}/storage/v1`.
-  경로별로 `{ url, exp }`를 두고 남은 시간이 30분 이상이면 다시 씀(브라우저 캐시가 맞음). 한 번에 최대 100개씩.
-- **큰 사진 서명**: 누를 때만 `POST /storage/v1/object/sign/place-photos/<path>` `{ "expiresIn": 600 }`. 캐시하지 않음.
+- **사진 주소 서명**(v0.2.1): 서버가 `/api/public/img/<만료 초>.<서명>/<경로>`를 만들어 준다. 서명은 `HMAC-SHA256(키, "<만료 초>|<경로>")`의 base64url 43자이고,
+  키는 secret key에서 `HMAC-SHA256(secret key, "group-place public img v1")`로 뽑는다(다시 시작해도 같은 주소가 맞고, secret key는 주소에 안 들어감).
+  저장소에 묻지 않는다(파일이 있고 크기가 상한 안인 경로만 `public_room_view`가 줌). 썸네일은 1시간, 경로별로 `{ url, exp }`를 두고 남은 시간이 30분 이상이면
+  다시 씀(같은 주소라 브라우저 캐시가 맞음). 큰 사진은 누를 때마다 10분짜리.
+- **사진 넘기기** `GET /api/public/img/…`(v0.2.1): v0.2.0은 Supabase 서명 URL을 그대로 줬는데, Storage 응답의 `Last-Modified`·`ETag`에 업로드 시각이 초까지 드러나서
+  (대개 방문한 날) "날짜는 월까지만"이 지켜지지 않았다. 그래서 서버가 `GET {SUPABASE_URL}/storage/v1/object/authenticated/place-photos/<경로>`(secret key)로 받아
+  `content-type`(jpeg·png·webp만)·`content-length`·`cache-control: private, max-age=<주소 수명: 썸네일 3600·큰 사진 600>`·`nosniff`·
+  `cross-origin-resource-policy: same-origin`만 붙여 넘긴다.
+  순서: GET만(그 밖 405) → 준비 전·사진 끔 503 → IP 횟수(분당 600, 다른 공개 API 몫과 따로) → 서명·경로 형식(틀리면 404, 저장소에 안 감) → 만료(지나면 404)
+  → 전체 횟수(분당 3,000, 서명·만료가 맞은 요청만 셈: 로그인 없는 위조 주소로 모두의 사진을 막지 못하게) → 받기(없는 파일 404, 썸네일 150KB·큰 사진 2MB를 넘으면 404,
+  그 밖 실패 502). 메모리 캐시는 썸네일 10분(합계 16MB)·큰 사진 2분(합계 32MB), 같은 경로를 동시에 받으면 저장소에는 한 번만 묻는다.
+  저장소에서 동시에 받는 것은 8개까지이고 나머지는 300개까지 줄을 선다. 줄도 차면 503 + `Retry-After: 5`(버퍼가 한꺼번에 쌓여 서비스 MemoryMax 256M을 넘지 않게).
+  다 된 요청은 로그를 남기지 않는다(방 하나에 수십 장). 주소에는 사이트 주소(`PUBLIC_ORIGIN`)를 앞에 붙여 준다(배포 전에 열어 둔 v0.2.0 탭은 https 주소만 받으므로).
+  화면 `imgUrl`은 이 주소 모양(`PUBLIC_IMG_RE`, 같은 사이트면 경로만)·`data:`·개발용 localhost만 받는다(Supabase https 주소는 버림).
 - **사진 한도**(월 1GB에서 거꾸로, 아이디어 문서 8장): 하루(KST) 썸네일 800개·큰 사진 60개, 사람마다 하루 썸네일 200개·큰 사진 20개,
   월 추정 합계 1,000,000,000바이트(썸네일 25,000, 큰 사진 200,000바이트로 셈).
   썸네일은 **(사람, 썸네일 경로) 짝을 하루에 한 번만** 센다: 같은 사람이 그날 이미 받은 썸네일은 다시 열기·다른 앱에 다녀오기·`/thumbs`에서 다시 받아도 세지 않고 URL을 다시 준다
   (서명은 30분 이상 남은 것을 다시 씀). 처음 받는 썸네일이 남은 한도보다 많으면 장소 순서대로 남은 만큼만 넣고 나머지는 `null`, `photos_paused: true`.
   방 응답은 대표 썸네일만이라, 장소 70곳인 방을 처음 열면 70개를 쓴다(예전 계획은 3장씩 210개를 응답마다 다시 셌다).
-  로그인 없는 사람(§3.9)은 누구인지 몰라 늘 센다. 실제로 서명된 것만 센다.
+  로그인 없는 사람(§3.9)은 누구인지 몰라 늘 센다. 주소를 준 것만 센다(사진 바이트를 넘길 때는 세지 않음).
 - **카운터 파일** `${STATE_DIRECTORY}/public-budget.json`(권한 0600): `{ "v":1, "day":"YYYY-MM-DD", "month":"YYYY-MM", "salt":"<16진수>", "thumbs":n, "large":n, "anon":n, "bytes":n,
   "users": { "<해시 16자>": [썸네일, 큰 사진] }, "seen": ["<해시 16자>", …] }`.
   사람 키 = `sha256(salt + uid)` 앞 16자, 본 썸네일 키 = `sha256(salt + '|' + uid + '|' + 경로)` 앞 16자(경로·uid 원문은 남기지 않음, 하루 썸네일 한도만큼만 쌓임, 최대 50,000).
@@ -693,9 +705,9 @@ if (/invalid_visibility/.test(m)) return '공개 범위를 다시 골라 주세�
 |---|---|---|
 | 방 | 이름, 소개, 멤버 수, 장소·다녀온 곳·후기 수, 마지막 활동 묶음(7일 안·31일 안·그 전) | 방 uuid, 초대 코드, `created_by`, 만든 시각, 숨김 여부, 마지막 활동 날짜 |
 | 멤버 | 닉네임, 색, 응답 안 번호(m1–m5) | 사용자 id, 아이디·이메일, 방장 표시, 들어온 날짜, 다른 방 |
-| 장소 | 이름, 카테고리, 주소, 지도 링크(아는 지도 주소만), 상태, **함께 쓰는 메모**, 담은 달, 담은 사람 번호, 장소 uuid(사진 서명 URL에 어차피 들어감) | **찜**, 정확한 등록 시각, 지도 주소가 아닌 링크 |
+| 장소 | 이름, 카테고리, 주소, 지도 링크(아는 지도 주소만), 상태, **함께 쓰는 메모**, 담은 달, 담은 사람 번호, 장소 uuid(사진 주소에 어차피 들어감) | **찜**, 정확한 등록 시각, 지도 주소가 아닌 링크 |
 | 방문·후기 | 방문한 달, 멤버별 별점·후기 글 | 정확한 날짜, 수정 시각 |
-| 사진 | 장소마다 앞의 3장 썸네일(1시간 서명 URL, 목록은 대표만·상세에서 나머지), 누르면 큰 사진(10분), 전체 장 수 | 저장소 경로(화면에 안 보냄), 업로드 시각(무작위 파일 이름만 서명), EXIF/GPS(업로드 때 지워짐), 크기가 큰 파일(썸네일 150KB·큰 사진 2MB 넘음) |
+| 사진 | 장소마다 앞의 3장 썸네일(1시간 사진 주소, 목록은 대표만·상세에서 나머지), 누르면 큰 사진(10분), 전체 장 수 | 저장소 경로(화면에 안 보냄), 업로드 시각(무작위 파일 이름만, 저장소의 Last-Modified·ETag는 서버가 버림 — v0.2.1), EXIF/GPS(업로드 때 지워짐), 크기가 큰 파일(썸네일 150KB·큰 사진 2MB 넘음) |
 | 월드컵·비공개 방 | — | 전부 |
 
 ---
@@ -900,7 +912,7 @@ v0.2.0은 로그인한 사람만 본다. 링크를 가진 누구나(로그인 �
   (**Authorization이 있는 요청은 캐시하지 않음**: 로그인 사용자 응답과 섞이지 않게 경로를 `/api/public/anon/rooms…`로 나누는 편이 안전).
 - 그러면 노트북이 꺼져도 최대 5분은 에지가 응답한다. 더 길게 버티려면 서버가 공개 방 JSON 스냅샷을 정적 파일로 만들어 Cloudflare Pages 같은 정적 호스팅에 올리는 방법이 있다(나중).
 - 관리자 숨기기 때는 서비스 재시작에 더해 Cloudflare API(전용 토큰, 그 존의 Cache Purge 권한만)로 그 방 경로를 지운다. `public.sh hide`가 같이 한다.
-- 사진은 서명 URL이라 에지 캐시와 맞지 않는다(아이디어 문서 정할 것 7). 익명 사진은 아래 10.6.
+- 사진은 만료가 있는 서명 주소라 에지 캐시와 맞지 않는다(아이디어 문서 정할 것 7). 익명 사진은 아래 10.6.
 
 ### 10.5 `/r/<key>` 링크 미리보기와 검색 엔진
 

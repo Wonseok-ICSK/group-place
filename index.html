@@ -599,7 +599,7 @@ const PUBLIC_ROOMS_ENABLED = false; // 공개 방 둘러보기 (GET /api/public/
 
 const BUCKET = 'place-photos';
 // 계정 설정 맨 아래에 보이는 빌드 번호 'v버전-배포일(YYMMDD)-무작위 5자(16진수)'. 배포할 때마다 새로 만듦
-const APP_VERSION = 'v0.2.0-261022-bcba1';
+const APP_VERSION = 'v0.2.1-261022-13392';
 
 /* 공개 방 (docs/public-rooms-design.md §4) */
 const PUBLIC_ACK_VERSION = 1;            // 동의 문구 버전. DB public_ack_version()과 같아야 함 (시험이 비교)
@@ -2623,11 +2623,18 @@ const MONTH_RE = /^\d{4}-\d{2}$/;
 const MEMBER_NO_RE = /^m[1-5]$/; // 응답 안에서만 쓰는 멤버 번호
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const pp = (w, a, b) => josa(w, a, b).slice(String(w).length); // 조사만: pp('라멘', '과', '와') → '과'
-// 사진 주소: https(서버가 서명한 Storage 주소), 개발용 http://localhost, 작은 data: 그림(가짜 Supabase)만
+// 사진 주소: 홈 서버가 서명해 넘겨주는 같은 사이트의 /api/public/img/…(public.cjs, 서버는 https://<사이트>/…로 줌), 개발용 http://localhost,
+// 작은 data: 그림(가짜 Supabase)만. Supabase 서명 주소는 받지 않음(저장소 응답 헤더에 업로드 시각이 드러나서 서버가 대신 받아 넘김)
+const PUBLIC_IMG_RE = /^\/api\/public\/img\/\d{10}\.[A-Za-z0-9_-]{43}\/[0-9a-f-]{36}\/(t\/)?[0-9a-f-]{32,36}\.jpg$/;
 function imgUrl(u) {
   const s = String(u || '');
+  if (PUBLIC_IMG_RE.test(s)) return s;
   if (/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(s)) return s;
-  try { const x = new URL(s); return x.protocol === 'https:' || (x.protocol === 'http:' && /^(localhost|127\.0\.0\.1)$/.test(x.hostname)) ? x.href : ''; } catch { return ''; }
+  try {
+    const x = new URL(s);
+    if (x.origin === location.origin && PUBLIC_IMG_RE.test(x.pathname) && x.href === x.origin + x.pathname) return x.pathname;
+    return x.protocol === 'http:' && /^(localhost|127\.0\.0\.1)$/.test(x.hostname) ? x.href : '';
+  } catch { return ''; }
 }
 // 공개 방 지도 링크: 아는 지도 주소(네이버·구글·카카오)만 (서버 public.cjs mapUrl과 같은 규칙). 아니면 null → 네이버 지도 검색 링크로.
 // 남이 넣은 낚시 주소가 '네이버 지도에서 보기'로 보이거나 '내 방에 담기'로 내 방에 들어오지 않게

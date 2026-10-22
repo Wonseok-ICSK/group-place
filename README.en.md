@@ -14,7 +14,7 @@
   <img alt="PWA" src="https://img.shields.io/badge/PWA-installable-1f6f5c">
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Auth·Postgres·Storage-3ecf8e">
   <img alt="Node" src="https://img.shields.io/badge/Node-20+-339933">
-  <img alt="Version" src="https://img.shields.io/badge/version-v0.2.0-1f6f5c">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.2.1-1f6f5c">
   <img alt="Status" src="https://img.shields.io/badge/status-MVP_testing-d9822b">
 </p>
 
@@ -96,7 +96,7 @@ flowchart LR
 | Client | `index.html` | The whole app (vanilla JS, supabase-js v2 from a CDN). The Supabase URL/key are placeholders the server fills in when serving the page |
 | Server | `deploy/home/server.cjs` | Serves an allowlist of files from memory and injects settings; listens on 127.0.0.1 only |
 | Signup | `deploy/home/signup.cjs` | `POST /api/signup`, `POST /api/join` (consent check for public rooms). The secret key lives only on this server |
-| Public rooms | `deploy/home/public.cjs` | `GET /api/public/rooms…` (signed-in users only; allowlist filter, cache, rate limits, signed photo URLs with daily budgets) and `/r/<public key>`. Enabled only with `PUBLIC_ROOMS=on` |
+| Public rooms | `deploy/home/public.cjs` | `GET /api/public/rooms…` (signed-in users only; allowlist filter, cache, rate limits, daily photo budgets); photos are relayed by the server (`/api/public/img`) so storage headers never reveal upload times and `/r/<public key>`. Enabled only with `PUBLIC_ROOMS=on` |
 | Maps | `api/place.js` | Google Maps link → place name and address (signed-in users only) |
 | Database | `supabase/schema.sql` → `friends-keepalive.sql` → `friends-signup.sql` → `groups.sql` → `colors.sql` → `public.sql` | Tables, functions, grants, RLS, photo storage, multi-room rules, member colors, public rooms. Run in this order (roll back in reverse: `public_rollback.sql` → `colors_rollback.sql` → `groups_rollback.sql`) |
 | Deploy | `deploy/home/install.sh`, `deploy.ps1`, `*.service`, `*.timer` | One release per commit, automatic rollback on a failed health check, a daily keepalive for the free Supabase project |
@@ -132,14 +132,14 @@ Design docs (Korean): [groups](docs/groups-design.md) · [public rooms](docs/pub
 ## Development
 
 ```bash
-node --test deploy/home/*.test.cjs          # 108 server tests: signup, join and public room APIs (fake Supabase)
-cd dev/sqltest && npm install && npm test   # 53 SQL tests: PGlite runs schema.sql → … → public.sql and checks grants, limits, colors, public rooms
+node --test deploy/home/*.test.cjs          # 112 server tests: signup, join, public room APIs and the photo relay (fake Supabase)
+cd dev/sqltest && npm install && npm test   # 54 SQL tests: PGlite runs schema.sql → … → public.sql and checks grants, limits, colors, public rooms
 node dev/mock/serve.mjs                     # run the UI against a fake Supabase (dev/mock/shoot.py takes screenshots and checks the read-only view)
 bash scripts/leak-check.sh                  # pre-commit check for secrets and values of other deployments
 git config core.hooksPath .githooks         # run leak-check on every commit
 ```
 
-Build numbers look like `vVERSION-YYMMDD-xxxxx` with five random hex characters (e.g. `v0.2.0-261022-bcba1`, shown at the bottom of the account screen).
+Build numbers look like `vVERSION-YYMMDD-xxxxx` with five random hex characters (e.g. `v0.2.1-261022-13392`, shown at the bottom of the account screen).
 
 ## Roadmap
 

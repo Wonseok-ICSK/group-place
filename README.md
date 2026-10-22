@@ -14,7 +14,7 @@
   <img alt="PWA" src="https://img.shields.io/badge/PWA-홈_화면_앱-1f6f5c">
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Auth·Postgres·Storage-3ecf8e">
   <img alt="Node" src="https://img.shields.io/badge/Node-20+-339933">
-  <img alt="Version" src="https://img.shields.io/badge/version-v0.2.0-1f6f5c">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.2.1-1f6f5c">
   <img alt="Status" src="https://img.shields.io/badge/status-MVP_시험_중-d9822b">
 </p>
 
@@ -96,7 +96,7 @@ flowchart LR
 | 화면 | `index.html` | 앱 전체(바닐라 JS, supabase-js v2를 CDN으로). 주소·공개 키 자리는 비워 두고 서버가 보낼 때 채움 |
 | 서버 | `deploy/home/server.cjs` | 정해진 파일만 메모리에서 보내고, 설정값을 화면에 넣음. 127.0.0.1에서만 받음 |
 | 가입 | `deploy/home/signup.cjs` | `POST /api/signup`, `POST /api/join`(공개 방이면 동의 확인). secret key는 이 서버에만 있음 |
-| 공개 방 | `deploy/home/public.cjs` | `GET /api/public/rooms…`(로그인한 사람만, 허용 목록 필터·캐시·횟수 제한·사진 서명과 하루 한도), `/r/<공개 키>`. `PUBLIC_ROOMS=on`일 때만 켬 |
+| 공개 방 | `deploy/home/public.cjs` | `GET /api/public/rooms…`(로그인한 사람만, 허용 목록 필터·캐시·횟수 제한·사진 하루 한도), 사진은 서버가 받아 넘김(`/api/public/img`, 저장소 헤더의 업로드 시각을 버림), `/r/<공개 키>`. `PUBLIC_ROOMS=on`일 때만 켬 |
 | 지도 | `api/place.js` | 구글 지도 링크 → 장소 이름·주소 (로그인한 사람만) |
 | DB | `supabase/schema.sql` → `friends-keepalive.sql` → `friends-signup.sql` → `groups.sql` → `colors.sql` → `public.sql` | 표, 함수, 권한, RLS, 사진 저장소, 여러 방·5명 규칙, 멤버 색, 공개 방. 순서대로 실행(되돌리기는 거꾸로: `public_rollback.sql` → `colors_rollback.sql` → `groups_rollback.sql`) |
 | 배포 | `deploy/home/install.sh`, `deploy.ps1`, `*.service`, `*.timer` | 커밋 단위 릴리스, 실패하면 이전 릴리스로 되돌림, 하루 한 번 무료 프로젝트 깨우기 |
@@ -132,14 +132,14 @@ flowchart LR
 ## 개발
 
 ```bash
-node --test deploy/home/*.test.cjs          # 서버 시험 108개: 가입·참여·공개 방 API (가짜 Supabase)
-cd dev/sqltest && npm install && npm test   # SQL 시험 53개: PGlite로 schema.sql → … → public.sql 실행, 권한·제한·색·공개 방 확인
+node --test deploy/home/*.test.cjs          # 서버 시험 112개: 가입·참여·공개 방 API·사진 넘기기 (가짜 Supabase)
+cd dev/sqltest && npm install && npm test   # SQL 시험 54개: PGlite로 schema.sql → … → public.sql 실행, 권한·제한·색·공개 방 확인
 node dev/mock/serve.mjs                     # 가짜 Supabase로 화면 띄우기 (dev/mock/shoot.py로 화면 캡처와 읽기 전용 화면 자동 확인)
 bash scripts/leak-check.sh                  # 커밋 전 비밀 값·다른 배포 값 검사
 git config core.hooksPath .githooks         # 커밋할 때 leak-check 자동 실행
 ```
 
-빌드 번호는 `v버전-배포일(YYMMDD)-무작위 5자`로 씁니다(예: `v0.2.0-261022-bcba1`, 계정 설정 맨 아래에 보임).
+빌드 번호는 `v버전-배포일(YYMMDD)-무작위 5자`로 씁니다(예: `v0.2.1-261022-13392`, 계정 설정 맨 아래에 보임).
 
 ## 다음에 만들 것
 
