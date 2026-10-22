@@ -1,0 +1,2182 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F6F7F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12171F" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="우리 장소">
+<title>우리의 장소 기록</title>
+<meta name="description" content="둘이 함께 가고 싶은 곳을 모으고, 다녀온 곳엔 각자 별점과 후기를 남기는 커플용 장소 기록">
+<!-- 둘만 쓰는 앱이라 검색에는 안 나오게. robots.txt로 막으면 검색엔진이 이 표시를 못 읽고 링크 미리보기까지 막힐 수 있어서 이걸로만 막음 -->
+<meta name="robots" content="noindex, nofollow">
+<!-- 아이콘: 두 원(우리 두 사람)이 겹친 자리에 핀(우리의 장소) -->
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/icons/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<!-- 카톡 등으로 주소를 보낼 때 보이는 미리보기 (이미지는 전체 주소여야 함) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="우리의 장소 기록">
+<meta property="og:title" content="우리의 장소 기록">
+<meta property="og:description" content="가고 싶은 곳은 같이 모으고, 다녀온 곳엔 각자 별점과 후기를.">
+<meta property="og:url" content="https://YOUR-SITE.example/">
+<meta property="og:image" content="https://YOUR-SITE.example/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="두 원이 겹친 자리에 핀이 있는 우리의 장소 기록 마크">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<!-- supabase-js는 버전을 고정하고(새 버전이 저절로 들어오지 않게) 파일이 바뀌지 않았는지 브라우저가 확인(integrity).
+     npm 패키지에 실제로 들어 있는 파일(dist/umd/supabase.js)을 씀. .min.js는 jsDelivr가 그때그때 만들어서 내용이 바뀔 수 있음.
+     올릴 때는 버전과 integrity 값을 같이 바꿈: curl -s <주소> | openssl dgst -sha384 -binary | base64 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+<style>
+:root{
+  --bg:#F6F7F4; --surface:#FFFFFF; --sunken:#EEF0EB;
+  --ink:#1E2A3A; --muted:#626D7D; --line:#E1E4DE; --line-strong:#C7CCC4;
+  --p1:#0E8C86; --p1-soft:#DDF1EF;
+  --p2:#C98208; --p2-soft:#FBEFD6;
+  --heart:#E5484D; --danger:#C2362F;
+  --gold-ink:#5B3A00;
+  --p1-ink:#0B746F; --p2-ink:#A36600; /* 도장 글씨: 밝은 화면에선 각자 색을 조금 진하게 */
+  --r-s:8px; --r-m:14px; --r-l:22px;
+  --gutter:16px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#12171F; --surface:#1A212B; --sunken:#151B24;
+    --ink:#E8ECF1; --muted:#9AA4B4; --line:#29323F; --line-strong:#3B4656;
+    --p1:#3CC2B9; --p1-soft:#14363A;
+    --p2:#F0B23E; --p2-soft:#3A2D14;
+    --heart:#FF6B70; --danger:#FF7A72;
+    --p1-ink:#3CC2B9; --p2-ink:#F0B23E;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
+  font-size:15px; line-height:1.55; letter-spacing:-0.01em;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--p1);outline-offset:2px;border-radius:6px}
+.wrap{max-width:560px;margin:0 auto;padding:0 var(--gutter)}
+.hidden{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- forms & buttons ---------- */
+label.field{display:block;margin:0 0 14px}
+label.field>span{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px}
+.input,textarea.input{
+  width:100%; font-size:16px; padding:11px 12px; border-radius:var(--r-s);
+  border:1px solid var(--line-strong); background:var(--surface); outline:none;
+}
+.input:focus{border-color:var(--p1);box-shadow:0 0 0 3px var(--p1-soft)}
+textarea.input{resize:vertical;min-height:84px;line-height:1.6}
+.hint{font-size:12.5px;color:var(--muted);margin:6px 0 0}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  border:0;border-radius:999px;padding:12px 20px;font-weight:700;font-size:15px;
+  background:var(--ink);color:var(--bg);min-height:46px;
+}
+.btn.block{width:100%}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line-strong)}
+.btn.small{min-height:36px;padding:7px 14px;font-size:14px}
+.btn[disabled]{opacity:.55;cursor:default}
+.text-btn{background:none;border:0;padding:8px 4px;font-weight:600;color:var(--muted);font-size:14px}
+.text-btn.danger{color:var(--danger)}
+.icon-btn{
+  width:40px;height:40px;border-radius:50%;border:0;background:transparent;
+  display:inline-grid;place-items:center;color:var(--ink);
+}
+.icon-btn:hover{background:var(--sunken)}
+.icon-btn svg{width:22px;height:22px}
+.icon-btn[disabled]{opacity:.3;cursor:default;background:transparent}
+.error{color:var(--danger);font-size:14px;margin:10px 0 0;min-height:1em}
+
+/* ---------- auth / onboarding ---------- */
+.gate{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding-top:40px;padding-bottom:40px}
+.mark{display:flex;margin-bottom:22px}
+.mark i{width:34px;height:34px;border-radius:50%;display:block}
+.mark i:first-child{background:var(--p1)}
+.mark i:last-child{background:var(--p2);margin-left:-12px;opacity:.92}
+.gate h1{font-size:28px;line-height:1.25;letter-spacing:-0.03em;margin:0 0 8px;font-weight:800}
+.gate p.lead{color:var(--muted);margin:0 0 28px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);padding:20px}
+.switcher{display:flex;gap:6px;background:var(--sunken);padding:4px;border-radius:999px;margin-bottom:18px}
+.switcher button{flex:1;border:0;background:transparent;border-radius:999px;padding:9px 0;font-weight:700;color:var(--muted)}
+.switcher button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.code-box{
+  font-size:30px;font-weight:800;letter-spacing:.18em;text-align:center;
+  padding:16px;border-radius:var(--r-m);background:var(--p1-soft);color:var(--ink);margin:10px 0 12px;
+  font-variant-numeric:tabular-nums;
+}
+
+/* ---------- main ---------- */
+.top{position:sticky;top:0;z-index:5;background:var(--bg);padding-top:env(safe-area-inset-top)}
+.top-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0 10px}
+.title{margin:0;font-size:22px;font-weight:800;letter-spacing:-0.03em}
+.top-actions{display:flex;align-items:center;gap:2px}
+.duo{display:flex;gap:12px;font-size:13px;color:var(--muted);margin-top:2px}
+.duo span{display:inline-flex;align-items:center;gap:5px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.v1 .dot,.dot.v1{background:var(--p1)}
+.v2 .dot,.dot.v2{background:var(--p2)}
+.v1{--c:var(--p1);--c-soft:var(--p1-soft)}
+.v2{--c:var(--p2);--c-soft:var(--p2-soft)}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tabs button{
+  flex:1;border:0;background:none;padding:10px 0 11px;font-weight:700;color:var(--muted);
+  border-bottom:2.5px solid transparent;margin-bottom:-1px;font-size:15px;
+}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+.tabs .n{font-weight:600;font-size:13px;margin-left:3px;font-variant-numeric:tabular-nums}
+.tools{padding:12px 0 6px}
+.search{position:relative}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--muted)}
+.search .input{padding-left:38px;border-radius:999px;background:var(--surface)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:none;margin:0 calc(var(--gutter) * -1);padding-left:var(--gutter);padding-right:var(--gutter)}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:none;border:1px solid var(--line-strong);background:transparent;border-radius:999px;
+  padding:6px 13px;font-size:14px;font-weight:600;color:var(--muted)
+}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.sort{display:flex;justify-content:flex-end;gap:2px;margin-top:4px}
+.sort button{border:0;background:none;padding:4px 8px;font-size:13px;font-weight:600;color:var(--muted);border-radius:999px}
+.sort button[aria-pressed="true"]{color:var(--ink);font-weight:750}
+
+.invite{
+  margin:12px 0 4px;padding:14px 16px;border-radius:var(--r-m);background:var(--p2-soft);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px
+}
+.invite b{font-size:18px;letter-spacing:.12em;font-variant-numeric:tabular-nums}
+
+.list{list-style:none;margin:8px 0 0;padding:0 0 120px}
+.list li+li{margin-top:10px}
+.place{
+  display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);
+  border-radius:var(--r-m);padding:14px 16px;
+}
+.place:active{background:var(--sunken)}
+.place-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.place-name{font-size:17px;font-weight:750;letter-spacing:-0.02em;line-height:1.35}
+.heart-mark{color:var(--heart);flex:none;margin-top:2px}
+.heart-mark svg{width:18px;height:18px;display:block}
+.meta{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:13.5px;color:var(--muted);min-width:0}
+.cat{flex:none;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--sunken);color:var(--ink)}
+.addr{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pair{display:flex;align-items:center;gap:8px;margin-top:12px}
+.pair-tags{display:flex;gap:6px;flex-wrap:wrap;min-width:0}
+.avg{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:3px;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+.avg svg{width:15px;height:15px;display:block}
+.avg path{fill:var(--ink)}
+.voice-tag{
+  display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 8px;border-radius:999px;
+  background:var(--c-soft);font-size:13px;font-weight:650;
+}
+.voice-tag.empty{background:transparent;border:1px dashed var(--line-strong);color:var(--muted);font-weight:500}
+.stars{display:inline-flex;gap:1px;vertical-align:middle}
+.stars svg{display:block}
+.stars path{fill:var(--line-strong)}
+.stars .h{fill:transparent}
+.stars .on path,.stars .half .h{fill:var(--c)}
+.note-prev{margin:10px 0 0;font-size:14px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.added{margin-top:10px;font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.place-row{display:flex;gap:12px;align-items:flex-start}
+.place-main{flex:1;min-width:0}
+.thumb{flex:none;width:68px;height:68px;border-radius:10px;object-fit:cover;background:var(--sunken);display:block}
+
+.empty-state{padding:48px 8px;text-align:center;color:var(--muted)}
+.empty-state strong{display:block;color:var(--ink);font-size:17px;margin-bottom:6px}
+
+.fab{
+  position:fixed;z-index:6;right:max(var(--gutter), calc(50% - 280px + var(--gutter)));
+  bottom:calc(20px + env(safe-area-inset-bottom));
+  box-shadow:0 6px 18px rgba(30,42,58,.22);padding:14px 22px 14px 18px;font-size:16px
+}
+.fab svg{width:20px;height:20px}
+
+/* ---------- sheets ---------- */
+.sheet-backdrop{position:fixed;inset:0;background:rgba(15,20,28,.42);z-index:20;animation:fade .18s ease}
+.sheet{
+  position:fixed;z-index:21;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;
+  max-height:94dvh;display:flex;flex-direction:column;background:var(--bg);
+  border-radius:var(--r-l) var(--r-l) 0 0;animation:rise .24s cubic-bezier(.2,.8,.2,1);
+}
+@media (min-width:600px){.sheet{bottom:3vh;border-radius:var(--r-l);max-height:94vh}}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;padding:8px 8px 0 8px}
+.sheet-head h2{font-size:17px;margin:0;font-weight:750}
+.sheet-head .right{display:flex;align-items:center;gap:2px}
+.sheet-body{overflow-y:auto;padding:4px 20px calc(28px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
+@keyframes rise{from{transform:translateY(24px);opacity:.4}to{transform:none;opacity:1}}
+@keyframes fade{from{opacity:0}}
+@media (prefers-reduced-motion:reduce){.sheet,.sheet-backdrop{animation:none}}
+
+.detail-name{font-size:26px;line-height:1.25;font-weight:800;letter-spacing:-0.03em;margin:6px 0 6px}
+.detail-meta{display:flex;align-items:flex-start;gap:8px;color:var(--muted);font-size:14px}
+.detail-meta .cat{margin-top:1px}
+.map-link{display:inline-flex;align-items:center;gap:6px;margin-top:12px;font-weight:700;font-size:14px;color:var(--p1);text-decoration:none}
+.map-link svg{width:16px;height:16px}
+.seg{display:flex;gap:6px;background:var(--sunken);padding:4px;border-radius:999px;margin:18px 0 6px}
+.seg button{flex:1;border:0;background:transparent;border-radius:999px;padding:9px 0;font-weight:700;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.heart-btn[aria-pressed="true"]{color:var(--heart)}
+.block{margin-top:26px}
+.block>h3{font-size:14px;font-weight:750;margin:0 0 10px;color:var(--ink)}
+.block-row{display:flex;justify-content:flex-end;margin-top:8px}
+
+.block-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}
+.block-head h3{font-size:14px;font-weight:750;margin:0}
+.block-head .n{font-weight:600;color:var(--muted);margin-left:5px;font-variant-numeric:tabular-nums}
+.block-head .text-btn{color:var(--p1)}
+.visit{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);padding:10px 16px 14px}
+.visit+.visit{margin-top:10px}
+.visit-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:38px}
+.visit-date{font-weight:750;font-variant-numeric:tabular-nums}
+.input.date{width:auto;padding:6px 10px}
+.vrow{border-left:3px solid var(--c);padding:1px 0 1px 11px;margin-top:10px}
+.vrow-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px}
+.voice-who{display:flex;align-items:center;gap:7px;font-weight:750}
+.you{font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--c-soft);color:var(--ink)}
+.voice-body{margin:4px 0 0;white-space:pre-wrap;word-break:break-word}
+.voice-empty{color:var(--muted);font-size:14px;margin:2px 0 0}
+.rate-input{display:flex;margin:6px 0 10px -3px}
+.rs{position:relative;display:block;padding:3px}
+.rs svg{width:32px;height:32px;display:block}
+.rs path{fill:var(--line-strong);transition:fill .12s}
+.rs .h{fill:transparent}
+.rs.on path,.rs.half .h{fill:var(--c)}
+.rs button{position:absolute;top:0;bottom:0;width:50%;border:0;background:none;padding:0}
+.rs button:first-of-type{left:0;border-radius:8px 0 0 8px}
+.rs button:last-of-type{right:0;border-radius:0 8px 8px 0}
+.voice-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px}
+.voice-actions .btns{display:flex;align-items:center;gap:4px}
+.danger-zone{margin-top:32px;padding-top:16px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted)}
+
+.cat-pick{display:flex;flex-wrap:wrap;gap:6px}
+.chip.add{border-style:dashed}
+.new-cat{display:flex;gap:8px;margin-top:10px}
+.new-cat .input{flex:1;min-width:0}
+.cat-list{list-style:none;margin:0;padding:0}
+.cat-list li{display:flex;align-items:center;gap:2px}
+.cat-list li+li{margin-top:6px}
+.cat-list .input{flex:1;min-width:0;padding:8px 10px;margin-right:4px}
+.cat-list .icon-btn{width:36px;height:36px;color:var(--muted)}
+.cat-list .icon-btn svg{width:18px;height:18px}
+
+.cup-summary{margin:20px 0 6px;padding:14px 16px;border-radius:var(--r-m);background:var(--p1-soft)}
+.cup-summary b{display:block;font-size:17px;letter-spacing:-0.02em}
+.cup-summary span{font-size:14px;color:var(--muted)}
+.cup-round{text-align:center;font-size:24px;font-weight:800;letter-spacing:-0.03em;margin:6px 0 14px}
+.cup-round span{display:block;font-size:13px;font-weight:600;color:var(--muted);letter-spacing:0;font-variant-numeric:tabular-nums}
+.duel{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pick{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-m);padding:8px 8px 12px;text-align:left;min-width:0}
+.pick:hover{border-color:var(--line-strong)}
+.pick:active{background:var(--sunken)}
+.pick img,.pick-ph{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:var(--sunken);margin-bottom:4px}
+.pick-ph{display:grid;place-items:center;font-size:44px;font-weight:800;color:var(--line-strong)}
+.pick-name{font-weight:750;font-size:16px;line-height:1.3;padding:0 4px;overflow-wrap:anywhere}
+.pick-meta{font-size:12.5px;color:var(--muted);padding:0 4px}
+.vs{position:absolute;left:50%;top:36%;transform:translate(-50%,-50%);width:42px;height:42px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;font-weight:800;font-size:13px;pointer-events:none;box-shadow:0 0 0 4px var(--bg)}
+.cup-foot{display:flex;justify-content:center;margin-top:10px;min-height:40px;align-items:center}
+.cup-win{text-align:center}
+.cup-win .photo{max-width:320px;margin:10px auto 4px}
+.trophy{display:inline-grid;place-items:center;width:56px;height:56px;border-radius:50%;background:var(--p2-soft);color:var(--p2);margin:8px 0 4px}
+.trophy svg{width:30px;height:30px}
+.cup-actions{display:flex;gap:8px;margin-top:20px}
+.cup-actions .btn{flex:1}
+
+/* ---------- 명예의 전당: 우승 도장, 준우승 태그, 역대 기록 ---------- */
+.stamp-wrap{position:relative;display:inline-block;flex:none;line-height:0}
+.stamp{--rot:-15deg;display:inline-block;width:var(--sz,52px);height:var(--sz,52px);color:var(--c);transform:rotate(var(--rot))}
+.stamp.v1{color:var(--p1-ink)}
+.stamp.v2{color:var(--p2-ink)}
+.stamp svg{display:block;width:100%;height:100%;overflow:visible}
+.stamp text{font-family:inherit}
+.stamp.gold{color:var(--gold-ink)}
+@media (prefers-color-scheme: light){.stamp:not(.gold) svg{mix-blend-mode:multiply}}
+.stamp.fresh{animation:stamp-in .6s cubic-bezier(.2,.9,.3,1.15) both}
+@keyframes stamp-in{
+  0%{opacity:0;transform:scale(2) rotate(calc(var(--rot) - 16deg))}
+  55%{opacity:1;transform:scale(.88) rotate(var(--rot))}
+  75%{transform:scale(1.06) rotate(var(--rot))}
+  100%{transform:scale(1) rotate(var(--rot))}
+}
+@media (prefers-reduced-motion:reduce){.stamp.fresh{animation:none}}
+.stamp-more{position:absolute;right:-5px;top:-3px;min-width:18px;padding:0 5px;border-radius:999px;background:var(--ink);color:var(--bg);font-size:10.5px;font-weight:800;line-height:17px;text-align:center;font-variant-numeric:tabular-nums}
+/* 목록 카드: 사진이 있으면 사진 왼쪽 아래 모서리에 걸쳐 찍고, 없으면 사진 자리에 */
+.place-side{position:relative;flex:none}
+.place-side>.stamp-wrap{position:absolute;left:-12px;bottom:-12px;--sz:48px}
+.place-side.solo>.stamp-wrap{position:static;--sz:54px}
+.list{overflow-x:clip} /* '쾅' 하고 커졌다 줄어드는 도장이 화면 옆으로 삐져나가지 않게 */
+/* 준우승 태그는 길면 주소와 같이 줄어들며 말줄임 */
+.tag{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--c-soft);color:var(--ink);white-space:nowrap}
+.tag.gold{background:linear-gradient(135deg,#FFF8D6,#F8DC74 55%,#FFEEAA);color:var(--gold-ink)}
+.meta .cat{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 준우승 태그가 있으면 칸이 모자랄 때 주소부터 줄이고, 그래도 모자라면 카테고리와 태그가 나눠서 말줄임 */
+.meta.has-tag{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,max-content) minmax(0,1fr)}
+.meta.has-tag>*{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.honors{display:flex;flex-wrap:wrap;gap:12px 14px;margin-top:16px}
+.honor{display:flex;flex-direction:column;align-items:center;gap:6px;width:74px;text-align:center;--sz:64px}
+.honor small{font-size:11.5px;font-weight:600;color:var(--muted);line-height:1.3}
+.honor-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.win-stamp{display:flex;justify-content:center;margin:18px 0 6px;--sz:112px}
+.win-msg{margin:6px 0 0;font-weight:700}
+.win-msg b{color:var(--gold-ink)}
+@media (prefers-color-scheme: dark){.win-msg b{color:#F3D36E}}
+.rec-year{font-size:14px;font-weight:750;margin:22px 0 10px}
+.rec-year:first-of-type{margin-top:14px}
+.rec{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);padding:12px 16px 14px}
+.rec+.rec{margin-top:10px}
+.rec.both{border-color:#EBC24A}
+.rec-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rec-title{font-weight:750;letter-spacing:-0.02em}
+.gold-badge{flex:none;font-size:12px;font-weight:800;padding:2px 9px;border-radius:999px;background:linear-gradient(135deg,#FFF8D6,#F8DC74 45%,#FFEEAA 75%,#EBC24A);color:var(--gold-ink)}
+.rec-row{border-left:3px solid var(--c);padding:1px 0 1px 11px;margin-top:10px}
+.rec-line{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px}
+.rec-row .who{display:flex;align-items:center;gap:7px;font-weight:750;font-size:14px}
+.rec-win{display:flex;align-items:center;gap:6px;margin-top:2px;font-weight:750;font-size:16px;line-height:1.35}
+.rec-win svg{width:17px;height:17px;flex:none;color:var(--c)}
+.rec-sub{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.rec-sub .text-btn{padding:0 2px;font-size:13px}
+.link{border:0;background:none;padding:0;font:inherit;color:inherit;text-align:left;text-decoration:underline;text-decoration-color:var(--line-strong);text-underline-offset:3px}
+.gone{color:var(--muted);font-weight:600}
+.photo{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:var(--r-m);background:var(--sunken);margin:6px 0 4px}
+.photo-actions{display:flex;align-items:center;gap:8px;margin-top:12px}
+.photo-actions label{position:relative}
+/* 장소 추가 화면: 고른 사진 미리보기 */
+label.field>.photo-previews{display:flex;flex-wrap:wrap;gap:6px;margin:0} /* label.field>span 기본 모양(한 줄 제목) 덮어씀 */
+label.field>.photo-previews:not(:empty){margin-top:8px}
+.photo-preview{position:relative;display:block;width:72px;height:72px}
+.photo-preview img{display:block;width:100%;height:100%;object-fit:cover;border-radius:10px;background:var(--sunken)}
+.cover-badge{position:absolute;left:6px;top:6px;padding:1px 7px;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;font-weight:700;line-height:18px;pointer-events:none}
+/* 상세: 사진 넘겨 보기 */
+.gallery{position:relative;margin:6px 0 4px}
+.gallery-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;border-radius:var(--r-m);background:var(--sunken);scrollbar-width:none;overscroll-behavior-x:contain}
+.gallery-track::-webkit-scrollbar{display:none}
+.gallery-item{position:relative;flex:0 0 100%;scroll-snap-align:start;border:0;padding:0;background:none;display:block;cursor:zoom-in}
+.gallery-item img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover}
+.gallery-item .cover-badge{left:10px;top:10px}
+.gallery-count{position:absolute;right:10px;bottom:10px;padding:2px 9px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none}
+/* 크게 보기 */
+.viewer{position:fixed;inset:0;z-index:30;background:#000;animation:fade .15s ease}
+.viewer-track{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior:contain}
+.viewer-track::-webkit-scrollbar{display:none}
+.viewer-item{flex:0 0 100%;height:100%;scroll-snap-align:start;display:grid;place-items:center}
+.viewer-item img{max-width:100%;max-height:100%;object-fit:contain}
+.viewer-close{position:absolute;right:max(8px, env(safe-area-inset-right));top:max(8px, env(safe-area-inset-top));color:#fff;background:rgba(0,0,0,.45)}
+.viewer-close:hover{background:rgba(0,0,0,.65)}
+.viewer-count{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);padding:3px 11px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){.viewer{animation:none}}
+textarea.input.url{min-height:0;resize:none;line-height:1.45}
+.settings-group{margin-top:22px}
+.settings-group h3{font-size:14px;margin:0 0 10px}
+.settings-group .error:empty{display:none} /* 오류가 없을 땐 자리를 비워 두지 않음 (묶음 사이 간격이 벌어지지 않게) */
+.settings-group .btn.block{margin-top:0} /* 상세 화면용 .block{margin-top} 이 꽉 찬 버튼(.btn.block)에도 걸려서 벌어지던 간격 */
+.app-version{margin:16px 0 0;text-align:center;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.row{display:flex;gap:8px;align-items:flex-end}
+.row .field{flex:1;margin:0}
+
+/* ---------- toast ---------- */
+#toast{
+  position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translate(-50%,20px);
+  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:600;
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:40;max-width:calc(100% - 32px);text-align:center
+}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+.loading{min-height:100dvh;display:grid;place-items:center;color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">불러오는 중…</div></div>
+<div id="sheet-root"></div>
+<div id="viewer-root"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<!-- 도장용: 인주가 고르게 안 묻은 느낌(번짐·얼룩), 황금 도장 색 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <filter id="stamp-ink" x="-6%" y="-6%" width="112%" height="112%">
+    <feTurbulence type="fractalNoise" baseFrequency=".45" numOctaves="2" seed="7" result="noise"/>
+    <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -4 3.4" result="speckle"/>
+    <feComposite in="SourceGraphic" in2="speckle" operator="in" result="inked"/>
+    <feTurbulence type="fractalNoise" baseFrequency=".05" numOctaves="1" seed="3" result="warp"/>
+    <feDisplacementMap in="inked" in2="warp" scale="2" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <linearGradient id="stamp-gold" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#FFFBE0"/><stop offset=".3" stop-color="#FBE387"/><stop offset=".55" stop-color="#F2C94C"/>
+    <stop offset=".78" stop-color="#FFEFAE"/><stop offset="1" stop-color="#E8B93A"/>
+  </linearGradient>
+</defs></svg>
+
+<script>
+/* =====================================================================
+   설정: Supabase 대시보드 → Project Settings → API Keys 에서 복사
+   - Project URL      예) https://abcdefghijk.supabase.co
+   - Publishable key  예) sb_publishable_xxxxxxxx  (공개해도 되는 키)
+   ※ secret key / service_role 키, DB 비밀번호는 절대 넣지 마세요.
+   ===================================================================== */
+const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
+const SUPABASE_KEY = 'YOUR_KEY';
+// 위 두 줄과 아래 두 줄은 홈 서버(deploy/home/server.cjs)가 보낼 때 설정값으로 바꾼다. 이대로면 설정 안내 화면이 뜬다.
+// 아이디 로그인: 비어 있지 않으면 '아이디'로 로그인하고, @가 없는 입력은 '아이디@이 주소' 계정으로 로그인 (메일은 안 보냄)
+const LOGIN_ID_DOMAIN = '';
+// 로그인 화면의 '초대 코드로 가입' (POST /api/signup, 홈 서버에만 있음)
+const SIGNUP_ENABLED = false;
+
+const BUCKET = 'place-photos';
+// 설정 화면 맨 아래에 보이는 버전. 배포할 때마다 README 업데이트 노트와 같이 올림 ('v버전: 배포일 YYMMDD')
+const APP_VERSION = 'v1.7.1: 261021';
+
+/* ---------- 작은 도우미 ---------- */
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const STAR = 'M12 2.6l2.8 5.9 6.4.8-4.7 4.5 1.2 6.4L12 17.1l-5.7 3.1 1.2-6.4-4.7-4.5 6.4-.8z';
+const ICON = {
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+  heart: (on) => `<svg viewBox="0 0 24 24" fill="${on ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 20.5s-7.5-4.6-7.5-10.3A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3z"/></svg>`,
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>',
+  up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+  down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/></svg>',
+  trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 4h9v5.5a4.5 4.5 0 0 1-9 0z"/><path d="M16.5 6H20v1a3.5 3.5 0 0 1-3.8 3.5M7.5 6H4v1a3.5 3.5 0 0 0 3.8 3.5"/><path d="M12 14v3.5M8.5 20.5h7M9.5 17.5h5v3h-5z"/></svg>',
+};
+const STAR_HALF = 'M12 2.6v14.5l-5.7 3.1 1.2-6.4-4.7-4.5 6.4-.8z'; // 별의 왼쪽 절반
+const starSvg = `<path d="${STAR}"/><path class="h" d="${STAR_HALF}"/>`;
+// i번째 별: 'on' 전체, 'half' 왼쪽 절반만 칠함
+const starCls = (n, i) => (n >= i ? 'on' : n >= i - 0.5 ? 'half' : '');
+const stars = (n, size = 14) => {
+  let s = '';
+  for (let i = 1; i <= 5; i++) s += `<svg class="${starCls(n, i)}" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${starSvg}</svg>`;
+  return `<span class="stars" role="img" aria-label="5점 만점에 ${n}점">${s}</span>`;
+};
+// 별 하나를 반으로 나눠 왼쪽을 누르면 x.5점, 오른쪽을 누르면 x점
+function rateInput(n) {
+  let s = '';
+  for (let i = 1; i <= 5; i++) {
+    s += `<span class="rs ${starCls(n, i)}"><svg viewBox="0 0 24 24" aria-hidden="true">${starSvg}</svg>`
+      + `<button type="button" data-action="rate" data-n="${i - 0.5}" aria-label="${i - 0.5}점" aria-pressed="${n === i - 0.5}"></button>`
+      + `<button type="button" data-action="rate" data-n="${i}" aria-label="${i}점" aria-pressed="${n === i}"></button></span>`;
+  }
+  return `<div class="rate-input" role="group" aria-label="내 별점">${s}</div>`;
+}
+// 받침에 맞는 조사: josa('지훈', '이', '가') → '지훈이'
+const josa = (word, withFinal, withoutFinal) => {
+  const ch = String(word).trim().slice(-1);
+  const code = ch.charCodeAt(0) - 0xac00;
+  if (code < 0 || code > 11171) return `${word}${withFinal}(${withoutFinal})`;
+  return word + (code % 28 ? withFinal : withoutFinal);
+};
+const fmtDate = (iso) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+};
+const fmtDay = (day) => day.replaceAll('-', '.'); // 방문일 'YYYY-MM-DD' → 'YYYY.MM.DD'
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const safeUrl = (u) => {
+  u = String(u || '').trim();
+  if (!u) return '';
+  if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+  try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch { return ''; }
+};
+let toastTimer;
+// ms = 0이면 다음 알림이 올 때까지 계속 보임 (사진 올리는 중처럼 오래 걸리는 일)
+function toast(msg, ms = 2200) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  if (ms) toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+function friendly(err) {
+  const m = (err && (err.message || err.error_description || err.msg)) || String(err || '');
+  if (/invalid_code/.test(m)) return '초대 코드를 다시 확인해 주세요.';
+  if (/couple_full/.test(m)) return '이미 두 사람이 모두 참여한 공간이에요.';
+  if (/already_in_couple/.test(m)) return '이미 참여한 공간이 있어요. 새로고침해 주세요.';
+  if (/Invalid login credentials/i.test(m)) return LOGIN_ID_DOMAIN ? '아이디 또는 비밀번호가 맞지 않아요.' : '이메일 또는 비밀번호가 맞지 않아요.';
+  if (/Email not confirmed/i.test(m)) return '이메일 인증이 끝나지 않은 계정이에요.';
+  // 친구용: DB가 join_couple을 막아 뒀는데 가입·참여 서버가 아직 꺼져 있을 때 (secret key 없음, 서버를 막 다시 켬)
+  if (LOGIN_ID_DOMAIN && /permission denied for function join_couple/i.test(m)) return '지금은 코드로 참여할 수 없어요. 잠시 후 새로고침해 보고, 계속 안 되면 관리자에게 알려 주세요.';
+  if ((err && err.code === '42501') || /permission denied/i.test(m)) return `DB 권한이 없어요. SQL 설정을 확인해 주세요. (${m})`;
+  if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.';
+  if (/should be different/i.test(m)) return '지금과 다른 비밀번호를 입력해 주세요.';
+  if (/Password should be|weak_password/i.test(m)) return '비밀번호가 너무 짧거나 쉬워요. 더 길게 입력해 주세요.';
+  if (/Bucket not found|photo_path/i.test(m)) return '사진 기능용 SQL을 먼저 실행해 주세요.';
+  if (/place_photos/.test(m) && /does not exist|schema cache|relationship/i.test(m)) return '사진 여러 장용 SQL을 먼저 실행해 주세요.';
+  if (/row-level security policy for table "objects"/i.test(m)) return '사진 저장 권한이 없어요. 사진용 SQL을 다시 실행해 주세요.';
+  if (/image_decode/.test(m)) return '이 사진은 읽을 수 없어요. JPG나 PNG로 다시 시도해 주세요.';
+  if (/visits_place_day_key/.test(m)) return '그 날짜에는 이미 방문 기록이 있어요.';
+  if (/categories_couple_name_key/.test(m)) return '이미 있는 카테고리 이름이에요.';
+  if (/on table "categories" violates foreign key/.test(m)) return '이 카테고리를 쓰는 장소가 있어요. 장소의 카테고리를 먼저 바꿔 주세요.';
+  if (/places_category_fkey/.test(m)) return '없는 카테고리예요. 새로고침한 뒤 다시 골라 주세요.';
+  if (/cup_results/.test(m) && /does not exist|schema cache/i.test(m)) return '월드컵 기록용 SQL을 먼저 실행해 주세요.';
+  if (/cup_category_gone/.test(m)) return '하는 사이 이 카테고리가 지워져서 기록을 남길 수 없어요.';
+  if (/cup_results_category_fkey/.test(m)) return '하는 사이 카테고리가 바뀌었어요. 다시 저장해 주세요.';
+  if (/check constraint/i.test(m)) return '입력값을 다시 확인해 주세요.';
+  return m || '알 수 없는 오류가 발생했어요.';
+}
+async function busy(btn, fn) {
+  const label = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '처리 중…'; }
+  try { return await fn(); }
+  finally { if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = label; } }
+}
+
+/* ---------- 상태 ---------- */
+const configured = !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_KEY.includes('YOUR_KEY');
+const sb = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+const state = {
+  user: null, couple: null, members: [], places: [],
+  categories: [],       // [{id, name, position}] 두 사람이 함께 쓰는 카테고리
+  tab: 'want_to_go', category: '전체', query: '',
+  sort: 'recent',       // 다녀온 곳 정렬: 'recent' 최근 방문순 | 'added' 최근 추가순 | 'rating' 평균 평점순
+  sheet: null,          // {type, id}
+  editVisit: null,      // 내 후기를 쓰는 중인 방문 id ('new' = 새 방문)
+  photoIdx: 0,          // 상세 화면에서 보고 있는 사진 번호
+  draftRating: 0,
+  cupSetup: null,       // 월드컵 조건 {year, cat, mode}
+  cup: null,            // 진행 중인 월드컵
+  cupTab: 'new',        // 월드컵 시트: 'new' 새 월드컵 | 'records' 역대 기록
+  cupResults: [],       // 끝낸 월드컵 기록 (사람·연도·카테고리마다 하나)
+};
+const uid = () => state.user && state.user.id;
+function person(id) {
+  const m = state.members.find((x) => x.user_id === id);
+  if (!m) return { name: '알 수 없음', cls: 'v1', me: false };
+  return { name: m.display_name || (m.user_id === uid() ? '나' : '상대'), cls: m.role === 'owner' ? 'v1' : 'v2', me: m.user_id === uid() };
+}
+const ownerFirst = () => [...state.members].sort((a, b) => (a.role === 'owner' ? 0 : 1) - (b.role === 'owner' ? 0 : 1));
+const catNames = () => state.categories.map((c) => c.name);
+const field = (form, n) => form.elements.namedItem(n);
+// 아이디 로그인: @가 없으면 아이디로 보고 정해진 주소를 붙임. LOGIN_ID_DOMAIN이 비어 있으면 입력 그대로(이메일)
+const loginEmail = (s) => {
+  s = String(s || '').trim();
+  return LOGIN_ID_DOMAIN && s && !s.includes('@') ? `${s.toLowerCase()}@${LOGIN_ID_DOMAIN}` : s;
+};
+// 아이디로 만든 계정이면 아이디, 아니면 '' (설정 화면에 주소 대신 아이디를 보여 줌)
+const loginId = (email) => {
+  const e = String(email || ''), tail = `@${LOGIN_ID_DOMAIN}`;
+  return LOGIN_ID_DOMAIN && e.toLowerCase().endsWith(tail) ? e.slice(0, -tail.length) : '';
+};
+
+/* ---------- 데이터 ---------- */
+async function loadAll() {
+  const [c, m] = await Promise.all([
+    sb.from('couples').select('id, name, invite_code').limit(1),
+    sb.from('couple_members').select('user_id, display_name, role'),
+  ]);
+  if (c.error) throw c.error;
+  if (m.error) throw m.error;
+  state.couple = c.data[0] || null;
+  state.members = m.data || [];
+  if (!state.couple) { state.places = []; state.categories = []; state.cupResults = []; return; }
+  const [p, k, w] = await Promise.all([
+    sb.from('places').select('*, reviews(*), visits!visits_place_id_fkey(*), place_photos(*)').order('created_at', { ascending: false }),
+    sb.from('categories').select('id, name, position').order('position').order('created_at'),
+    sb.from('cup_results').select('*').order('played_at', { ascending: false }),
+  ]);
+  if (p.error) throw p.error;
+  if (k.error) throw k.error;
+  state.places = (p.data || []).map(withVisits);
+  state.categories = k.data || [];
+  // 월드컵 기록은 덤: 못 불러와도(표가 아직 없거나 되돌린 뒤) 나머지는 그대로 씀
+  state.cupResults = w.error ? [] : w.data || [];
+  if (state.category !== '전체' && !catNames().includes(state.category)) state.category = '전체';
+  await signPhotos();
+}
+// 방문마다 두 사람의 후기를 묶고, 최근 방문이 앞에 오게 정렬
+function withVisits(p) {
+  const reviews = p.reviews.map((r) => ({ ...r, rating: r.rating == null ? null : Number(r.rating) }));
+  const visits = p.visits
+    .map((v) => ({ ...v, reviews: reviews.filter((r) => r.visit_id === v.id) }))
+    .sort((a, b) => b.visited_on.localeCompare(a.visited_on) || b.created_at.localeCompare(a.created_at));
+  // 사진은 순서대로, 맨 앞이 대표 사진
+  const photos = [...(p.place_photos || [])]
+    .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+  return { ...p, reviews, visits, photos };
+}
+
+/* ---------- 사진 (비공개 버킷 → 서명 URL) ---------- */
+const MAX_PHOTOS = 10; // 장소마다 최대 사진 수
+const photoCache = {}; // path → { url, at }
+async function signPhotos() {
+  const now = Date.now();
+  const need = state.places.flatMap((p) => p.photos.map((x) => x.path))
+    .filter((x) => !(photoCache[x] && now - photoCache[x].at < 6 * 3600e3));
+  if (!need.length) return;
+  const { data, error } = await sb.storage.from(BUCKET).createSignedUrls(need, 12 * 3600);
+  if (error || !data) return; // 사진 없이 표시
+  data.forEach((d) => { if (d.signedUrl && d.path) photoCache[d.path] = { url: d.signedUrl, at: now }; });
+}
+const signedUrl = (path) => (photoCache[path] ? photoCache[path].url : '');
+const photoUrl = (p) => (p.photos && p.photos[0] ? signedUrl(p.photos[0].path) : ''); // 대표 사진
+// 긴 변 1080px JPEG로 줄여서 올림 (휴대폰 원본은 너무 큼)
+// 사진 열기: 먼저 <img>로(사진 방향 정보를 확실히 따름), 안 되면 createImageBitmap으로 한 번 더.
+// 어떤 사진은 열지도 실패하지도 않고 멈춰 있어서 20초가 넘으면 못 여는 사진으로 봄
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('image_decode')), ms))]);
+async function openPhoto(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await withTimeout(new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('image_decode')); i.src = url; }), 20000);
+    return { src: img, w: img.naturalWidth, h: img.naturalHeight, done: () => URL.revokeObjectURL(url) };
+  } catch (err) {
+    URL.revokeObjectURL(url);
+    if (!window.createImageBitmap) throw err;
+    const bmp = await withTimeout(createImageBitmap(file, { imageOrientation: 'from-image' }), 20000).catch(() => { throw new Error('image_decode'); });
+    return { src: bmp, w: bmp.width, h: bmp.height, done: () => bmp.close() };
+  }
+}
+async function shrink(file, max = 1080) {
+  const ph = await openPhoto(file);
+  try {
+    if (!ph.w || !ph.h) throw new Error('image_decode');
+    const k = Math.min(1, max / Math.max(ph.w, ph.h));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(ph.w * k)); c.height = Math.max(1, Math.round(ph.h * k));
+    c.getContext('2d').drawImage(ph.src, 0, 0, c.width, c.height);
+    return await new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('image_decode'))), 'image/jpeg', 0.82));
+  } finally { ph.done(); }
+}
+// 사진 여러 장을 하나씩 줄여서 올리고 뒤에 이어 붙임 (최대 MAX_PHOTOS장). 한 장이 실패해도 나머지는 계속
+async function addPhotos(place, files, onProgress = () => {}) {
+  const list = [...files].slice(0, Math.max(0, MAX_PHOTOS - place.photos.length));
+  let pos = place.photos.reduce((m, x) => Math.max(m, x.position), -1);
+  let done = 0, error = null;
+  for (const [i, file] of list.entries()) {
+    onProgress(i + 1, list.length);
+    try {
+      const blob = await shrink(file);
+      const path = `${place.id}/${Date.now()}-${i}.jpg`;
+      const up = await sb.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg' });
+      if (up.error) throw up.error;
+      const res = await sb.from('place_photos').insert({ place_id: place.id, path, position: ++pos, created_by: uid() });
+      if (res.error) { await sb.storage.from(BUCKET).remove([path]); throw res.error; }
+      done++;
+    } catch (err) { if (!error) { error = err; error.photoName = file.name; } }
+  }
+  return { done, tried: list.length, skipped: files.length - list.length, error };
+}
+function photoResultText(r) {
+  if (r.error && /image_decode/.test(r.error.message)) {
+    // 어떤 사진이 왜 안 됐는지: 휴대폰 브라우저가 못 여는 형식(HEIC·RAW 등)이거나 너무 큰 사진
+    const failed = r.tried - r.done;
+    const which = r.error.photoName ? `‘${r.error.photoName}’ 사진${failed > 1 ? ` 등 ${failed}장` : ''}` : `사진 ${failed}장`;
+    return `${r.done ? `사진 ${r.done}장을 올렸고, ` : ''}${which}은 이 휴대폰에서 열 수 없어서 못 올렸어요. 사진 앱에서 다시 저장하거나 스크린샷으로 골라 주세요.`;
+  }
+  if (r.error) return `${r.done ? `사진 ${r.done}장을 올렸고, ` : '사진 '}${r.tried - r.done}장은 못 올렸어요. ${friendly(r.error)}`;
+  if (r.skipped) return `${r.done ? `사진 ${r.done}장을 올렸어요. ` : ''}사진은 ${MAX_PHOTOS}장까지라 ${r.skipped}장은 빠졌어요.`;
+  return r.done > 1 ? `사진 ${r.done}장을 올렸어요.` : '사진을 저장했어요.';
+}
+// 표에서 먼저 지우고 파일을 지움 (파일만 남는 건 괜찮지만, 없는 파일을 가리키면 안 되니까)
+async function deletePhoto(photo) {
+  const { data, error } = await sb.from('place_photos').delete().eq('id', photo.id).select('id');
+  if (error) throw error;
+  if (data.length) await sb.storage.from(BUCKET).remove([photo.path]);
+}
+// 대표 사진 = 맨 앞. 지금 맨 앞보다 하나 앞 순서로 옮김
+async function setCover(place, photo) {
+  const first = Math.min(...place.photos.map((x) => x.position));
+  const { error } = await sb.from('place_photos').update({ position: first - 1 }).eq('id', photo.id);
+  if (error) throw error;
+}
+async function refresh({ keepSheet = true } = {}) {
+  await loadAll();
+  render();
+  if (keepSheet && state.sheet && state.sheet.type === 'detail') renderSheet();
+}
+
+/* ---------- 화면: 설정 필요 / 로그인 / 시작하기 ---------- */
+function viewConfig() {
+  return `<main class="wrap gate">
+    <div class="mark"><i></i><i></i></div>
+    <h1>연결 정보가 필요해요</h1>
+    <p class="lead">index.html 위쪽의 <b>SUPABASE_URL</b>과 <b>SUPABASE_KEY</b>에 프로젝트 URL과 Publishable key를 넣어 주세요. 대시보드의 Project Settings → API Keys에 있어요.</p>
+  </main>`;
+}
+function viewLogin() {
+  const id = !!LOGIN_ID_DOMAIN; // 친구용: 이메일 대신 아이디
+  return `<main class="wrap gate">
+    <div class="mark"><i></i><i></i></div>
+    <h1>우리의 장소 기록</h1>
+    <p class="lead">가고 싶은 곳을 모으고, 다녀온 곳엔 각자 후기를 남겨요.</p>
+    <form class="panel" id="login-form" novalidate>
+      <label class="field"><span>${id ? '아이디' : '이메일'}</span><input class="input" type="${id ? 'text' : 'email'}" name="email" autocomplete="username"${id ? ' autocapitalize="off" autocorrect="off" spellcheck="false"' : ''} required></label>
+      <label class="field"><span>비밀번호</span><input class="input" type="password" name="password" autocomplete="current-password" required></label>
+      <button class="btn block" type="submit">로그인</button>
+      <p class="error" id="login-error"></p>
+    </form>
+    ${SIGNUP_ENABLED ? '<button class="text-btn" data-action="auth-mode" data-mode="signup" style="margin-top:16px;align-self:center">초대 코드로 가입</button>' : ''}
+  </main>`;
+}
+// 친구용: 초대 코드로 가입. 가입 코드(W-XXXX-XXXX)면 가입만, 공간 코드(8자리)면 그 공간에 바로 참여
+let authMode = 'login'; // 로그인 전 화면: 'login' | 'signup'
+function viewSignup() {
+  return `<main class="wrap gate">
+    <div class="mark"><i></i><i></i></div>
+    <h1>초대 코드로 가입</h1>
+    <p class="lead">받은 초대 코드로 계정을 만들어요. 메일 인증은 없어요.</p>
+    <form class="panel" id="signup-form" novalidate>
+      <label class="field"><span>초대 코드</span><input class="input" name="code" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="20" placeholder="W-XXXX-XXXX 또는 8자리 코드" required>
+        <p class="hint">관리자에게 받은 가입 코드(W로 시작)면 가입한 뒤 공간을 만들어요. 친구가 보낸 8자리 공간 초대 코드면 가입하면서 그 공간에 바로 들어가요.</p></label>
+      <label class="field"><span>아이디</span><input class="input" type="text" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="20" required>
+        <p class="hint">영문 소문자·숫자와 . _ - 로 3~20자. 로그인할 때 써요.</p></label>
+      <label class="field"><span>앱에서 보일 이름</span><input class="input" name="name" maxlength="20" placeholder="예: 지훈" required></label>
+      <label class="field"><span>비밀번호</span><input class="input" type="password" name="password" autocomplete="new-password" minlength="8" maxlength="72" required></label>
+      <label class="field"><span>비밀번호 확인</span><input class="input" type="password" name="password2" autocomplete="new-password" minlength="8" maxlength="72" required></label>
+      <button class="btn block" type="submit">가입하기</button>
+      <p class="error" id="signup-error"></p>
+    </form>
+    <button class="text-btn" data-action="auth-mode" data-mode="login" style="margin-top:16px;align-self:center">이미 계정이 있어요 · 로그인</button>
+  </main>`;
+}
+// 서버(deploy/home/signup.cjs)와 같은 규칙으로 먼저 확인해서 바로 알려 줌. 최종 판단은 서버가 함
+const SIGNUP_CODE_RE = /^W[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/;
+function signupInput(f) {
+  const code = f.code.value.toUpperCase().replace(/[\s-]/g, '');
+  const username = f.username.value.trim().toLowerCase();
+  const displayName = field(f, 'name').value.trim();
+  const password = f.password.value;
+  if (!SIGNUP_CODE_RE.test(code) && !/^[0-9A-F]{8}$/.test(code)) return { error: '초대 코드를 다시 확인해 주세요. (W로 시작하는 가입 코드나 8자리 공간 코드)' };
+  if (!/^[a-z0-9][a-z0-9._-]{2,19}$/.test(username) || username.includes('..') || username.endsWith('.')) return { error: '아이디는 영문 소문자·숫자와 . _ - 로 3~20자예요. (맨 앞은 영문이나 숫자)' };
+  if (!displayName) return { error: '앱에서 보일 이름을 입력해 주세요.' };
+  if (password.length < 8 || new TextEncoder().encode(password).length > 72) return { error: '비밀번호는 8~72자로 입력해 주세요.' };
+  if (password !== f.password2.value) return { error: '두 비밀번호가 달라요.' };
+  return { code, username, displayName, password };
+}
+// 홈 서버 API (친구용). 실패하면 서버가 준 문구, 없으면 msg.notFound(404) / msg.failed, 60초가 넘으면 msg.slow
+async function postApi(path, body, msg, token) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 60000);
+  try {
+    const headers = { 'content-type': 'application/json' };
+    if (token) headers.authorization = `Bearer ${token}`;
+    const r = await fetch(path, { method: 'POST', signal: ctl.signal, headers, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || (r.status === 404 ? msg.notFound : msg.failed));
+    return j;
+  } catch (err) {
+    if (err && err.name === 'AbortError') throw new Error(msg.slow);
+    throw err;
+  } finally { clearTimeout(timer); }
+}
+const signUp = (input) => postApi('/api/signup', input, {
+  notFound: '가입을 받지 않는 사이트예요.',
+  failed: '가입을 끝내지 못했어요. 잠시 후 다시 시도해 주세요.',
+  slow: '응답이 너무 늦어요. 잠시 뒤 로그인해 보거나 다시 시도해 주세요.',
+});
+// 친구용: 공간 코드로 참여도 홈 서버(POST /api/join)를 거침. 코드 맞히기를 가입과 합쳐 접속한 곳마다 1시간 5번으로 막으려고
+// 친구용 DB는 join_couple을 앱에서 직접 못 부르게 막아 둠(supabase/friends-signup.sql). 결과는 sb.rpc처럼 { error }
+async function joinViaServer(code, name) {
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data.session && data.session.access_token;
+    if (!token) return { error: new Error('로그인이 끝났어요. 다시 로그인해 주세요.') };
+    await postApi('/api/join', { code, displayName: name }, {
+      notFound: '이 사이트에서는 코드로 참여할 수 없어요.',
+      failed: '참여하지 못했어요. 잠시 후 다시 시도해 주세요.',
+      slow: '응답이 너무 늦어요. 새로고침해서 확인하거나 다시 시도해 주세요.',
+    }, token);
+    return { error: null };
+  } catch (error) { return { error }; }
+}
+let onboardMode = 'create';
+function viewOnboard() {
+  const create = onboardMode === 'create';
+  // 친구용: 초대 코드로 가입할 때 적은 이름을 미리 채움
+  const meta = (LOGIN_ID_DOMAIN && state.user && state.user.user_metadata) || {};
+  const name = typeof meta.display_name === 'string' ? meta.display_name : '';
+  return `<main class="wrap gate">
+    <div class="mark"><i></i><i></i></div>
+    <h1>둘만의 공간을 연결해요</h1>
+    <p class="lead">한 사람이 공간을 만들고, 다른 사람은 초대 코드로 들어오면 돼요.</p>
+    <div class="panel">
+      <div class="switcher" role="group" aria-label="시작 방법">
+        <button type="button" data-action="onboard-mode" data-mode="create" aria-pressed="${create}">새로 만들기</button>
+        <button type="button" data-action="onboard-mode" data-mode="join" aria-pressed="${!create}">코드로 참여</button>
+      </div>
+      <form id="onboard-form" novalidate>
+        ${create ? '' : `<label class="field"><span>초대 코드</span><input class="input" name="code" autocomplete="off" autocapitalize="characters" maxlength="12" placeholder="8자리 코드" required></label>`}
+        <label class="field"><span>앱에서 보일 내 이름</span><input class="input" name="name" maxlength="20" placeholder="예: 지훈"${name ? ` value="${esc(name)}"` : ''} required></label>
+        <button class="btn block" type="submit">${create ? '공간 만들기' : '참여하기'}</button>
+        <p class="error" id="onboard-error"></p>
+      </form>
+    </div>
+    <button class="text-btn" data-action="logout" style="margin-top:16px;align-self:center">다른 계정으로 로그인</button>
+  </main>`;
+}
+
+/* ---------- 화면: 메인 목록 ---------- */
+const avgRating = (p) => {
+  const rs = p.reviews.map((r) => r.rating).filter(Boolean);
+  return rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null;
+};
+// 그 사람이 가장 최근 방문에 남긴 별점
+const latestRating = (p, userId) => {
+  for (const v of p.visits) {
+    const r = v.reviews.find((x) => x.author_id === userId && x.rating);
+    if (r) return r.rating;
+  }
+  return null;
+};
+const lastDay = (p) => (p.visits[0] ? p.visits[0].visited_on : p.created_at.slice(0, 10));
+function filtered() {
+  const list = matched();
+  if (state.tab === 'visited') {
+    // 평점순: 카드에 보이는 평균 평점(소수 한 자리) 높은 순 → 같으면 방문 많은 순 → 그래도 같으면 최근 방문순. 평점 없으면 맨 뒤
+    // 최근 방문순: 마지막 방문일(기록이 없으면 담은 날) / 최근 추가순: 장소를 담은 시각
+    const shown = (p) => { const a = avgRating(p); return a == null ? -1 : Number(a.toFixed(1)); };
+    const desc = (x, y) => (x < y ? 1 : x > y ? -1 : 0);
+    list.sort(state.sort === 'rating'
+      ? (a, b) => desc(shown(a), shown(b)) || desc(a.visits.length, b.visits.length) || desc(lastDay(a), lastDay(b))
+      : state.sort === 'added'
+        ? (a, b) => desc(a.created_at, b.created_at)
+        : (a, b) => desc(lastDay(a), lastDay(b)));
+  }
+  return list;
+}
+function matched() {
+  const q = state.query.trim().toLowerCase();
+  return state.places.filter((p) => {
+    if (state.tab === 'fav' ? !p.favorite : p.status !== state.tab) return false;
+    if (state.category !== '전체' && p.category !== state.category) return false;
+    if (!q) return true;
+    return [p.name, p.address, p.shared_note, p.category].some((v) => (v || '').toLowerCase().includes(q))
+      || p.reviews.some((r) => (r.body || '').toLowerCase().includes(q));
+  });
+}
+function pairTags(p) {
+  const order = ownerFirst();
+  return order.map((m) => {
+    const who = person(m.user_id);
+    const n = latestRating(p, m.user_id);
+    if (n) return `<span class="voice-tag ${who.cls}"><i class="dot"></i>${esc(who.name)} ${stars(n, 13)}</span>`;
+    return `<span class="voice-tag empty ${who.cls}"><i class="dot"></i>${esc(who.name)} 후기 전</span>`;
+  }).join('');
+}
+function placeCard(p) {
+  const by = person(p.created_by);
+  const avg = avgRating(p);
+  const lower = p.status === 'visited'
+    ? `<div class="pair"><div class="pair-tags">${pairTags(p)}</div>${avg ? `<span class="avg" role="img" aria-label="평균 ${avg.toFixed(1)}점"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR}"/></svg>${avg.toFixed(1)}</span>` : ''}</div>`
+    : `<div class="added ${by.cls}"><i class="dot"></i>${esc(josa(by.name, '이', '가'))} 담음 <span aria-hidden="true">|</span> ${fmtDate(p.created_at)}</div>`;
+  const img = photoUrl(p);
+  // 도장은 가장 앞선 것 하나(+나머지 개수), 준우승은 카테고리 옆에 태그 하나(+나머지 개수)
+  const { stamps, seconds } = honorsOf(p.id);
+  const stamp = stamps.length ? stampHtml(stamps[0], stamps.length - 1) : '';
+  return `<li><button class="place" data-action="open" data-id="${p.id}">
+    <div class="place-row">
+      <div class="place-main">
+        <div class="place-top">
+          <span class="place-name">${esc(p.name)}</span>
+          ${p.favorite ? `<span class="heart-mark" aria-label="찜">${ICON.heart(true)}</span>` : ''}
+        </div>
+        <div class="meta${seconds.length ? ' has-tag' : ''}"><span class="cat">${esc(p.category)}</span>${seconds.length ? secondTag(seconds[0], seconds.length - 1) : ''}${p.address ? `<span class="addr">${esc(p.address)}</span>` : ''}</div>
+        ${p.shared_note ? `<p class="note-prev">${esc(p.shared_note)}</p>` : ''}
+      </div>
+      ${img || stamp ? `<div class="place-side${img ? '' : ' solo'}">${img ? `<img class="thumb" src="${esc(img)}" alt="" loading="lazy">` : ''}${stamp}</div>` : ''}
+    </div>
+    ${lower}
+  </button></li>`;
+}
+function listHtml() {
+  const list = filtered();
+  const emptyMsg = state.query || state.category !== '전체'
+    ? '<strong>조건에 맞는 장소가 없어요</strong>검색어나 카테고리를 바꿔 보세요.'
+    : state.tab === 'want_to_go' ? '<strong>가고 싶은 곳을 담아 보세요</strong>오른쪽 아래 버튼으로 첫 장소를 추가해요.'
+    : state.tab === 'visited' ? '<strong>아직 다녀온 곳이 없어요</strong>가고 싶은 곳에서 ‘다녀왔어요’를 누르면 여기로 옮겨져요.'
+    : '<strong>찜한 곳이 없어요</strong>장소를 열고 하트를 누르면 여기에 모여요.';
+  return list.length ? `<ul class="list">${list.map(placeCard).join('')}</ul>` : `<div class="empty-state">${emptyMsg}</div>`;
+}
+function viewMain() {
+  const want = state.places.filter((p) => p.status === 'want_to_go').length;
+  const visited = state.places.filter((p) => p.status === 'visited').length;
+  const fav = state.places.filter((p) => p.favorite).length;
+  const cats = ['전체', ...new Set([...catNames(), ...state.places.map((p) => p.category)])];
+  const tabBtn = (key, label, n) => `<button role="tab" data-action="tab" data-tab="${key}" aria-selected="${state.tab === key}">${label}<span class="n">${n}</span></button>`;
+  const sortBtn = (key, label) => `<button data-action="sort" data-sort="${key}" aria-pressed="${state.sort === key}">${label}</button>`;
+  const ordered = ownerFirst();
+  return `<div class="top"><div class="wrap">
+      <div class="top-row">
+        <div>
+          <h1 class="title">${esc(state.couple.name)}</h1>
+          <div class="duo">${ordered.map((m) => { const w = person(m.user_id); return `<span class="${w.cls}"><i class="dot"></i>${esc(w.name)}</span>`; }).join('')}</div>
+        </div>
+        <div class="top-actions">
+          <button class="icon-btn" data-action="cup" aria-label="장소 월드컵">${ICON.trophy}</button>
+          <button class="icon-btn" data-action="settings" aria-label="설정">${ICON.gear}</button>
+        </div>
+      </div>
+      <div class="tabs" role="tablist">${tabBtn('want_to_go', '가고 싶은 곳', want)}${tabBtn('visited', '다녀온 곳', visited)}${tabBtn('fav', '찜', fav)}</div>
+    </div></div>
+    <main class="wrap">
+      ${state.couple.invite_code ? `<div class="invite"><div>상대에게 초대 코드를 보내 주세요<br><b>${esc(state.couple.invite_code)}</b></div><button class="btn small" data-action="copy-code">복사</button></div>` : ''}
+      <div class="tools">
+        <label class="search"><span class="sr">검색</span>${ICON.search}<input class="input" id="q" type="search" placeholder="이름, 주소, 메모, 후기 검색" value="${esc(state.query)}"></label>
+        <div class="chips" role="group" aria-label="카테고리">${cats.map((c) => `<button class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${state.category === c}">${esc(c)}</button>`).join('')}</div>
+        ${state.tab === 'visited' ? `<div class="sort" role="group" aria-label="정렬">${sortBtn('recent', '최근 방문순')}${sortBtn('added', '최근 추가순')}${sortBtn('rating', '평점순')}</div>` : ''}
+      </div>
+      <div id="list-area">${listHtml()}</div>
+    </main>
+    <button class="btn fab" data-action="add">${ICON.plus}장소 추가</button>`;
+}
+
+/* ---------- 시트: 장소 추가/수정 ---------- */
+const catChip = (c, on) => `<button type="button" class="chip" data-action="pick-cat" data-cat="${esc(c)}" aria-pressed="${on}">${esc(c)}</button>`;
+function selectCat(form, name) {
+  form.category.value = name;
+  form.querySelectorAll('[data-action=pick-cat]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.cat === name));
+}
+function placeForm(p) {
+  const v = p || { name: '', address: '', category: catNames()[0] || '', naver_url: '', status: state.tab === 'visited' ? 'visited' : 'want_to_go', shared_note: '' };
+  const cats = [...new Set([...catNames(), v.category])].filter(Boolean);
+  return `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">${p ? '정보 수정' : '장소 추가'}</h2><span style="width:40px"></span></div>
+  <form class="sheet-body" id="place-form" novalidate>
+    <label class="field"><span>장소 이름</span><input class="input" name="name" maxlength="80" value="${esc(v.name)}" required></label>
+    <div class="field"><span style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">카테고리</span>
+      <div class="cat-pick" role="radiogroup" aria-label="카테고리">${cats.map((c) => catChip(c, v.category === c)).join('')}<button type="button" class="chip add" data-action="new-cat">+ 새 카테고리</button></div>
+      <div class="new-cat hidden"><input class="input" maxlength="20" placeholder="새 카테고리 이름" aria-label="새 카테고리 이름" enterkeyhint="done"><button type="button" class="btn small" data-action="add-cat">추가</button></div>
+      <input type="hidden" name="category" value="${esc(v.category)}">
+    </div>
+    <label class="field" style="margin-top:14px"><span>지도 링크 (네이버·구글)</span><textarea class="input url" name="naver_url" rows="2" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://naver.me/… 또는 https://maps.app.goo.gl/…">${esc(v.naver_url || '')}</textarea>
+      <p class="hint">공유하기로 복사한 링크나 문구를 붙여넣으면 링크만 골라 넣고, 비어 있는 이름·주소도 채워 줘요. 해외 장소는 구글 지도 링크로.</p></label>
+    <label class="field"><span>주소</span><input class="input" name="address" maxlength="200" value="${esc(v.address || '')}"></label>
+    ${p ? '' : `<div class="field"><span style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">상태</span>
+      <div class="seg" style="margin:0" role="group" aria-label="상태">
+        <button type="button" data-action="pick-status" data-status="want_to_go" aria-pressed="${v.status === 'want_to_go'}">가고 싶은 곳</button>
+        <button type="button" data-action="pick-status" data-status="visited" aria-pressed="${v.status === 'visited'}">다녀왔어요</button>
+      </div><input type="hidden" name="status" value="${v.status}"></div>
+    <label class="field" style="margin-top:14px"><span>함께 쓰는 메모</span><textarea class="input" name="shared_note" maxlength="2000" placeholder="웨이팅, 추천 메뉴, 주차 같은 것들">${esc(v.shared_note)}</textarea></label>
+    <label class="field"><span>사진 (선택 · 여러 장 가능)</span><input class="input" type="file" name="photo" accept="image/*" multiple>
+      <span class="photo-previews" id="photo-previews"></span>
+      <p class="hint" id="photo-hint">처음 고른 사진이 대표 사진이에요. 최대 ${MAX_PHOTOS}장.</p></label>`}
+    <button class="btn block" type="submit">${p ? '변경 저장' : '장소 추가'}</button>
+    <p class="error" id="form-error"></p>
+  </form>`;
+}
+// 네이버 지도 공유 문구 예) "[네이버지도]\n장소명\n서울 ○○구 …\nhttps://naver.me/xxxx"
+// 링크엔 ' 가 들어갈 수 있음 (구글 지도 주소창 링크 …/place/Joe's+Pizza/…)
+const URL_RE = /https?:\/\/[^\s<>"]+/i;
+const URL_RE_G = /https?:\/\/[^\s<>"]+/gi;
+// 링크 끝에 붙은 문장부호·글자 떼기 ("…/AbCd." "…/AbCd)" "…/AbCd여기"). 짧은 링크는 정해진 글자까지만
+const SHORT_RE = /^https?:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|naver\.me)\/[A-Za-z0-9_-]+(\?[A-Za-z0-9_=&%-]*)?/i;
+const cleanUrl = (u) => { const s = u.match(SHORT_RE); return (s ? s[0] : u).replace(/[.,!?;:'"’”)\]}]+$/, ''); };
+const ADDR_RE = /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|충청|전북|전남|전라|경북|경남|경상|제주)/;
+const isShareText = (t) => URL_RE.test(t) && t.replace(URL_RE_G, '').trim().length > 0;
+function parseShare(text) {
+  const url = cleanUrl((text.match(URL_RE) || [])[0] || '');
+  const lines = text.split(/\r?\n/)
+    .map((s) => s.replace(URL_RE_G, '').replace(/^\[[^\]]*\]\s*/, '').trim())
+    .filter((s) => s && !/^(네이버\s?지도|naver\s?map|google\s?(지도|maps))$/i.test(s) && !/^[\d\-\s()+]{7,}$/.test(s));
+  const name = (lines[0] || '').replace(/\s*[-|:]\s*네이버\s?지도$/i, '').trim();
+  const rest = lines.slice(1);
+  return { url, name, address: rest.find((s) => ADDR_RE.test(s)) || rest[0] || '' };
+}
+// 비어 있는 이름·주소 칸만 채우고, 채운 칸 이름을 돌려줌
+function fillEmpty(form, s) {
+  const filled = [];
+  if (!field(form, 'name').value.trim() && s.name) { field(form, 'name').value = s.name; filled.push('이름'); }
+  if (!form.address.value.trim() && s.address) { form.address.value = s.address; filled.push('주소'); }
+  return filled;
+}
+// 구글 지도 링크면 true (이름·주소는 구글에 물어본 뒤 따로 채움)
+function applyShare(form, text) {
+  const s = parseShare(text);
+  if (!s.url) return false;
+  form.naver_url.value = s.url;
+  if (isGoogleMaps(s.url)) { fillFromGoogle(form, s); return true; }
+  fillEmpty(form, s);
+  return false;
+}
+
+// 구글 지도 링크 (해외 장소용). 공유 링크엔 이름·주소가 없을 때가 많아서 서버(api/place.js)가 구글 지도에서 읽어 옴
+function isGoogleMaps(u) {
+  let x;
+  try { x = new URL(safeUrl(u)); } catch { return false; }
+  const h = x.hostname;
+  return h === 'maps.app.goo.gl' || (h === 'goo.gl' && x.pathname.startsWith('/maps'))
+    || (/^(www\.|maps\.)?google\.(com|[a-z]{2}|co\.[a-z]{2}|com\.[a-z]{2})$/.test(h) && (h.startsWith('maps.') || /^\/maps(\/|$)/.test(x.pathname)));
+}
+async function googlePlace(url, signal) {
+  const { data } = await sb.auth.getSession();
+  const r = await fetch('/api/place', {
+    method: 'POST', signal, body: JSON.stringify({ url }),
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${(data.session && data.session.access_token) || ''}` },
+  });
+  if (!r.ok) throw new Error(`place ${r.status}`);
+  const j = await r.json();
+  return { name: String(j.name || '').trim(), address: String(j.address || '').trim() };
+}
+const GOOGLE_WAIT = '구글 지도에서 이름·주소를 가져오는 중…';
+const googleKey = (v) => safeUrl(cleanUrl(String(v || '').trim()));
+let googleJob = null, googleTimer; // 지금 구글에 묻는 중인 것 { form, url, ctl, done }
+// 화면을 닫거나 링크를 바꾸면 묻던 걸 그만두고 '가져오는 중' 알림도 내림
+function cancelGoogle() {
+  clearTimeout(googleTimer);
+  const job = googleJob;
+  if (!job) return;
+  googleJob = null;
+  job.ctl.abort();
+  if (job.form.dataset.google === job.url) delete job.form.dataset.google; // 같은 링크를 다시 넣으면 또 물어봄
+  if ($('#toast').textContent === GOOGLE_WAIT) $('#toast').classList.remove('show');
+}
+// 비어 있는 이름·주소를 구글 지도에서 채움. fallback: 구글이 못 준 칸에 쓸 값 (붙여넣은 공유 문구에서 고른 이름·주소)
+function fillFromGoogle(form, fallback = {}) {
+  clearTimeout(googleTimer);
+  const raw = form.naver_url.value.trim();
+  const url = googleKey(raw);
+  if (!form.isConnected || !isGoogleMaps(url) || form.dataset.google === url) return; // 같은 링크는 한 번만 물어봄
+  if (field(form, 'name').value.trim() && form.address.value.trim()) return; // 채울 칸이 없음
+  cancelGoogle();
+  if (cleanUrl(raw) !== raw) form.naver_url.value = cleanUrl(raw);
+  form.dataset.google = url;
+  const job = googleJob = { form, url, ctl: new AbortController() };
+  toast(GOOGLE_WAIT, 0);
+  job.done = (async () => {
+    const timer = setTimeout(() => job.ctl.abort(), 12000);
+    const info = await googlePlace(url, job.ctl.signal).catch(() => null);
+    clearTimeout(timer);
+    if (googleJob !== job) return; // 그사이 화면을 닫았거나 링크를 바꿈
+    googleJob = null;
+    if (!info) delete form.dataset.google; // 실패했으면 다시 붙여넣을 때 또 물어봄
+    const filled = fillEmpty(form, info ? { name: info.name || fallback.name, address: info.address || fallback.address } : fallback);
+    const what = filled.length ? `${filled.join('·')}${filled[filled.length - 1] === '이름' ? '을' : '를'}` : '';
+    if (info) {
+      if (what) toast(`구글 지도에서 ${what} 채웠어요.`);
+      else if ($('#toast').textContent === GOOGLE_WAIT) $('#toast').classList.remove('show');
+    } else toast(`구글 지도에서 이름·주소를 가져오지 못했어요. ${what ? `붙여넣은 문구로 ${what} 채웠어요.` : '직접 적어 주세요.'}`, 5000);
+  })();
+}
+
+/* ---------- 시트: 장소 상세 ---------- */
+// 사진 넘겨 보기: 옆으로 밀면 다음 사진, 누르면 크게. 맨 앞이 대표 사진(목록 썸네일)
+function galleryHtml(p) {
+  if (!p.photos.length) return '';
+  const many = p.photos.length > 1;
+  return `<div class="gallery">
+    <div class="gallery-track" id="gallery">${p.photos.map((ph, i) => `<button type="button" class="gallery-item" data-action="view-photo" data-i="${i}" aria-label="사진 ${i + 1} 크게 보기">
+      <img src="${esc(signedUrl(ph.path))}" alt="${esc(p.name)} 사진 ${i + 1}"${i ? ' loading="lazy"' : ''}>${many && !i ? '<span class="cover-badge">대표</span>' : ''}</button>`).join('')}</div>
+    ${many ? `<span class="gallery-count" id="gallery-count" aria-live="polite">1 / ${p.photos.length}</span>` : ''}
+  </div>`;
+}
+// 지금 보고 있는 사진 번호 (옆으로 민 정도로 계산)
+const galleryIndex = () => {
+  const t = $('#gallery');
+  return t && t.clientWidth ? Math.min(t.children.length - 1, Math.max(0, Math.round(t.scrollLeft / t.clientWidth))) : 0;
+};
+// 번호 표시와 '대표 사진으로' 버튼(대표가 아닌 사진일 때만)을 지금 사진에 맞춤
+function syncGallery() {
+  const i = galleryIndex(), t = $('#gallery');
+  if (!t) return;
+  state.photoIdx = i;
+  const count = $('#gallery-count'), cover = $('#photo-cover');
+  if (count) count.textContent = `${i + 1} / ${t.children.length}`;
+  if (cover) cover.hidden = i === 0;
+}
+function showGallery(i) {
+  const t = $('#gallery');
+  if (!t) return;
+  t.scrollLeft = Math.min(i, t.children.length - 1) * t.clientWidth;
+  syncGallery();
+}
+// 크게 보기: 화면 가득, 사진 전체가 보이게(잘리지 않게). 옆으로 밀어 넘김
+function openViewer(p, i) {
+  const root = $('#viewer-root');
+  root.innerHTML = `<div class="viewer" role="dialog" aria-modal="true" aria-label="${esc(p.name)} 사진">
+    <div class="viewer-track" id="viewer-track">${p.photos.map((ph, k) => `<div class="viewer-item"><img src="${esc(signedUrl(ph.path))}" alt="${esc(p.name)} 사진 ${k + 1}"></div>`).join('')}</div>
+    <button class="icon-btn viewer-close" data-action="close-viewer" aria-label="닫기">${ICON.close}</button>
+    ${p.photos.length > 1 ? `<span class="viewer-count" id="viewer-count">${i + 1} / ${p.photos.length}</span>` : ''}
+  </div>`;
+  const t = $('#viewer-track');
+  t.scrollLeft = i * t.clientWidth;
+  $('.viewer-close', root).focus();
+  syncHistory();
+}
+function closeViewer() {
+  const root = $('#viewer-root');
+  if (!root.innerHTML) return false;
+  const i = $('#viewer-track') ? Math.round($('#viewer-track').scrollLeft / Math.max(1, $('#viewer-track').clientWidth)) : 0;
+  root.innerHTML = '';
+  showGallery(i); // 크게 보던 사진에서 이어서
+  syncHistory();
+  return true;
+}
+// 방문 한 번: 날짜 + 두 사람의 별점·후기. 편집 중이면 날짜와 내 줄이 입력칸으로 바뀜 (v가 없으면 새 방문)
+function visitCard(p, v, editing) {
+  const reviews = v ? v.reviews : [];
+  const mine = reviews.find((r) => r.author_id === uid());
+  const partnerWrote = reviews.some((r) => r.author_id !== uid());
+  const rows = ownerFirst().filter((m) => v || m.user_id === uid()).map((m) => {
+    const w = person(m.user_id);
+    const who = `<span class="voice-who"><i class="dot"></i>${esc(w.name)}${w.me ? '<span class="you">나</span>' : ''}</span>`;
+    if (w.me && editing) {
+      return `<div class="vrow ${w.cls}">
+        <div class="vrow-head">${who}</div>
+        ${rateInput(state.draftRating)}
+        <textarea class="input" id="my-review" maxlength="3000" placeholder="어땠는지 남겨 보세요">${esc(mine ? mine.body : '')}</textarea>
+      </div>`;
+    }
+    const r = reviews.find((x) => x.author_id === m.user_id);
+    return `<div class="vrow ${w.cls}">
+      <div class="vrow-head">${who}${r && r.rating ? stars(r.rating, 16) : ''}</div>
+      ${r ? (r.body ? `<p class="voice-body">${esc(r.body)}</p>` : '') : '<p class="voice-empty">아직 후기가 없어요.</p>'}
+    </div>`;
+  }).join('');
+  const head = editing
+    ? `<label><span class="sr">방문 날짜</span><input class="input date" type="date" id="visit-date" value="${v ? v.visited_on : today()}" max="${today()}" required></label>`
+    : `<span class="visit-date">${fmtDay(v.visited_on)}</span><button class="text-btn" data-action="edit-visit" data-visit="${v.id}">${mine ? '내 후기 수정' : '내 후기 쓰기'}</button>`;
+  // 상대 후기가 없는 방문만 통째로 지울 수 있고, 있으면 내 후기만 지움
+  const del = v && !partnerWrote ? '<button class="text-btn danger" data-action="delete-visit">방문 삭제</button>'
+    : mine ? '<button class="text-btn danger" data-action="delete-review">내 후기 삭제</button>' : '';
+  const actions = editing ? `<div class="voice-actions">
+      <span>${del}</span>
+      <span class="btns">${v || p.visits.length ? '<button class="text-btn" data-action="cancel-visit">취소</button>' : ''}<button class="btn small" data-action="save-visit">저장</button></span>
+    </div>` : '';
+  return `<article class="visit">
+    <div class="visit-head">${head}</div>
+    ${rows}${actions}
+  </article>`;
+}
+function detailView(p) {
+  const link = safeUrl(p.naver_url) || `https://map.naver.com/p/search/${encodeURIComponent(p.name)}`;
+  const showVisits = p.status === 'visited' || p.visits.length > 0;
+  // 방문 기록이 하나도 없으면 새 방문 입력칸을 바로 보여줌
+  const editId = state.editVisit || (p.visits.length ? null : 'new');
+  const { stamps, seconds } = honorsOf(p.id);
+  const honors = (stamps.length ? `<div class="honors">${stamps.map((h) => `<div class="honor">${stampHtml(h)}<small>${h.gold ? '둘 다 1위' : esc(person(h.user_id).name)}</small></div>`).join('')}</div>` : '')
+    + (seconds.length ? `<div class="honor-tags">${seconds.map((h) => secondTag(h, 0, true)).join('')}</div>` : '');
+  return `<div class="sheet-head">
+      <button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button>
+      <div class="right">
+        <button class="icon-btn heart-btn" data-action="toggle-fav" aria-pressed="${p.favorite}" aria-label="찜">${ICON.heart(p.favorite)}</button>
+        <button class="text-btn" data-action="edit" style="padding-right:10px">정보 수정</button>
+      </div>
+    </div>
+    <div class="sheet-body">
+      ${galleryHtml(p)}
+      <h2 class="detail-name" id="sheet-title">${esc(p.name)}</h2>
+      <div class="detail-meta"><span class="cat">${esc(p.category)}</span><span>${esc(p.address || '주소 없음')}</span></div>
+      ${honors}
+      <a class="map-link" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${ICON.pin}${!p.naver_url ? '네이버 지도에서 검색' : isGoogleMaps(p.naver_url) ? '구글 지도에서 보기' : '네이버 지도에서 보기'}</a>
+      <div class="photo-actions">
+        ${p.photos.length < MAX_PHOTOS ? '<label class="btn small ghost">사진 추가<input class="sr" type="file" id="photo-input" accept="image/*" multiple></label>' : ''}
+        ${p.photos.length > 1 ? '<button class="text-btn" data-action="photo-cover" id="photo-cover" hidden>대표 사진으로</button>' : ''}
+        ${p.photos.length ? `<button class="text-btn danger" data-action="remove-photo">${p.photos.length > 1 ? '이 사진 삭제' : '사진 삭제'}</button>` : ''}
+      </div>
+      <div class="seg" role="group" aria-label="방문 상태">
+        <button data-action="set-status" data-status="want_to_go" aria-pressed="${p.status === 'want_to_go'}">가고 싶은 곳</button>
+        <button data-action="set-status" data-status="visited" aria-pressed="${p.status === 'visited'}">다녀왔어요</button>
+      </div>
+      <section class="block">
+        <h3>함께 쓰는 메모</h3>
+        <textarea class="input" id="shared-note" maxlength="2000" placeholder="둘 다 고칠 수 있는 메모예요">${esc(p.shared_note)}</textarea>
+        <div class="block-row"><button class="btn small ghost" data-action="save-note">메모 저장</button></div>
+      </section>
+      ${showVisits ? `<section class="block">
+        <div class="block-head"><h3>방문 기록${p.visits.length ? `<span class="n">${p.visits.length}</span>` : ''}</h3>${editId === 'new' ? '' : '<button class="text-btn" data-action="add-visit">+ 방문 추가</button>'}</div>
+        ${editId === 'new' ? visitCard(p, null, true) : ''}
+        ${p.visits.map((v) => visitCard(p, v, editId === v.id)).join('')}
+      </section>` : `<p class="hint" style="margin-top:18px">‘다녀왔어요’로 바꾸면 방문한 날짜와 각자 별점·후기를 남길 수 있어요.</p>`}
+      <div class="danger-zone"><span>${esc(josa(person(p.created_by).name, '이', '가'))} ${fmtDate(p.created_at)}에 담음</span><button class="text-btn danger" data-action="delete-place">장소 삭제</button></div>
+    </div>`;
+}
+
+/* ---------- 시트: 장소 월드컵 ---------- */
+// 방문 기록 날짜 기준: 2025년과 2026년에 모두 갔으면 두 해 월드컵에 다 나옴
+const cupYears = () => [...new Set(state.places.flatMap((p) => p.visits.map((v) => v.visited_on.slice(0, 4))))].sort().reverse();
+function cupPool(year, cat) {
+  return state.places.filter((p) => (year === 'all' ? p.status === 'visited' || p.visits.length > 0 : p.visits.some((v) => v.visited_on.startsWith(year)))
+    && (cat === '전체' || p.category === cat));
+}
+const cupTitle = (year, cat) => `${year === 'all' ? '역대' : year} ${cat === '전체' ? '장소' : cat} 월드컵`;
+// 후보 수 이하에서 가장 큰 2의 거듭제곱이 본선. 넘치는 만큼 예선을 치러서 아무도 빠지지 않게 함
+function cupPlan(n) {
+  let size = 1;
+  while (size * 2 <= n) size *= 2;
+  return { size, extra: n - size };
+}
+const roundName = (players) => (players === 2 ? '결승' : `${players}강`);
+// 예선이 본선보다 많으면(예: 30곳 → 예선 14경기) '32강'처럼 부름
+const playinName = ({ size, extra }) => (extra * 2 > size ? roundName(size * 2) : '예선');
+function cupPlanText(n) {
+  if (n < 2) return '후보가 2곳 이상이어야 해요.';
+  const { size, extra } = cupPlan(n);
+  if (!extra) return `후보 ${n}곳 · ${size === 2 ? '바로 결승' : `${roundName(size)}부터`}`;
+  return extra * 2 > size
+    ? `후보 ${n}곳 · ${roundName(size * 2)}부터 (부전승 ${size * 2 - n}곳)`
+    : `후보 ${n}곳 · 예선 ${extra}경기 → ${roundName(size)}`;
+}
+const shuffle = (list) => {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+};
+// 대진표 자리 순서: 1번 시드와 2번 시드는 결승에서만 만남 (4강이면 1-4, 2-3)
+function seedOrder(n) {
+  let order = [1];
+  while (order.length < n) { const m = order.length * 2 + 1; order = order.flatMap((s) => [s, m - s]); }
+  return order;
+}
+function mainRound(seeds) {
+  const order = seedOrder(seeds.length);
+  const pairs = [];
+  for (let i = 0; i < order.length; i += 2) pairs.push([seeds[order[i] - 1], seeds[order[i + 1] - 1]]);
+  return pairs;
+}
+function startCup() {
+  const { year, cat, mode } = state.cupSetup;
+  // 섞은 뒤 평점순으로 세우면 평점이 같은 곳끼리는 무작위
+  const list = shuffle(cupPool(year, cat));
+  if (mode === 'seed') list.sort((a, b) => (avgRating(b) ?? -1) - (avgRating(a) ?? -1));
+  const ids = list.map((p) => p.id);
+  const { size, extra } = cupPlan(ids.length);
+  // 위쪽 시드는 본선 직행, 아래쪽 2×extra곳이 예선 (예선 안에서도 강한 곳 vs 약한 곳)
+  const direct = ids.slice(0, ids.length - 2 * extra), pool = ids.slice(ids.length - 2 * extra);
+  const playIn = Array.from({ length: extra }, (_, i) => [pool[i], pool[pool.length - 1 - i]]);
+  state.cup = {
+    title: cupTitle(year, cat), year, cat, n: ids.length, size, extra, direct,
+    // 저장할 때 쓰려고 기억해 둠: 하는 사이 카테고리 이름이 바뀌거나 장소가 지워져도 그대로 남기게
+    catId: cat === '전체' ? null : (state.categories.find((x) => x.name === cat) || {}).id,
+    names: Object.fromEntries(list.map((p) => [p.id, p.name])),
+    stage: extra ? 'playin' : 'main', matches: extra ? playIn : mainRound(direct),
+    idx: 0, winners: [], history: [], champion: null, runnerUp: null,
+  };
+}
+function pickCup(id) {
+  const c = state.cup;
+  c.history.push(JSON.stringify({ ...c, history: [] }));
+  const [a, b] = c.matches[c.idx];
+  c.winners.push(id);
+  c.idx += 1;
+  if (c.idx < c.matches.length) return;
+  if (c.stage === 'playin') {
+    c.stage = 'main';
+    c.matches = mainRound([...c.direct, ...c.winners]); // 예선 통과한 곳이 본선의 낮은 시드
+  } else if (c.winners.length === 1) {
+    c.champion = id; c.runnerUp = id === a ? b : a;
+    return;
+  } else {
+    c.matches = Array.from({ length: c.winners.length / 2 }, (_, i) => [c.winners[2 * i], c.winners[2 * i + 1]]);
+  }
+  c.idx = 0; c.winners = [];
+}
+function undoCup() {
+  const prev = state.cup.history.pop();
+  if (prev) state.cup = { ...JSON.parse(prev), history: state.cup.history };
+}
+const cupPlace = (id) => state.places.find((x) => x.id === id) || { id, name: '삭제된 장소', category: '', reviews: [], visits: [], photos: [] };
+function cupCard(id) {
+  const p = cupPlace(id), img = photoUrl(p), avg = avgRating(p);
+  return `<button class="pick" data-action="cup-pick" data-id="${esc(id)}">
+    ${img ? `<img src="${esc(img)}" alt="">` : `<span class="pick-ph" aria-hidden="true">${esc(p.name.slice(0, 1))}</span>`}
+    <span class="pick-name">${esc(p.name)}</span>
+    <span class="pick-meta">${esc(p.category)}${avg ? ` · ★ ${avg.toFixed(1)}` : ''}</span>
+  </button>`;
+}
+function cupSetupView() {
+  const s = state.cupSetup;
+  const n = cupPool(s.year, s.cat).length;
+  const chip = (action, key, value, label) => `<button type="button" class="chip" data-action="${action}" data-${key}="${esc(value)}" aria-pressed="${s[key] === value}">${esc(label)}</button>`;
+  const label = (t) => `<span style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">${t}</span>`;
+  // 고른 해에 후보가 있는 카테고리만
+  const cats = ['전체', ...catNames()].map((c) => [c, cupPool(s.year, c).length]).filter(([c, k]) => c === '전체' || k > 0);
+  const undated = s.year === 'all' ? 0 : state.places.filter((p) => p.status === 'visited' && !p.visits.length && (s.cat === '전체' || p.category === s.cat)).length;
+  const mine = myResult(s.year, s.cat);
+  return `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">장소 월드컵</h2><span style="width:40px"></span></div>
+  <div class="sheet-body">
+    ${cupTabs()}
+    <div class="field">${label('연도')}<div class="cat-pick" role="group" aria-label="연도">${[...cupYears(), 'all'].map((y) => chip('cup-year', 'year', y, y === 'all' ? '전체 기간' : y)).join('')}</div></div>
+    <div class="field" style="margin-top:14px">${label('카테고리')}<div class="cat-pick" role="group" aria-label="카테고리">${cats.map(([c, k]) => chip('cup-cat', 'cat', c, `${c} ${k}`)).join('')}</div></div>
+    <div class="field" style="margin-top:14px">${label('대진')}<div class="seg" style="margin:0" role="group" aria-label="대진">
+      <button type="button" data-action="cup-mode" data-mode="seed" aria-pressed="${s.mode === 'seed'}">평점 높은 곳 우대</button>
+      <button type="button" data-action="cup-mode" data-mode="random" aria-pressed="${s.mode === 'random'}">무작위</button></div>
+      <p class="hint">${s.mode === 'seed' ? '평점이 높은 곳은 본선에 바로 오르고, 낮은 곳부터 예선을 치러요. 강한 곳끼리는 늦게 만나요.' : '대진을 무작위로 섞어요.'}</p></div>
+    <div class="cup-summary"><b>${esc(cupTitle(s.year, s.cat))}</b><span>${cupPlanText(n)}</span></div>
+    ${undated ? `<p class="hint">방문 기록이 없는 다녀온 곳 ${undated}곳은 연도별 월드컵에 나오지 않아요. 장소에서 방문 날짜를 남기면 들어가요.</p>` : ''}
+    ${mine ? `<p class="hint">${fmtDate(mine.played_at)}에 한 월드컵이에요 (1위 ${esc(mine.champion_name)}). 다시 하면 새 결과로 바뀌어요.</p>` : ''}
+    <button class="btn block" data-action="cup-start" style="margin-top:16px" ${n < 2 ? 'disabled' : ''}>시작하기</button>
+  </div>`;
+}
+function cupView() {
+  const c = state.cup;
+  const head = `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">${esc(c.title)}</h2><span style="width:40px"></span></div>`;
+  if (c.champion) {
+    const w = cupPlace(c.champion), img = photoUrl(w);
+    // 저장이 끝나면 도장이 '쾅' 찍힘. 상대도 같은 월드컵에서 같은 곳을 골랐으면 황금 도장
+    const h = c.saved === 'ok' && honorsOf(c.champion).stamps.find((x) => x.year === c.year && x.cat === c.cat);
+    const saved = h
+      ? `<div class="win-stamp">${stampHtml(h, 0, true)}</div>
+        <p class="win-msg">${h.gold ? '<b>둘 다 1위!</b> 황금 도장이 찍혔어요.' : `${esc(honorTitle(c.year, c.cat))} 1위 도장을 찍었어요.`}</p>
+        ${c.prev ? `<p class="hint" style="margin-top:4px">지난번 1위 ${esc(c.prev)} 기록은 이번 결과로 바뀌었어요.</p>` : ''}`
+      : c.saved === 'ok' // 그새 지워진 장소가 1위면 도장 없이 기록만 남음
+        ? '<p class="win-msg">기록에 남겼어요.</p>'
+      : c.saved === 'error'
+        ? `<p class="error">기록을 저장하지 못했어요. ${esc(c.saveError)}</p><button class="btn small ghost" data-action="cup-save" style="margin-top:8px">다시 저장</button>`
+        : '<p class="hint">기록에 남기는 중…</p>';
+    return `${head}<div class="sheet-body cup-win">
+      <span class="trophy">${ICON.trophy}</span>
+      <p class="cup-round" style="margin:0">우승</p>
+      ${img ? `<img class="photo" src="${esc(img)}" alt="${esc(w.name)} 사진">` : ''}
+      <h2 class="detail-name">${esc(w.name)}</h2>
+      <p class="hint">준우승 · ${esc(cupPlace(c.runnerUp).name)}</p>
+      ${saved}
+      <div class="cup-actions"><button class="btn ghost" data-action="cup-again">다시 하기</button>${state.places.some((x) => x.id === w.id) ? `<button class="btn" data-action="open" data-id="${w.id}">장소 보기</button>` : ''}</div>
+      <button class="text-btn" data-action="cup-records" style="margin-top:8px">역대 기록 보기</button>
+    </div>`;
+  }
+  const [a, b] = c.matches[c.idx];
+  const round = c.stage === 'playin' ? playinName(c) : roundName(c.matches.length * 2);
+  return `${head}<div class="sheet-body">
+    <p class="cup-round">${round}<span>${c.idx + 1} / ${c.matches.length}</span></p>
+    <div class="duel">${cupCard(a)}<span class="vs" aria-hidden="true">VS</span>${cupCard(b)}</div>
+    <div class="cup-foot">${c.history.length ? '<button class="text-btn" data-action="cup-undo">이전 선택 취소</button>' : '<span class="hint" style="margin:0">더 좋았던 곳을 골라 주세요.</span>'}</div>
+  </div>`;
+}
+
+/* ---------- 명예의 전당: 월드컵 기록, 우승 도장 ---------- */
+// 기록의 연도·카테고리를 월드컵 조건과 같은 꼴로: 비운 칸은 'all'(전체 기간) / '전체'(종합)
+const recYear = (r) => (r.year == null ? 'all' : String(r.year).padStart(4, '0'));
+const recCat = (r) => r.category ?? '전체';
+const honorTitle = (year, cat) => `${year === 'all' ? '역대' : year} ${cat === '전체' ? '종합' : cat}`;
+const myResult = (year, cat) => state.cupResults.find((r) => r.user_id === uid() && recYear(r) === year && recCat(r) === cat);
+// 같은 월드컵(연도 + 카테고리)의 두 사람 기록끼리 묶음
+function cupGroups() {
+  const groups = new Map();
+  for (const r of state.cupResults) {
+    const key = `${recYear(r)}|${recCat(r)}`;
+    if (!groups.has(key)) groups.set(key, { key, year: recYear(r), cat: recCat(r), rs: [] });
+    groups.get(key).rs.push(r);
+  }
+  return [...groups.values()];
+}
+// 황금 먼저, 그다음 최근 연도(역대가 맨 앞), 종합, 최근에 한 순
+const honorOrder = (a, b) => (b.gold - a.gold)
+  || (a.year === b.year ? 0 : a.year === 'all' ? -1 : b.year === 'all' ? 1 : Number(b.year) - Number(a.year))
+  || ((b.cat === '전체') - (a.cat === '전체'))
+  || String(b.at).localeCompare(String(a.at));
+// 장소마다 받은 1위 도장과 준우승 태그. 같은 월드컵에서 두 사람이 같은 곳을 고르면 황금 하나로 합침
+let honorCache = { src: null, map: new Map() };
+function honorsOf(placeId) {
+  if (honorCache.src !== state.cupResults) {
+    const map = new Map();
+    const slot = (id) => { if (!map.has(id)) map.set(id, { stamps: [], seconds: [] }); return map.get(id); };
+    for (const g of cupGroups()) {
+      for (const [field, list] of [['champion_id', 'stamps'], ['runner_up_id', 'seconds']]) {
+        const byPlace = new Map();
+        g.rs.forEach((r) => { if (r[field]) byPlace.set(r[field], [...(byPlace.get(r[field]) || []), r]); });
+        for (const [id, rs] of byPlace) {
+          const base = { year: g.year, cat: g.cat, at: rs.map((r) => r.played_at).sort().pop() };
+          // 도장 키는 기록 id로: 카테고리 이름을 바꿔도 '쾅'이 다시 나오지 않게
+          slot(id)[list].push(rs.length > 1
+            ? { ...base, gold: true, key: `${list}:gold:${rs.map((r) => r.id).sort().join('+')}:${id}` }
+            : { ...base, gold: false, user_id: rs[0].user_id, key: `${list}:${rs[0].id}:${rs[0].played_at}` });
+        }
+      }
+    }
+    map.forEach((h) => { h.stamps.sort(honorOrder); h.seconds.sort(honorOrder); });
+    honorCache = { src: state.cupResults, map };
+  }
+  return honorCache.map.get(placeId) || { stamps: [], seconds: [] };
+}
+// 처음 보는 도장만 '쾅' 찍히는 효과. 이 기기에서 이미 본 도장은 기억해 둠
+const SEEN_KEY = 'our-places:seen-stamps';
+const seenStamps = (() => { try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY)) || []); } catch { return new Set(); } })();
+function markStampsSeen() {
+  const fresh = [...document.querySelectorAll('.stamp.fresh')].map((el) => el.dataset.stamp).filter((k) => !seenStamps.has(k));
+  if (!fresh.length) return;
+  fresh.forEach((k) => seenStamps.add(k));
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify([...seenStamps].slice(-500))); } catch { /* 못 남기면 다음에 한 번 더 찍힐 뿐 */ }
+}
+// 둥근 도장: 위 '2026'(전체 기간이면 '역대'), 가운데는 카테고리 이름만(전체면 '종합'), 아래 '1위'
+function stampSvg(h) {
+  const mid = h.cat === '전체' ? '종합' : h.cat;
+  const len = [...mid].length;
+  const size = len <= 2 ? 25 : len === 3 ? 22 : 20;
+  // 네 글자부터는 원 안에 들어가게 폭을 맞춤 (이름은 자르지 않음)
+  const fit = len >= 4 ? ` textLength="${len === 4 ? 62 : 66}" lengthAdjust="spacingAndGlyphs"` : '';
+  const words = `<text x="50" y="33" font-size="15.5" font-weight="800">${esc(h.year === 'all' ? '역대' : h.year)}</text>
+    <text x="50" y="${len <= 2 ? 59.5 : 58.5}" font-size="${size}" font-weight="900"${fit}>${esc(mid)}</text>
+    <text x="50" y="80" font-size="17" font-weight="900">1위</text>`;
+  if (h.gold) {
+    return `<svg viewBox="0 0 100 100" aria-hidden="true">
+      <circle cx="50" cy="50" r="47" fill="url(#stamp-gold)" stroke="#D4A12A" stroke-width="2.5"/>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="#C08A12" stroke-width="1.3" stroke-dasharray="1.6 2.4"/>
+      <g fill="#664400" text-anchor="middle">${words}</g>
+      <path fill="#FFF1A8" stroke="#D4A12A" stroke-width=".9" d="M87 2l2.7 7.6L97.5 12l-7.8 2.6L87 22.5l-2.7-7.9L76.5 12l7.8-2.4z"/>
+      <path fill="#FFF1A8" stroke="#D4A12A" stroke-width=".7" d="M9 77l1.7 4.6L15.5 83l-4.8 1.6L9 89.5l-1.7-4.9L2.5 83l4.8-1.4z"/>
+    </svg>`;
+  }
+  return `<svg viewBox="0 0 100 100" aria-hidden="true"><g filter="url(#stamp-ink)">
+    <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="5"/>
+    <circle cx="50" cy="50" r="38.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <g fill="currentColor" text-anchor="middle">${words}</g>
+  </g></svg>`;
+}
+// 각자 고른 1위는 그 사람 색 도장, 둘 다 고른 1위는 황금 도장
+function stampHtml(h, more = 0, fresh = !seenStamps.has(h.key)) {
+  const label = `${h.gold ? '둘 다 고른' : `${person(h.user_id).name}의`} ${honorTitle(h.year, h.cat)} 1위`;
+  return `<span class="stamp-wrap"><span class="stamp ${h.gold ? 'gold' : person(h.user_id).cls}${fresh ? ' fresh' : ''}" data-stamp="${esc(h.key)}" role="img" aria-label="${esc(label)}">${stampSvg(h)}</span>${more ? `<span class="stamp-more" aria-label="도장 ${more}개 더">+${more}</span>` : ''}</span>`;
+}
+// 준우승 태그: 카드에선 색으로만(누가 골랐는지), 상세에선 이름까지
+const secondTag = (h, more = 0, named = false) => {
+  const who = h.gold ? '둘 다' : person(h.user_id).name;
+  return `<span class="tag ${h.gold ? 'gold' : person(h.user_id).cls}" title="${esc(`${who} 고른 ${honorTitle(h.year, h.cat)} 준우승`)}">#${esc(honorTitle(h.year, h.cat))} 준우승${named ? ` · ${esc(who)}` : ''}${more ? ` +${more}` : ''}</span>`;
+};
+// 끝난 월드컵을 내 기록으로 저장. 같은 월드컵을 다시 했으면 새 결과로 바꿈
+async function saveCup() {
+  const c = state.cup;
+  c.saved = 'saving';
+  const prev = myResult(c.year, c.cat);
+  c.prev = prev && prev.champion_id !== c.champion ? prev.champion_name : null;
+  // 하는 사이 상대가 카테고리 이름을 바꿨으면 바뀐 이름으로, 장소를 지웠으면 이름만 남김
+  const row = () => {
+    const keep = (id) => (state.places.some((x) => x.id === id) ? id : null);
+    return {
+      couple_id: state.couple.id, user_id: uid(),
+      year: c.year === 'all' ? null : Number(c.year),
+      category: c.cat === '전체' ? null : (state.categories.find((x) => x.id === c.catId) || {}).name,
+      champion_id: keep(c.champion), champion_name: c.names[c.champion],
+      runner_up_id: keep(c.runnerUp), runner_up_name: c.names[c.runnerUp],
+      candidates: c.n, played_at: new Date().toISOString(),
+    };
+  };
+  const upsert = (r) => (r.category === undefined
+    ? Promise.resolve({ error: { message: 'cup_category_gone' } })
+    : sb.from('cup_results').upsert(r, { onConflict: 'couple_id,user_id,year,category' }).select().single());
+  let res = await upsert(row());
+  // 이 기기가 모르는 사이 상대가 장소·카테고리를 바꿨을 수 있으니 새로 불러와서 한 번 더
+  if (res.error) {
+    try { await loadAll(); } catch { /* 처음 오류를 그대로 보여 줌 */ }
+    res = await upsert(row());
+  }
+  if (res.error) {
+    c.saved = 'error'; c.saveError = friendly(res.error);
+  } else {
+    // 상대가 같은 월드컵을 방금 끝냈을 수도 있으니 기록 전체를 다시 받아서 황금 도장 여부를 정함
+    const all = await sb.from('cup_results').select('*').order('played_at', { ascending: false });
+    state.cupResults = all.error ? [res.data, ...state.cupResults.filter((r) => r.id !== res.data.id)] : all.data;
+    c.saved = 'ok';
+    if (c.cat !== '전체' && res.data.category !== c.cat) { c.cat = res.data.category; c.title = cupTitle(c.year, c.cat); } // 바뀐 카테고리 이름으로
+  }
+  if (state.cup !== c || !state.sheet || state.sheet.type !== 'cup') {
+    // 저장하는 사이 다른 화면으로 갔으면: 기록·장소 화면만 새로 그리고, 실패는 알려 줌 (입력 폼은 건드리지 않음)
+    if (c.saved === 'error') toast(`월드컵 기록을 저장하지 못했어요. ${c.saveError}`);
+    if (state.sheet && (state.sheet.type === 'detail' || (state.sheet.type === 'cup' && !state.cup))) renderSheet();
+  } else renderSheet();
+  render();
+}
+async function deleteCupResult(id) {
+  const r = state.cupResults.find((x) => x.id === id);
+  if (!r || !confirm(`${cupTitle(recYear(r), recCat(r))} 내 기록을 지울까요? 1위 도장도 같이 사라져요.`)) return;
+  const { error } = await sb.from('cup_results').delete().eq('id', id);
+  if (error) throw error;
+  state.cupResults = state.cupResults.filter((x) => x.id !== id);
+  renderSheet(); render();
+  toast('월드컵 기록을 지웠어요.');
+}
+const cupTabs = () => `<div class="seg" style="margin:4px 0 8px" role="group" aria-label="월드컵">
+  <button type="button" data-action="cup-tab" data-tab="new" aria-pressed="${state.cupTab === 'new'}">새 월드컵</button>
+  <button type="button" data-action="cup-tab" data-tab="records" aria-pressed="${state.cupTab === 'records'}">역대 기록${state.cupResults.length ? ` ${cupGroups().length}` : ''}</button>
+</div>`;
+const placeLink = (id, name) => (id && state.places.some((x) => x.id === id)
+  ? `<button class="link" data-action="open" data-id="${esc(id)}">${esc(name)}</button>`
+  : `<span>${esc(name)}</span> <span class="gone">(지운 장소)</span>`);
+function recCard(g) {
+  // 1위 장소를 지웠어도(연결이 끊겨도) 같은 이름이면 둘 다 1위로 봄
+  const pick = (r) => r.champion_id || `이름:${r.champion_name}`;
+  const both = g.rs.length > 1 && g.rs.every((r) => pick(r) === pick(g.rs[0]));
+  const rows = ownerFirst().map((m) => {
+    const w = person(m.user_id), r = g.rs.find((x) => x.user_id === m.user_id);
+    const who = `<span class="who"><i class="dot"></i>${esc(w.name)}${w.me ? '<span class="you">나</span>' : ''}</span>`;
+    if (!r) {
+      return `<div class="rec-row ${w.cls}"><div class="rec-line">${who}${w.me
+        ? `<button class="text-btn" data-action="cup-play" data-year="${esc(g.year)}" data-cat="${esc(g.cat)}" style="color:var(--p1)">나도 하기</button>`
+        : '<span class="rec-sub">아직 안 했어요</span>'}</div></div>`;
+    }
+    return `<div class="rec-row ${w.cls}">
+      <div class="rec-line">${who}<span class="rec-sub">${fmtDate(r.played_at)}</span></div>
+      <div class="rec-win">${ICON.trophy}${placeLink(r.champion_id, r.champion_name)}</div>
+      <div class="rec-sub">준우승 ${placeLink(r.runner_up_id, r.runner_up_name)} · 후보 ${r.candidates}곳${w.me ? ` · <button class="text-btn danger" data-action="cup-del" data-id="${esc(r.id)}">기록 삭제</button>` : ''}</div>
+    </div>`;
+  }).join('');
+  return `<article class="rec${both ? ' both' : ''}">
+    <div class="rec-head"><span class="rec-title">${esc(cupTitle(g.year, g.cat))}</span>${both ? '<span class="gold-badge">둘 다 1위</span>' : ''}</div>
+    ${rows}
+  </article>`;
+}
+function cupRecordsView() {
+  const head = `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">장소 월드컵</h2><span style="width:40px"></span></div>`;
+  const groups = cupGroups();
+  if (!groups.length) {
+    return `${head}<div class="sheet-body">${cupTabs()}<div class="empty-state"><strong>아직 기록이 없어요</strong>월드컵을 끝까지 하면 여기에 남고, 1위 장소엔 도장이 찍혀요.</div></div>`;
+  }
+  // 최근 연도부터, 전체 기간은 맨 아래. 한 해 안에서는 종합 → 카테고리 순서
+  const catPos = (c) => (c === '전체' ? -1 : catNames().indexOf(c));
+  const years = [...new Set(groups.map((g) => g.year))].sort((a, b) => (a === 'all' ? 1 : b === 'all' ? -1 : Number(b) - Number(a)));
+  const sections = years.map((y) => `<h3 class="rec-year">${y === 'all' ? '전체 기간' : `${y}년`}</h3>${groups
+    .filter((g) => g.year === y).sort((a, b) => catPos(a.cat) - catPos(b.cat)).map(recCard).join('')}`).join('');
+  return `${head}<div class="sheet-body">${cupTabs()}
+    <p class="hint" style="margin:0">각자 고른 1위엔 그 사람 색 도장이, 둘 다 같은 곳을 고르면 황금 도장이 찍혀요.</p>
+    ${sections}
+  </div>`;
+}
+
+/* ---------- 카테고리 (두 사람이 함께 씀) ---------- */
+async function addCategory(btn) {
+  const box = btn.closest('.new-cat'), input = box.querySelector('input');
+  const name = input.value.trim();
+  if (!name) { input.focus(); return; }
+  if (name === '전체') { toast('‘전체’는 카테고리 이름으로 쓸 수 없어요.'); return; }
+  if (!catNames().includes(name)) {
+    const position = Math.max(0, ...state.categories.map((c) => c.position)) + 1;
+    const { data, error } = await sb.from('categories').insert({ couple_id: state.couple.id, name, position }).select('id, name, position').single();
+    if (error) throw error;
+    state.categories.push(data);
+    toast(`‘${name}’ 카테고리를 추가했어요.`);
+  }
+  input.value = '';
+  render();
+  const form = btn.closest('#place-form');
+  if (!form) { renderSheet(); return; }
+  // 장소 폼은 쓰던 내용이 날아가지 않게 다시 그리지 않고 칩만 끼워 넣어 골라 둠
+  const pick = form.querySelector('.cat-pick');
+  if (![...pick.querySelectorAll('[data-action=pick-cat]')].some((b) => b.dataset.cat === name)) {
+    pick.querySelector('[data-action=new-cat]').insertAdjacentHTML('beforebegin', catChip(name, false));
+  }
+  selectCat(form, name);
+  box.classList.add('hidden');
+}
+async function renameCategory(input) {
+  const cat = state.categories.find((c) => c.id === input.dataset.catId);
+  if (!cat) return;
+  const name = input.value.trim();
+  if (name === cat.name) { input.value = name; return; }
+  if (!name || name === '전체') {
+    input.value = cat.name;
+    toast(name ? '‘전체’는 카테고리 이름으로 쓸 수 없어요.' : '카테고리 이름을 입력해 주세요.');
+    return;
+  }
+  const { error } = await sb.from('categories').update({ name }).eq('id', cat.id);
+  if (error) { input.value = cat.name; throw error; }
+  if (state.category === cat.name) state.category = name;
+  if (state.cupSetup && state.cupSetup.cat === cat.name) state.cupSetup.cat = name;
+  await refresh(); // 그 카테고리 장소들도 DB에서 같이 바뀌었으니 다시 불러옴
+  renderSheet();
+  toast('카테고리 이름을 바꿨어요.');
+}
+async function moveCategory(id, dir) {
+  const list = [...state.categories];
+  const i = list.findIndex((c) => c.id === id), j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  // 순서를 0부터 다시 매기고 바뀐 것만 저장
+  const changed = list.map((c, k) => [c, k]).filter(([c, k]) => c.position !== k);
+  const res = await Promise.all(changed.map(([c, k]) => sb.from('categories').update({ position: k }).eq('id', c.id)));
+  const bad = res.find((r) => r.error);
+  if (bad) throw bad.error;
+  state.categories = list.map((c, k) => ({ ...c, position: k }));
+  renderSheet(); render();
+  const again = $(`#sheet-root [data-action=cat-move][data-id="${id}"][data-dir="${dir}"]`);
+  if (again && !again.disabled) again.focus();
+}
+async function deleteCategory(id) {
+  const cat = state.categories.find((c) => c.id === id);
+  if (!cat) return;
+  const used = state.places.filter((x) => x.category === cat.name).length;
+  if (used) { toast(`‘${cat.name}’에 장소가 ${used}곳 있어요. 장소의 카테고리를 먼저 바꿔 주세요.`); return; }
+  if (state.categories.length === 1) { toast('카테고리는 하나 이상 있어야 해요.'); return; }
+  // 그 카테고리 월드컵 기록은 DB에서 같이 지워짐 (도장도 사라짐)
+  const cups = cupGroups().filter((g) => g.cat === cat.name).length;
+  if (!confirm(`‘${cat.name}’ 카테고리를 삭제할까요?${cups ? ` ${cat.name} 월드컵 기록 ${cups}개와 도장도 같이 지워져요.` : ''}`)) return;
+  const { error } = await sb.from('categories').delete().eq('id', id);
+  if (error) throw error;
+  state.categories = state.categories.filter((c) => c.id !== id);
+  state.cupResults = state.cupResults.filter((r) => r.category !== cat.name);
+  if (state.category === cat.name) state.category = '전체';
+  renderSheet(); render();
+  toast('카테고리를 삭제했어요.');
+}
+
+/* ---------- 시트: 설정 ---------- */
+function settingsView() {
+  const me = state.members.find((m) => m.user_id === uid());
+  const id = loginId(state.user.email); // 친구용 아이디 계정이면 주소 대신 아이디
+  return `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">설정</h2><span style="width:40px"></span></div>
+  <div class="sheet-body">
+    <p class="hint" style="margin:4px 0 0">${id ? `아이디 ${esc(id)}로` : `${esc(state.user.email)}로`} 로그인했어요.</p>
+    <form class="settings-group" id="name-form" novalidate>
+      <h3>내 이름</h3>
+      <div class="row"><label class="field"><span class="sr">내 이름</span><input class="input" name="name" maxlength="20" value="${esc(me ? me.display_name : '')}" required></label><button class="btn small" type="submit" style="min-height:46px">이름 저장</button></div>
+    </form>
+    ${state.couple.invite_code ? `<div class="settings-group"><h3>초대 코드</h3><div class="code-box">${esc(state.couple.invite_code)}</div><button class="btn block ghost" data-action="copy-code">코드 복사</button><p class="hint">상대가 참여하면 코드는 자동으로 사라져요.</p></div>` : ''}
+    <div class="settings-group">
+      <h3>카테고리</h3>
+      <ul class="cat-list">${state.categories.map((c, i) => `<li>
+        <input class="input" data-cat-id="${c.id}" value="${esc(c.name)}" maxlength="20" aria-label="카테고리 이름">
+        <button class="icon-btn" data-action="cat-move" data-id="${c.id}" data-dir="-1" aria-label="${esc(c.name)} 위로" ${i ? '' : 'disabled'}>${ICON.up}</button>
+        <button class="icon-btn" data-action="cat-move" data-id="${c.id}" data-dir="1" aria-label="${esc(c.name)} 아래로" ${i < state.categories.length - 1 ? '' : 'disabled'}>${ICON.down}</button>
+        <button class="icon-btn" data-action="cat-delete" data-id="${c.id}" aria-label="${esc(c.name)} 삭제">${ICON.trash}</button>
+      </li>`).join('')}</ul>
+      <div class="new-cat"><input class="input" maxlength="20" placeholder="새 카테고리 이름" aria-label="새 카테고리 이름" enterkeyhint="done"><button class="btn small" data-action="add-cat">추가</button></div>
+      <p class="hint">이름을 바꾸면 그 카테고리의 장소도 같이 바뀌어요. 두 사람 모두에게 똑같이 보여요.</p>
+    </div>
+    <form class="settings-group" id="pw-form" novalidate>
+      <h3>비밀번호 변경</h3>
+      <label class="field"><span>새 비밀번호</span><input class="input" type="password" name="pw" autocomplete="new-password" minlength="8" required></label>
+      <label class="field"><span>새 비밀번호 확인</span><input class="input" type="password" name="pw2" autocomplete="new-password" minlength="8" required></label>
+      <button class="btn block ghost" type="submit">비밀번호 변경</button>
+      <p class="error" id="pw-error"></p>
+    </form>
+    <div class="settings-group"><button class="btn block ghost" data-action="logout">로그아웃</button></div>
+    <p class="app-version">${esc(APP_VERSION)}</p>
+  </div>`;
+}
+
+/* ---------- 렌더링 ---------- */
+let screen = 'loading';
+function render() {
+  const app = $('#app');
+  if (!configured) { screen = 'config'; app.innerHTML = viewConfig(); return; }
+  if (!state.user) { screen = 'login'; app.innerHTML = SIGNUP_ENABLED && authMode === 'signup' ? viewSignup() : viewLogin(); return; }
+  if (!state.couple) { screen = 'onboard'; app.innerHTML = viewOnboard(); return; }
+  screen = 'main';
+  app.innerHTML = viewMain();
+  markStampsSeen();
+}
+let lastFocus = null;
+function openSheet(type, id) {
+  cancelGoogle();
+  if (!state.sheet) lastFocus = document.activeElement;
+  state.sheet = { type, id };
+  if (type === 'detail') { state.editVisit = null; state.draftRating = 0; state.photoIdx = 0; }
+  renderSheet();
+  const first = $('#sheet-root input:not([type=hidden]), #sheet-root textarea');
+  if (first && type !== 'detail') first.focus(); else { const c = $('#sheet-root [data-action=close]'); c && c.focus(); }
+}
+/* ---------- 뒤로 가기 (안드로이드 뒤로 버튼, 브라우저 뒤로) ----------
+   층(시트 → 정보 수정 → 사진 크게 보기)이 열릴 때마다 방문 기록을 하나씩 쌓아서, 뒤로 가기는 맨 위 층만 닫음.
+   다 닫힌 상태에서 누르면 앱을 떠남.
+   ✕·저장·삭제처럼 앱이 직접 닫을 때는 쌓아 둔 기록도 같이 되돌림 (그때 오는 popstate는 무시).
+   기록은 화면을 누른 그 순간에만 쌓음: 누르지 않았는데 쌓으면 크롬이 그 기록을 건너뛰어 앱이 바로 꺼질 수 있음 */
+const layers = [];         // 기록을 쌓아 둔 층: 'sheet' | 'edit' | 'viewer'
+let skipPops = 0;          // 앱이 직접 되돌린 횟수만큼 popstate 무시
+let closingByBack = false; // 뒤로 가기로 닫는 중 (이때는 기록을 건드리지 않음)
+function wantedLayers() {
+  const want = [];
+  if (state.sheet) { want.push('sheet'); if (state.sheet.type === 'edit') want.push('edit'); }
+  if ($('#viewer-root').innerHTML) want.push('viewer');
+  return want;
+}
+// 화면을 열거나 닫은 뒤 부름: 열린 층 수와 쌓인 기록 수를 맞춤 (push: false면 지우기만)
+function syncHistory({ push = true } = {}) {
+  if (closingByBack) return;
+  const want = wantedLayers();
+  let same = 0;
+  while (same < layers.length && same < want.length && layers[same] === want[same]) same++;
+  if (layers.length > same) { // 닫힌 층의 기록부터 되돌림 (새로 쌓을 층이 있으면 되돌린 뒤에)
+    const n = layers.length - same;
+    layers.length = same;
+    skipPops++;
+    history.go(-n);
+    return;
+  }
+  // 되돌리는 중이면(앞에서 history.go를 부르고 아직 popstate가 안 옴) 그 popstate가 온 뒤에 쌓음. 순서가 꼬이지 않게
+  if (push && !skipPops) for (const kind of want.slice(same)) { layers.push(kind); history.pushState({ ourPlaces: layers.length }, ''); }
+}
+window.addEventListener('popstate', () => {
+  if (skipPops) { skipPops--; syncHistory(); return; }
+  const depth = (history.state && history.state.ourPlaces) || 0;
+  closingByBack = true;
+  try {
+    while (layers.length > depth) {
+      const kind = layers.pop();
+      if (kind === 'viewer') closeViewer();
+      else if (kind === 'edit') { if (state.sheet && state.sheet.type === 'edit') openSheet('detail', state.sheet.id); }
+      else closeSheet(); // 하던 월드컵은 지우지 않음 → 트로피를 다시 누르면 이어서
+    }
+  } finally { closingByBack = false; }
+  // 앞으로 가기로 기록만 앞서 나가면 다시 되돌림 (닫힌 화면을 기록만으로 다시 열지는 않음)
+  if (depth > layers.length) { skipPops++; history.go(layers.length - depth); return; }
+  // 닫다가 다른 층도 같이 닫혔으면(예: 상대가 지운 장소) 남은 기록도 맞춤. 여기선 누른 게 아니라서 새로 쌓지는 않음
+  syncHistory({ push: false });
+});
+function renderSheet() {
+  drawSheet();
+  syncHistory();
+}
+function drawSheet() {
+  const root = $('#sheet-root');
+  const s = state.sheet;
+  if (!s) { root.innerHTML = ''; root.dataset.view = ''; document.body.style.overflow = ''; return; }
+  let inner = '';
+  if (s.type === 'add') inner = placeForm(null);
+  else if (s.type === 'edit') inner = placeForm(state.places.find((x) => x.id === s.id));
+  else if (s.type === 'settings') inner = settingsView();
+  else if (s.type === 'cup') inner = state.cup ? cupView() : state.cupTab === 'records' ? cupRecordsView() : cupSetupView();
+  else if (s.type === 'detail') {
+    const p = state.places.find((x) => x.id === s.id);
+    if (!p) { closeSheet(); toast('삭제된 장소예요.'); return; }
+    // 입력 중인 글이 새로고침으로 날아가지 않게 보존
+    const same = root.dataset.view === `detail:${p.id}`;
+    // 후기 입력칸은 같은 방문을 계속 편집 중일 때만 되살림
+    const sameEdit = same && root.dataset.edit === String(state.editVisit);
+    const note = same && $('#shared-note'), review = sameEdit && $('#my-review'), day = sameEdit && $('#visit-date');
+    const edited = (el) => (el && el.value !== el.defaultValue ? el.value : null);
+    const keep = { note: edited(note), review: edited(review), day: edited(day), scroll: same ? $('.sheet-body', root).scrollTop : 0 };
+    mountSheet(detailView(p), `detail:${p.id}`);
+    root.dataset.edit = String(state.editVisit);
+    if (keep.note != null && $('#shared-note')) $('#shared-note').value = keep.note;
+    if (keep.review != null && $('#my-review')) $('#my-review').value = keep.review;
+    if (keep.day != null && $('#visit-date')) $('#visit-date').value = keep.day;
+    if (keep.scroll) $('.sheet-body', root).scrollTop = keep.scroll;
+    showGallery(state.photoIdx); // 다시 그려도 보던 사진 그대로
+    return;
+  }
+  mountSheet(inner, s.type);
+}
+function mountSheet(inner, key) {
+  const root = $('#sheet-root');
+  root.dataset.view = key;
+  const open = $('.sheet', root);
+  if (open) open.innerHTML = inner;
+  else root.innerHTML = `<div class="sheet-backdrop" data-action="close"></div><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">${inner}</section>`;
+  document.body.style.overflow = 'hidden';
+  markStampsSeen();
+}
+// 방문의 내 후기 입력칸 열기 ('new' = 새 방문, null = 닫기)
+function editVisit(p, id) {
+  const v = p.visits.find((x) => x.id === id);
+  const mine = v && v.reviews.find((r) => r.author_id === uid());
+  state.editVisit = id;
+  state.draftRating = mine && mine.rating ? mine.rating : 0;
+  renderSheet();
+}
+function closeSheet() {
+  cancelGoogle();
+  state.sheet = null;
+  $('#viewer-root').innerHTML = '';
+  renderSheet();
+  if (lastFocus && lastFocus.isConnected) lastFocus.focus();
+}
+
+/* ---------- 이벤트 ---------- */
+document.addEventListener('click', async (e) => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const a = el.dataset.action;
+  const placeId = state.sheet && state.sheet.id;
+  const p = placeId && state.places.find((x) => x.id === placeId);
+  try {
+    switch (a) {
+      case 'onboard-mode': onboardMode = el.dataset.mode; render(); break;
+      case 'auth-mode': authMode = el.dataset.mode; render(); window.scrollTo(0, 0); break;
+      case 'logout': await sb.auth.signOut(); break;
+      case 'tab': state.tab = el.dataset.tab; render(); break;
+      case 'cat': state.category = el.dataset.cat; render(); break;
+      case 'sort': state.sort = el.dataset.sort; render(); break;
+      case 'open': openSheet('detail', el.dataset.id); break;
+      case 'add': openSheet('add'); break;
+      case 'settings': openSheet('settings'); break;
+      case 'close': {
+        const s = state.sheet;
+        if (s && s.type === 'edit') { openSheet('detail', s.id); break; }
+        // 월드컵을 하던 중이면 한 번 물어봄. ✕로 닫으면 그만두는 것 (뒤로 가기로 닫으면 이어서 할 수 있게 남겨 둠)
+        if (s && s.type === 'cup' && state.cup && !state.cup.champion && state.cup.history.length && !confirm('월드컵을 그만할까요? 지금까지 고른 건 사라져요.')) break;
+        if (s && s.type === 'cup') state.cup = null;
+        closeSheet();
+        break;
+      }
+      case 'cup': {
+        // 뒤로 가기로 잠깐 닫았던 월드컵이 아직 안 끝났으면 이어서
+        if (state.cup && !state.cup.champion) { openSheet('cup'); toast('하던 월드컵을 이어서 해요.'); break; }
+        state.cup = null;
+        state.cupTab = 'new';
+        const s = state.cupSetup;
+        if (!s || (s.year !== 'all' && !cupYears().includes(s.year))) state.cupSetup = { year: cupYears()[0] || 'all', cat: '전체', mode: 'seed' };
+        else if (s.cat !== '전체' && !catNames().includes(s.cat)) s.cat = '전체';
+        openSheet('cup');
+        break;
+      }
+      case 'cup-year':
+        state.cupSetup.year = el.dataset.year;
+        if (!cupPool(state.cupSetup.year, state.cupSetup.cat).length) state.cupSetup.cat = '전체';
+        renderSheet(); break;
+      case 'cup-cat': state.cupSetup.cat = el.dataset.cat; renderSheet(); break;
+      case 'cup-mode': state.cupSetup.mode = el.dataset.mode; renderSheet(); break;
+      case 'cup-start': startCup(); renderSheet(); break;
+      case 'cup-pick':
+        if (state.cup.champion) break; // 결승을 두 번 눌러도 한 번만
+        pickCup(el.dataset.id); renderSheet();
+        if (state.cup.champion) await saveCup();
+        break;
+      case 'cup-save': state.cup.saved = 'saving'; renderSheet(); await saveCup(); break;
+      case 'cup-undo': undoCup(); renderSheet(); break;
+      case 'cup-again': state.cup = null; state.cupTab = 'new'; renderSheet(); break;
+      case 'cup-records': state.cup = null; state.cupTab = 'records'; renderSheet(); break;
+      case 'cup-tab': state.cupTab = el.dataset.tab; renderSheet(); break;
+      case 'cup-play': {
+        // 역대 기록에서 '나도 하기': 상대가 한 월드컵과 같은 조건으로
+        const { year, cat } = el.dataset;
+        if (year !== 'all' && !cupYears().includes(year)) { toast(`${year}년 방문 기록이 이제 없어요.`); break; }
+        state.cupSetup = { ...state.cupSetup, year, cat: cat === '전체' || catNames().includes(cat) ? cat : '전체' };
+        state.cupTab = 'new'; renderSheet();
+        break;
+      }
+      case 'cup-del': await deleteCupResult(el.dataset.id); break;
+      case 'new-cat': {
+        const box = el.closest('form').querySelector('.new-cat');
+        box.classList.remove('hidden');
+        box.querySelector('input').focus();
+        break;
+      }
+      case 'add-cat': await busy(el, () => addCategory(el)); break;
+      case 'cat-move': await moveCategory(el.dataset.id, Number(el.dataset.dir)); break;
+      case 'cat-delete': await deleteCategory(el.dataset.id); break;
+      case 'edit': openSheet('edit', placeId); break;
+      case 'copy-code':
+        try { await navigator.clipboard.writeText(state.couple.invite_code); toast('초대 코드를 복사했어요.'); }
+        catch { toast(`코드: ${state.couple.invite_code}`); }
+        break;
+      case 'pick-cat': selectCat(el.closest('form'), el.dataset.cat); break;
+      case 'pick-status': {
+        const form = el.closest('form');
+        form.status.value = el.dataset.status;
+        form.querySelectorAll('[data-action=pick-status]').forEach((b) => b.setAttribute('aria-pressed', b === el));
+        break;
+      }
+      case 'toggle-fav': {
+        const next = !p.favorite;
+        const { error } = await sb.from('places').update({ favorite: next }).eq('id', p.id);
+        if (error) throw error;
+        p.favorite = next; render(); renderSheet();
+        toast(next ? '찜했어요.' : '찜을 해제했어요.');
+        break;
+      }
+      case 'set-status': {
+        const next = el.dataset.status;
+        if (p.status === next) break;
+        const { error } = await sb.from('places').update({ status: next }).eq('id', p.id);
+        if (error) throw error;
+        p.status = next; render(); renderSheet();
+        toast(next === 'visited' ? '다녀온 곳으로 옮겼어요.' : '가고 싶은 곳으로 옮겼어요.');
+        break;
+      }
+      case 'save-note': await busy(el, async () => {
+        const { error } = await sb.from('places').update({ shared_note: $('#shared-note').value.trim() }).eq('id', p.id);
+        if (error) throw error;
+        await refresh(); toast('메모를 저장했어요.');
+      }); break;
+      case 'rate': {
+        const n = Number(el.dataset.n);
+        state.draftRating = state.draftRating === n ? 0 : n;
+        const group = el.closest('.rate-input');
+        group.querySelectorAll('.rs').forEach((s, k) => { s.className = `rs ${starCls(state.draftRating, k + 1)}`; });
+        group.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', Number(b.dataset.n) === state.draftRating));
+        break;
+      }
+      case 'add-visit': editVisit(p, 'new'); break;
+      case 'edit-visit': editVisit(p, el.dataset.visit); break;
+      case 'cancel-visit': editVisit(p, null); break;
+      case 'save-visit': await busy(el, async () => {
+        const day = $('#visit-date').value;
+        if (!day) { toast('방문 날짜를 골라 주세요.'); return; }
+        const body = $('#my-review').value.trim();
+        const rating = state.draftRating || null;
+        // 새 방문인데 그 날짜 방문이 이미 있으면(상대가 먼저 남김) 거기에 내 후기를 붙임
+        let v = p.visits.find((x) => x.id === state.editVisit) || p.visits.find((x) => x.visited_on === day);
+        if (!v) {
+          const { data, error } = await sb.from('visits').insert({ place_id: p.id, visited_on: day, created_by: uid() }).select().single();
+          if (error) throw error;
+          v = { ...data, reviews: [] };
+        } else if (v.visited_on !== day) {
+          const { error } = await sb.from('visits').update({ visited_on: day }).eq('id', v.id);
+          if (error) throw error;
+        }
+        // 별점과 글을 모두 비우고 저장하면 내 후기는 지움 (방문 날짜만 남음)
+        const mine = v.reviews.find((r) => r.author_id === uid());
+        const { error } = rating || body
+          ? mine
+            ? await sb.from('reviews').update({ rating, body }).eq('id', mine.id)
+            : await sb.from('reviews').insert({ place_id: p.id, visit_id: v.id, author_id: uid(), rating, body })
+          : mine ? await sb.from('reviews').delete().eq('id', mine.id) : { error: null };
+        if (error) throw error;
+        state.editVisit = null; state.draftRating = 0;
+        await refresh(); toast('방문 기록을 저장했어요.');
+      }); break;
+      case 'delete-review': {
+        const v = p.visits.find((x) => x.id === state.editVisit);
+        const mine = v && v.reviews.find((r) => r.author_id === uid());
+        if (!mine || !confirm('이 방문의 내 후기를 삭제할까요?')) break;
+        const { error } = await sb.from('reviews').delete().eq('id', mine.id);
+        if (error) throw error;
+        state.editVisit = null; state.draftRating = 0;
+        await refresh(); toast('후기를 삭제했어요.');
+        break;
+      }
+      case 'delete-visit': {
+        const v = p.visits.find((x) => x.id === state.editVisit);
+        if (!v || !confirm(`${fmtDay(v.visited_on)} 방문 기록을 삭제할까요?${v.reviews.length ? ' 내 후기도 함께 지워져요.' : ''}`)) break;
+        // 상대 후기가 그새 달렸으면 DB가 막아서 지워진 행이 없음
+        const { data, error } = await sb.from('visits').delete().eq('id', v.id).select('id');
+        if (error) throw error;
+        state.editVisit = null; state.draftRating = 0;
+        await refresh();
+        toast(data.length ? '방문 기록을 삭제했어요.' : '상대 후기가 있는 방문은 지울 수 없어요.');
+        break;
+      }
+      case 'delete-place': {
+        if (!confirm(`${josa(p.name, '을', '를')} 삭제할까요? 방문 기록과 두 사람의 후기도 함께 지워져요.`)) break;
+        // 사진 권한은 장소 존재 여부로 확인하므로 장소보다 먼저 지움 (사진 표 줄은 장소와 같이 지워짐)
+        if (p.photos.length) await sb.storage.from(BUCKET).remove(p.photos.map((x) => x.path));
+        const sheet = state.sheet;
+        const { error } = await sb.from('places').delete().eq('id', p.id);
+        if (error) throw error;
+        if (state.sheet === sheet) { state.sheet = null; renderSheet(); } // 그사이 다른 화면을 열었으면 그건 두고
+        await refresh(); toast('장소를 삭제했어요.');
+        break;
+      }
+      case 'remove-photo': {
+        const i = galleryIndex(), ph = p.photos[i];
+        if (!ph) break;
+        const ask = p.photos.length === 1 ? '사진을 삭제할까요?' : i === 0 ? '대표 사진을 삭제할까요? 다음 사진이 대표 사진이 돼요.' : '이 사진을 삭제할까요?';
+        if (!confirm(ask)) break;
+        await deletePhoto(ph);
+        state.photoIdx = Math.max(0, Math.min(i, p.photos.length - 2)); // 지운 자리의 다음(마지막이면 앞) 사진
+        await refresh(); toast('사진을 삭제했어요.');
+        break;
+      }
+      case 'photo-cover': {
+        const ph = p.photos[galleryIndex()];
+        if (!ph) break;
+        await setCover(p, ph);
+        state.photoIdx = 0;
+        await refresh(); toast('대표 사진으로 바꿨어요. 목록에도 이 사진이 보여요.');
+        break;
+      }
+      case 'view-photo': openViewer(p, Number(el.dataset.i)); break;
+      case 'close-viewer': closeViewer(); break;
+    }
+  } catch (err) {
+    toast(friendly(err));
+  }
+});
+
+// 사진을 옆으로 밀 때 번호 맞추기 (scroll은 버블링이 안 돼서 capture로 받음)
+document.addEventListener('scroll', (e) => {
+  if (e.target.id === 'gallery') syncGallery();
+  else if (e.target.id === 'viewer-track') {
+    const t = e.target, c = $('#viewer-count');
+    if (c) c.textContent = `${Math.round(t.scrollLeft / Math.max(1, t.clientWidth)) + 1} / ${t.children.length}`;
+  }
+}, true);
+
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'q') { state.query = e.target.value; $('#list-area').innerHTML = listHtml(); markStampsSeen(); }
+  // 휴대폰 키보드의 클립보드 버튼은 paste 이벤트 없이 글자를 넣으므로 여기서도 정리
+  if (e.target.name === 'naver_url') {
+    const form = e.target.form, v = e.target.value;
+    if (googleJob && googleJob.form === form && googleKey(v) !== googleJob.url) cancelGoogle(); // 묻는 중에 링크를 바꿈
+    if (isShareText(v)) applyShare(form, v);
+    // 링크만 붙여넣은 구글 지도 링크: 손으로 치는 중에 묻지 않게 잠깐 기다렸다가
+    else if (isGoogleMaps(v.trim())) {
+      clearTimeout(googleTimer);
+      googleTimer = setTimeout(() => fillFromGoogle(form), 400);
+    }
+  }
+});
+
+document.addEventListener('paste', (e) => {
+  const form = e.target.form;
+  if (!form || form.id !== 'place-form' || !['naver_url', 'name', 'address'].includes(e.target.name)) return;
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  if (!isShareText(text)) return; // 링크만, 혹은 일반 글자만 붙여넣은 경우는 그대로
+  e.preventDefault();
+  if (!applyShare(form, text)) toast('링크와 이름·주소를 채웠어요.'); // 구글 지도는 알림을 따로 띄움
+});
+
+document.addEventListener('change', async (e) => {
+  const t = e.target;
+  if (t.name === 'photo' && t.form && t.form.id === 'place-form') {
+    // 고른 사진 미리보기 (최대 장수까지, 첫 장에 '대표')
+    const box = $('#photo-previews');
+    box.querySelectorAll('img').forEach((img) => URL.revokeObjectURL(img.src));
+    const files = [...t.files];
+    box.innerHTML = files.slice(0, MAX_PHOTOS).map((f, i) => `<span class="photo-preview"><img src="${URL.createObjectURL(f)}" alt="고른 사진 ${i + 1}">${i ? '' : '<span class="cover-badge">대표</span>'}</span>`).join('');
+    $('#photo-hint').textContent = files.length > MAX_PHOTOS
+      ? `사진은 ${MAX_PHOTOS}장까지라 ${files.length - MAX_PHOTOS}장은 빠져요.`
+      : `처음 고른 사진이 대표 사진이에요. 최대 ${MAX_PHOTOS}장.`;
+  }
+  if (t.dataset.catId) {
+    try { await renameCategory(t); } catch (err) { toast(friendly(err)); }
+  }
+  if (t.id === 'photo-input' && t.files.length) {
+    const p = state.sheet && state.places.find((x) => x.id === state.sheet.id);
+    if (!p) return;
+    const before = p.photos.length;
+    const r = await addPhotos(p, t.files, (k, n) => toast(n > 1 ? `사진을 올리는 중… (${k}/${n})` : '사진을 올리는 중…', 0));
+    if (r.done) state.photoIdx = before; // 새로 올린 첫 사진을 보여 줌
+    try { await refresh(); } catch (err) { toast(friendly(err)); return; }
+    toast(photoResultText(r), r.error || r.skipped ? 6000 : 2200);
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  // Esc: 크게 보던 사진이 있으면 그것만 닫음
+  if (e.key === 'Escape' && closeViewer()) { e.preventDefault(); return; }
+  if (e.key === 'Escape' && state.sheet) { e.preventDefault(); $('[data-action=close]', $('#sheet-root')).click(); }
+  // 카테고리 입력칸의 Enter는 장소 폼 제출 대신 추가 / 이름 바꾸기 (한글 조합 중 Enter는 무시)
+  if (e.key === 'Enter' && !e.isComposing && e.target instanceof Element) {
+    const box = e.target.closest('.new-cat');
+    if (box) { e.preventDefault(); box.querySelector('[data-action=add-cat]').click(); }
+    else if (e.target.dataset.catId) { e.preventDefault(); e.target.blur(); }
+  }
+});
+
+document.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const btn = f.querySelector('[type=submit]');
+  if (f.id === 'login-form') {
+    const err = $('#login-error'); err.textContent = '';
+    const email = loginEmail(f.email.value), password = f.password.value;
+    if (!email || !password) { err.textContent = LOGIN_ID_DOMAIN ? '아이디와 비밀번호를 입력해 주세요.' : '이메일과 비밀번호를 입력해 주세요.'; return; }
+    await busy(btn, async () => {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) { err.textContent = friendly(error); return; }
+      state.user = data.user;
+      try { await refresh({ keepSheet: false }); } catch (x) { err.textContent = friendly(x); }
+    });
+  }
+  if (f.id === 'signup-form') {
+    const err = $('#signup-error'); err.textContent = '';
+    const input = signupInput(f);
+    if (input.error) { err.textContent = input.error; return; }
+    await busy(btn, async () => {
+      let j;
+      try { j = await signUp(input); } catch (x) { err.textContent = friendly(x); return; }
+      // 서버가 가입한 사람으로 로그인해서 받은 토큰을 그대로 씀 (로그인을 한 번 더 하지 않게)
+      const { data, error } = await sb.auth.setSession({ access_token: j.access_token, refresh_token: j.refresh_token });
+      if (error || !data.user) { authMode = 'login'; render(); $('#login-error').textContent = '가입했어요. 아이디와 비밀번호로 로그인해 주세요.'; return; }
+      state.user = data.user;
+      authMode = 'login';
+      try { await refresh({ keepSheet: false }); } catch (x) { render(); toast(friendly(x)); return; }
+      toast(j.joined ? '가입했어요. 공간에 들어왔어요.' : '가입했어요. 이제 둘만의 공간을 만들어요.');
+    });
+  }
+  if (f.id === 'onboard-form') {
+    const err = $('#onboard-error'); err.textContent = '';
+    const name = field(f, 'name').value.trim();
+    if (!name) { err.textContent = '이름을 입력해 주세요.'; return; }
+    await busy(btn, async () => {
+      const { error } = onboardMode === 'create'
+        ? await sb.rpc('create_couple', { p_display_name: name })
+        : SIGNUP_ENABLED ? await joinViaServer(f.code.value, name) // 친구용: 서버가 횟수를 세고 참여시킴
+          : await sb.rpc('join_couple', { p_invite_code: f.code.value, p_display_name: name });
+      if (error) { err.textContent = friendly(error); return; }
+      await refresh({ keepSheet: false });
+      toast(onboardMode === 'create' ? '공간을 만들었어요. 초대 코드를 보내 주세요.' : '공간에 참여했어요.');
+    });
+  }
+  if (f.id === 'place-form') {
+    const err = $('#form-error'); err.textContent = '';
+    // 저장하는 사이 뒤로 가기 등으로 화면이 바뀌었으면, 저장만 하고 화면은 그대로 둠 (누르지 않았는데 화면을 열지 않게)
+    const sheet = state.sheet;
+    const stillOpen = () => state.sheet === sheet;
+    if (isShareText(f.naver_url.value)) applyShare(f, f.naver_url.value);
+    // 구글 지도에서 이름·주소를 받는 중이면(아직 안 물어본 링크면 지금 물어서) 받은 다음에 저장
+    fillFromGoogle(f);
+    const job = googleJob && googleJob.form === f ? googleJob : null;
+    if (job) await busy(btn, () => job.done);
+    const name = field(f, 'name').value.trim();
+    if (!name) { err.textContent = '장소 이름을 입력해 주세요.'; field(f, 'name').focus(); return; }
+    if (!f.category.value) { err.textContent = '카테고리를 골라 주세요.'; return; }
+    const rawUrl = cleanUrl(f.naver_url.value.trim());
+    const naver_url = rawUrl ? safeUrl(rawUrl) : null;
+    if (rawUrl && !naver_url) { err.textContent = '링크 형식이 올바르지 않아요.'; return; }
+    const fields = { name, address: f.address.value.trim() || null, category: f.category.value, naver_url };
+    await busy(btn, async () => {
+      if (sheet.type === 'edit') {
+        const { error } = await sb.from('places').update(fields).eq('id', sheet.id);
+        if (error) { if (stillOpen()) err.textContent = friendly(error); else toast(friendly(error)); return; }
+        await refresh({ keepSheet: !stillOpen() });
+        if (stillOpen()) openSheet('detail', sheet.id);
+        toast('변경 내용을 저장했어요.');
+      } else {
+        const { data, error } = await sb.from('places').insert({
+          ...fields, status: f.status.value, shared_note: f.shared_note.value.trim(),
+          couple_id: state.couple.id, created_by: uid(),
+        }).select('id').single();
+        if (error) { if (stillOpen()) err.textContent = friendly(error); else toast(friendly(error)); return; }
+        const files = f.photo.files;
+        const r = files.length ? await addPhotos({ id: data.id, photos: [] }, files, (k, n) => { btn.textContent = `사진 올리는 중 ${k}/${n}`; }) : null;
+        state.tab = f.status.value;
+        await refresh({ keepSheet: !stillOpen() });
+        if (stillOpen()) openSheet('detail', data.id);
+        toast(r && (r.error || r.skipped) ? `장소를 추가했어요. ${photoResultText(r)}` : '장소를 추가했어요.', r && (r.error || r.skipped) ? 6000 : 2200);
+      }
+    });
+  }
+  if (f.id === 'name-form') {
+    const name = field(f, 'name').value.trim();
+    if (!name) return;
+    await busy(btn, async () => {
+      const { error } = await sb.from('couple_members').update({ display_name: name }).eq('user_id', uid());
+      if (error) { toast(friendly(error)); return; }
+      await refresh(); toast('이름을 바꿨어요.');
+    });
+  }
+  if (f.id === 'pw-form') {
+    const err = $('#pw-error'); err.textContent = '';
+    if (f.pw.value.length < 8) { err.textContent = '8자 이상 입력해 주세요.'; return; }
+    if (f.pw.value !== f.pw2.value) { err.textContent = '두 비밀번호가 달라요.'; return; }
+    await busy(btn, async () => {
+      const { error } = await sb.auth.updateUser({ password: f.pw.value });
+      if (error) { err.textContent = friendly(error); return; }
+      f.reset(); toast('비밀번호를 바꿨어요.');
+    });
+  }
+});
+
+// 다른 앱에 갔다 돌아오면 상대가 바꾼 내용을 다시 불러옴
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && state.user && state.couple) refresh().catch(() => {});
+});
+
+/* ---------- 시작 ---------- */
+(async function start() {
+  // 화면을 연 채로 새로고침했으면 그때 쌓였던 기록 위치에서 맨 처음 자리로 돌아감 (새로고침하면 화면은 닫혀 있으니까)
+  if (history.state && history.state.ourPlaces) { skipPops++; history.go(-history.state.ourPlaces); }
+  if (!configured) { render(); return; }
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') {
+      Object.assign(state, { user: null, couple: null, members: [], places: [], categories: [], sheet: null, cup: null, cupResults: [], cupTab: 'new' });
+      onboardMode = 'create';
+      authMode = 'login';
+      $('#viewer-root').innerHTML = ''; // 사진 크게 보기도 같이 닫음
+      renderSheet(); render();
+    } else if (session) {
+      state.user = session.user;
+    }
+  });
+  const { data } = await sb.auth.getSession();
+  state.user = data.session ? data.session.user : null;
+  if (state.user) {
+    try { await loadAll(); } catch (err) { toast(friendly(err)); }
+  }
+  render();
+})();
+</script>
+</body>
+</html>

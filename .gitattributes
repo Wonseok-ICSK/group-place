@@ -1,0 +1,6 @@
+# 저장소와 작업 폴더 모두 LF (서버는 리눅스)
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.ico binary

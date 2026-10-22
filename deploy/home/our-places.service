@@ -1,0 +1,53 @@
+# deploy/home/install.sh가 /etc/systemd/system/our-places.service로 설치한다.
+# 친구용 홈 서버: 127.0.0.1:8090, 코드는 root 소유(읽기 전용), 설정 /etc/our-places/env가 있어야 시작한다.
+[Unit]
+Description=our-places friends instance (static files + /api/place + /api/signup + /api/join)
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/our-places/env
+
+[Service]
+Type=simple
+User=ourplaces
+Group=ourplaces
+WorkingDirectory=/srv/our-places/current
+EnvironmentFile=/etc/our-places/env
+# 선택: 친구용 Supabase secret key (set-secret.sh가 root:ourplaces 640으로 씀). 없으면 '초대 코드로 가입'만 꺼진다
+EnvironmentFile=-/etc/our-places/secret.env
+Environment=NODE_ENV=production
+# --max-old-space-size: MemoryMax에 걸려 죽기 전에 V8이 먼저 정리하게
+ExecStart=/usr/bin/node --max-old-space-size=128 /srv/our-places/current/deploy/home/server.cjs
+Restart=always
+RestartSec=5
+# server.cjs가 설정 오류로 끝나면(78) 5초마다 다시 시작하지 않는다
+RestartPreventExitStatus=78
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+ProtectProc=invisible
+RemoveIPC=true
+# WonseokTravel(가격 검색)보다 뒤로: 메모리 상한과 낮은 CPU 비중
+MemoryHigh=160M
+MemoryMax=256M
+CPUWeight=50
+
+[Install]
+WantedBy=multi-user.target

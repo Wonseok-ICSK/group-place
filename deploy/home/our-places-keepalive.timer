@@ -1,0 +1,11 @@
+# 하루 한 번(한국 시간 12:10 전후). 서버가 꺼져 있던 날은 켜질 때 한 번 실행한다.
+[Unit]
+Description=Daily keepalive for the friends' Supabase project
+
+[Timer]
+OnCalendar=*-*-* 12:10:00
+RandomizedDelaySec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

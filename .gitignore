@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+*.log
+__pycache__/
+.DS_Store
+Thumbs.db
+# 개발 도구 설정(개인 환경, 다른 프로젝트 정보가 들어갈 수 있음)
+.claude/
+.codex/
+.mcp.json

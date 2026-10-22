@@ -1,0 +1,38 @@
+# 친구용 Supabase 무료 프로젝트가 7일 동안 DB 요청이 없으면 일시정지되는 것을 막는다.
+# supabase/friends-keepalive.sql의 keepalive() 함수(데이터를 읽지 않고 1만 돌려줌)를 하루 한 번 부른다.
+[Unit]
+Description=Keep the friends' Supabase project active (daily DB call)
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/our-places/env
+
+[Service]
+Type=oneshot
+User=ourplaces
+Group=ourplaces
+EnvironmentFile=/etc/our-places/env
+ExecStart=/usr/bin/curl -fsS -m 30 -o /dev/null -H "apikey: ${SUPABASE_KEY}" "${SUPABASE_URL}/rest/v1/rpc/keepalive"
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+CapabilityBoundingSet=
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+ProtectProc=invisible
+RemoveIPC=true
+UMask=0077
