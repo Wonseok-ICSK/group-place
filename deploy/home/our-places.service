@@ -1,7 +1,7 @@
 # deploy/home/install.sh가 /etc/systemd/system/our-places.service로 설치한다.
 # 친구용 홈 서버: 127.0.0.1:8090, 코드는 root 소유(읽기 전용), 설정 /etc/our-places/env가 있어야 시작한다.
 [Unit]
-Description=our-places friends instance (static files + /api/place + /api/signup + /api/join)
+Description=our-places friends instance (static files + /api/place + /api/signup + /api/join + /api/public)
 After=network-online.target
 Wants=network-online.target
 ConditionPathExists=/etc/our-places/env
@@ -22,6 +22,10 @@ RestartSec=5
 # server.cjs가 설정 오류로 끝나면(78) 5초마다 다시 시작하지 않는다
 RestartPreventExitStatus=78
 UMask=0077
+# 공개 방 사진 한도 카운터(public-budget.json)를 다시 시작해도 이어서 세려고 쓰는 폴더: /var/lib/our-places (STATE_DIRECTORY)
+# ProtectSystem=strict여도 이 폴더만 쓸 수 있다
+StateDirectory=our-places
+StateDirectoryMode=0700
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

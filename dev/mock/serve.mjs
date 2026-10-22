@@ -5,7 +5,9 @@
      - Pretendard 글꼴 CDN <link> → 뺌 (컴퓨터에 있는 글꼴로 보임)
      - SUPABASE_URL / SUPABASE_KEY → 'https://mock.invalid' / 'mock-key' (설정 안내 화면 대신 앱이 뜨게)
      - LOGIN_ID_DOMAIN → 'mock.invalid' (아이디 로그인), SIGNUP_ENABLED → true (초대 코드로 가입·코드로 참여는 /api/*)
-   /api/*는 가짜 Supabase가 브라우저 안에서 받는다(여기까지 오면 404).
+     - PUBLIC_ROOMS_ENABLED → true (공개 방 둘러보기, /api/public/*)
+   /api/*(공개 방 /api/public/* 포함)는 가짜 Supabase가 브라우저 안에서 받는다(여기까지 오면 404).
+   /r/<공개 키>(둘러보기 링크)는 홈 서버처럼 index.html을 그대로 보낸다. 형식이 다른 /r/...은 404.
    CSP로 같은 주소(127.0.0.1) 말고는 스크립트·연결·이미지를 막아서, 실수로 바깥에 나가려 해도 브라우저가 막는다.
    index.html은 요청마다 다시 읽으니 고친 뒤 새로고침만 하면 된다.
 
@@ -48,6 +50,7 @@ function page() {
   html = replaceOnce(html, /const SUPABASE_KEY = '[^'\n]*';/, "const SUPABASE_KEY = 'mock-key';", 'SUPABASE_KEY');
   html = replaceOnce(html, /const LOGIN_ID_DOMAIN = '[^'\n]*';/, `const LOGIN_ID_DOMAIN = '${MOCK_DOMAIN}';`, 'LOGIN_ID_DOMAIN');
   html = replaceOnce(html, /const SIGNUP_ENABLED = (?:true|false);/, 'const SIGNUP_ENABLED = true;', 'SIGNUP_ENABLED');
+  html = replaceOnce(html, /const PUBLIC_ROOMS_ENABLED = (?:true|false);/, 'const PUBLIC_ROOMS_ENABLED = true;', 'PUBLIC_ROOMS_ENABLED');
   // 남은 바깥 주소가 있으면 알려 줌 (og:* 미리보기 주소와 지도 링크·설명 주석은 불러오지 않으니 괜찮음)
   for (const m of html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)="(https?:\/\/[^"]+)"/g)) {
     if (!/^https?:\/\/(127\.0\.0\.1|localhost)[:/]/.test(m[1])) console.warn(`[serve] 바깥 주소를 불러오려는 태그가 남았어요: ${m[1]}`);
@@ -71,7 +74,8 @@ const server = http.createServer((req, res) => {
   let urlPath;
   try { urlPath = decodeURIComponent(new URL(req.url, `http://${HOST}`).pathname); } catch { send(400, TYPES['.json'], '{"error":"bad url"}'); return; }
   if (req.method !== 'GET' && req.method !== 'HEAD') { send(404, TYPES['.json'], '{"error":"mock: 이 API는 없어요 (가짜 Supabase가 브라우저에서 받음)"}'); return; }
-  if (urlPath === '/' || urlPath === '/index.html') {
+  // /r/<키>: 공개 키 글자 모음(l·o·0·1 없음) 10자만 (deploy/home/server.cjs와 같은 규칙)
+  if (urlPath === '/' || urlPath === '/index.html' || /^\/r\/[a-km-np-z2-9]{10}$/.test(urlPath)) {
     try { send(200, TYPES['.html'], page()); } catch (err) { send(500, 'text/plain; charset=utf-8', String(err.message || err)); console.error(`[serve] ${err.message}`); }
     return;
   }
@@ -80,5 +84,5 @@ const server = http.createServer((req, res) => {
   send(200, TYPES[path.extname(file)] || 'application/octet-stream', fs.readFileSync(file));
 });
 server.listen(PORT, HOST, () => {
-  console.log(`가짜 Supabase 화면: http://${HOST}:${PORT}/?mock=picker  (장면: picker·two·onboard·login, &go=A|B|C)`);
+  console.log(`가짜 Supabase 화면: http://${HOST}:${PORT}/?mock=picker  (장면: picker·two·onboard·login, &go=A|B|C, &pub=…, /r/k7m2p9xa4c?mock=picker)`);
 });

@@ -1,6 +1,6 @@
 'use strict';
-// groups.sql·colors.sql 시험 도우미: PGlite(메모리 안 Postgres)로 새 DB를 만들고, Supabase 흉내(stubs.sql) 위에
-// schema.sql → friends-keepalive.sql → friends-signup.sql (→ groups.sql → colors.sql)을 실행한다. 운영·시험 Supabase에는 연결하지 않음.
+// groups.sql·colors.sql·public.sql 시험 도우미: PGlite(메모리 안 Postgres)로 새 DB를 만들고, Supabase 흉내(stubs.sql) 위에
+// schema.sql → friends-keepalive.sql → friends-signup.sql (→ groups.sql → colors.sql → public.sql)을 실행한다. 운영·시험 Supabase에는 연결하지 않음.
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -14,15 +14,17 @@ const STUBS = fs.readFileSync(path.join(__dirname, 'stubs.sql'), 'utf8');
 // 시험용 사용자 id: n번 → 00000000-0000-4000-8000-00000000000n
 const uid = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
-// groups: groups.sql까지, colors: 그 위에 colors.sql까지 (colors는 groups가 있어야 함)
-async function newDb({ groups = true, colors = false } = {}) {
+// groups: groups.sql까지, colors: 그 위에 colors.sql까지 (colors는 groups가 있어야 함),
+// public: 그 위에 public.sql까지 (true면 colors.sql도 실행)
+async function newDb({ groups = true, colors = false, public: pub = false } = {}) {
   const db = await PGlite.create({ extensions: { pgcrypto } });
   await db.exec(STUBS);
   await db.exec(SQL('schema.sql'));
   await db.exec(SQL('friends-keepalive.sql'));
   await db.exec(SQL('friends-signup.sql'));
   if (groups) await db.exec(SQL('groups.sql'));
-  if (groups && colors) await db.exec(SQL('colors.sql'));
+  if (groups && (colors || pub)) await db.exec(SQL('colors.sql'));
+  if (groups && pub) await db.exec(SQL('public.sql'));
   return db;
 }
 
@@ -68,6 +70,11 @@ async function createRoom(db, n, name = '방', nick = `n${n}`) {
   const [r] = await run(db, asUser(n), 'select public.create_couple($1, $2) as id', [nick, name]);
   return r.id;
 }
+// 공개 방 만들기 (create_room 'public', 동의 문구 버전 1)
+async function createPublicRoom(db, n, name = '공개 방', nick = `별명${n}`, desc = '') {
+  const [r] = await run(db, asUser(n), "select public.create_room($1, $2, 'public', $3, 1) as id", [nick, name, desc]);
+  return r.id;
+}
 async function codeOf(db, room) {
   const [r] = await db.query('select invite_code from public.couples where id = $1', [room]).then((x) => x.rows);
   return r && r.invite_code;
@@ -98,7 +105,8 @@ async function snapshot(db) {
     columns: await q(`select table_name, column_name, data_type, is_nullable, coalesce(column_default, '')
                       from information_schema.columns where table_schema = 'public' order by 1, ordinal_position`),
     triggers: await q("select tgrelid::regclass::text, tgname from pg_trigger where not tgisinternal order by 1, 2"),
-    policies: await q("select schemaname, tablename, policyname, cmd, coalesce(qual, ''), coalesce(with_check, '') from pg_policies order by 1, 2, 3"),
+    // 칸 이름이 겹치면(coalesce 두 개) 행 객체에서 하나가 사라지므로 이름을 붙임
+    policies: await q("select schemaname, tablename, policyname, cmd, coalesce(qual, '') as qual, coalesce(with_check, '') as with_check from pg_policies order by 1, 2, 3"),
     tableAcl: await q(`select c.relname, coalesce((select string_agg(a::text, ',' order by a::text) from unnest(c.relacl) a), '')
                        from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' order by 1`),
     columnAcl: await q(`select c.relname, a.attname, coalesce((select string_agg(x::text, ',' order by x::text) from unnest(a.attacl) x), '')
@@ -110,5 +118,5 @@ async function snapshot(db) {
 
 module.exports = {
   ROOT, SQL, uid, newDb, addUsers, run, asUser, ANON, SERVICE, expectError,
-  createRoom, codeOf, join, members, count, snapshot,
+  createRoom, createPublicRoom, codeOf, join, members, count, snapshot,
 };

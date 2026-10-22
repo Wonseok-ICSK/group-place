@@ -1,9 +1,9 @@
 {
   "name": "group-place-sqltest",
   "private": true,
-  "description": "groups.sql·colors.sql 시험 (PGlite, 운영 DB에 연결하지 않음)",
+  "description": "groups.sql·colors.sql·public.sql 시험과 화면 정적 시험(public-client) (PGlite, 운영 DB에 연결하지 않음)",
   "scripts": {
-    "test": "node --test --test-concurrency=1"
+    "test": "node --test --test-concurrency=1 \"*.test.cjs\""
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8"

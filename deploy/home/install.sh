@@ -55,9 +55,9 @@ target="$base/releases/$rel"
 if [[ ! -d "$target" ]]; then
   tmp="$(mktemp -d "$base/releases/.new.XXXXXX")"
   tar -xzf "$tarball" -C "$tmp" --no-same-owner --no-same-permissions
-  if [[ ! -f "$tmp/index.html" || ! -f "$tmp/api/place.js" || ! -f "$tmp/deploy/home/server.cjs" || ! -f "$tmp/deploy/home/signup.cjs" ]]; then
-    die '릴리스에 index.html, api/place.js, deploy/home/server.cjs, deploy/home/signup.cjs가 모두 있어야 해요'
-  fi
+  for f in index.html api/place.js deploy/home/server.cjs deploy/home/signup.cjs deploy/home/public.cjs deploy/home/pages.cjs; do
+    [[ -f "$tmp/$f" ]] || die "릴리스에 $f 이 없어요 (index.html, api/place.js, deploy/home/server.cjs·signup.cjs·public.cjs·pages.cjs가 모두 있어야 해요)"
+  done
   chown -R root:root "$tmp"
   chmod -R u=rwX,go=rX "$tmp"
   mv -T "$tmp" "$target"
@@ -77,9 +77,12 @@ if [[ -n "${SUPABASE_URL:-}" || -n "${SUPABASE_KEY:-}" ]]; then
   # (LOGIN_ID_DOMAIN이 바뀌면 이미 만든 아이디 계정이 아이디로 로그인되지 않는다)
   old_origin=''
   old_domain=''
+  old_public=''
   if [[ -f "$env_file" ]]; then
     old_origin="$(sed -n 's/^PUBLIC_ORIGIN=//p' "$env_file" | tail -n 1)"
     old_domain="$(sed -n 's/^LOGIN_ID_DOMAIN=//p' "$env_file" | tail -n 1)"
+    # 공개 방 스위치는 손으로 넣는 값이라 설정 파일을 새로 써도 그대로 옮긴다 (on/off만)
+    old_public="$(grep -E '^PUBLIC_(ROOMS|PHOTOS)=(on|off)$' "$env_file" || true)"
   fi
   origin="${PUBLIC_ORIGIN:-$old_origin}"
   login_domain="${LOGIN_ID_DOMAIN:-$old_domain}"
@@ -89,6 +92,7 @@ if [[ -n "${SUPABASE_URL:-}" || -n "${SUPABASE_KEY:-}" ]]; then
   printf 'SUPABASE_URL=%s\nSUPABASE_KEY=%s\nPUBLIC_ORIGIN=%s\nPORT=%s\n' \
     "$SUPABASE_URL" "$SUPABASE_KEY" "$origin" "$default_port" >"$tmp_env"
   printf 'LOGIN_ID_DOMAIN=%s\n' "$login_domain" >>"$tmp_env"
+  if [[ -n "$old_public" ]]; then printf '%s\n' "$old_public" >>"$tmp_env"; fi
   chown root:ourplaces "$tmp_env"
   chmod 640 "$tmp_env"
   mv -f -- "$tmp_env" "$env_file"
@@ -184,6 +188,11 @@ done < <(ls -1dt "$base"/releases/*/ | tail -n +4)
 echo "our-places $rel 설치 완료 ($(curl -fsS -m 3 "http://127.0.0.1:$port/healthz"))"
 if [[ -f "$env_dir/secret.env" ]]; then
   echo "가입 코드 만들기: sudo bash $base/current/deploy/home/invite.sh new <메모>"
+  if grep -qx 'PUBLIC_ROOMS=on' "$env_file" 2>/dev/null; then
+    echo "공개 방: 켬 (목록·숨기기: sudo bash $base/current/deploy/home/public.sh list)"
+  else
+    echo "공개 방: 꺼 둠. 켜려면 $env_file 에 PUBLIC_ROOMS=on 을 넣고 sudo systemctl restart our-places"
+  fi
 else
   echo "초대 코드 가입은 꺼져 있어요. 켜려면: ssh -t <서버> \"sudo bash $base/current/deploy/home/set-secret.sh\""
 fi

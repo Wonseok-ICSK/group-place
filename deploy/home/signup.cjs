@@ -5,8 +5,12 @@
 // 코드는 두 가지를 받는다:
 //   가입 코드 W-XXXX-XXXX: 관리자가 만든 1회용 코드(supabase/friends-signup.sql). 가입만 하고 방은 앱에서 만든다(couple_id: null).
 //   방 코드 8자리: 방 멤버가 보낸 초대 코드. 가입하면서(또는 앱 안에서) 그 방에 들어간다
-//   (supabase/groups.sql의 join_couple_for 규칙: 방은 5명까지, 한 사람은 방 3개까지, 이미 그 방 멤버면 그 방 id를 그대로 돌려줌).
-// 친구용 프로젝트는 앱이 join_couple을 직접 못 부르게 막아 두고(friends-signup.sql), 여기서 횟수를 센 뒤 join_couple_for로 넣는다.
+//   (supabase/public.sql의 join_room_for 규칙: 코드 → 이미 그 방 멤버면 그 방 id → 방은 5명까지 → 한 사람은 방 3개까지
+//    → (공개 방만) 닉네임이 아이디와 같으면 거절 → (공개 방만) 동의(ackVersion)가 없으면 아무것도 바꾸지 않고 need_ack).
+// 공개 방(docs/public-rooms-design.md §3.8): 동의가 없으면 409 { needAck: true, roomName, ackVersion }으로 답하고,
+//   화면이 안내를 보여 준 뒤 ackVersion을 붙여 다시 보낸다. 이 409와 닉네임=아이디 400은 맞는 코드에서만 나오므로 횟수에서 뺀다.
+//   가입은 동의를 확인하기 전에는 계정을 만들지 않는다(space_code_info로 미리 확인).
+// 친구용 프로젝트는 앱이 join_couple을 직접 못 부르게 막아 두고(friends-signup.sql), 여기서 횟수를 센 뒤 join_room_for로 넣는다.
 // 계정은 아이디로 만든다: Supabase Auth는 이메일이 필요해서 '<아이디>@<LOGIN_ID_DOMAIN>'(메일은 보내지 않음).
 // 코드 맞히기를 막으려고 가입과 참여를 합쳐 IP마다 1시간에 5번, 전체 1시간에 30번까지만 받는다.
 // 성공(200)과 코드를 맞혀 본 것이 아닌 실패(아이디 중복 등)는 세지 않는다. 틀린 코드·찬 방·방 3개 초과는 센다.
@@ -21,6 +25,7 @@ const SIGNUP_CODE_RE = /^W[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/;
 const SPACE_CODE_RE = /^[0-9A-F]{8}$/;
 const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,19}$/;
 const MAX_BODY = 2048;
+const ACK_MAX = 100; // 동의 문구 버전(ackVersion)으로 받는 정수 범위 1~100
 const CALL_TIMEOUT_MS = 8000;
 const LIMITS = { perIp: 5, total: 30, windowMs: 3600_000 };
 // 만든 계정 수: 한 방(최대 5명)의 친구들이 같은 Wi-Fi에서 한꺼번에 가입해도 되게 IP마다 하루 6개, 전체 하루 20개
@@ -45,6 +50,9 @@ const MSG = {
   tooManyRooms: '방은 3개까지 들어갈 수 있어요. 다른 방에서 나간 뒤 다시 시도해 주세요.',
   joinFailed: '참여하지 못했어요. 잠시 후 다시 시도해 주세요.',
   login: '로그인이 끝났어요. 다시 로그인해 주세요.',
+  // 공개 방 (index.html friendly()·동의 시트의 문구와 글자까지 같게: need_ack / nickname_is_login_id)
+  needAck: '공개 방이에요. 안내를 읽고 동의하면 들어갈 수 있어요.',
+  nickIsId: '공개 방에서는 아이디와 같은 닉네임을 쓸 수 없어요. 별명을 정해 주세요.',
 };
 
 const HEADERS = {
@@ -63,13 +71,25 @@ function send(res, status, body, extra = {}) {
 const normalizeCode = (s) => String(s ?? '').toUpperCase().replace(/[\s-]/g, '');
 
 // 앱에서 보일 이름: 앞뒤 공백을 빼고 1~20자, 제어 문자 없음. 안 되면 null
+// 닉네임에 못 쓰는 글자: 제어 문자, 줄 나눔(U+2028·2029), 보이지 않는 글자(U+200B·200C·2060–2064·FEFF),
+// 글자 방향을 바꾸는 글자(U+200E·200F·202A–202E·2066–2069). U+200D(이모지 잇기)는 됨.
+// public.sql public_text_ok·화면 BAD_TEXT_RE와 같은 모음 (아이디처럼 보이는 닉네임·뒤집힌 이름을 막음)
+const BAD_TEXT_RE = /[\u0000-\u001f\u007f-\u009f\u200b\u200c\u200e\u200f\u2028\u2029\u202a-\u202e\u2060-\u2069\ufeff]/;
 function cleanDisplayName(raw) {
   const s = raw.trim();
   const len = [...s].length;
-  return len < 1 || len > 20 || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(s) ? null : s;
+  return len < 1 || len > 20 || BAD_TEXT_RE.test(s) ? null : s;
+}
+// 닉네임 = 아이디 비교용: NFKC(전각 → 보통 글자), 보이지 않는 글자 지움, 소문자 (public.sql public_nick_key와 같음)
+const nickKey = (s) => s.normalize('NFKC').replace(/[\u00ad\u034f\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, '').trim().toLowerCase();
+
+// 선택 칸 ackVersion: 없거나 null이면 null, 1~100 정수면 그 값, 그 밖이면 undefined(형식 오류)
+function cleanAck(raw) {
+  if (raw === undefined || raw === null) return null;
+  return Number.isInteger(raw) && raw >= 1 && raw <= ACK_MAX ? raw : undefined;
 }
 
-// 가입 요청 확인. 통과하면 { kind: 'invite' | 'space', code, username, password, displayName }
+// 가입 요청 확인. 통과하면 { kind: 'invite' | 'space', code, username, password, displayName, ackVersion }
 function validate(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: BAD_REQUEST };
   const { code: rawCode, username: rawName, password, displayName: rawDisplay } = body;
@@ -85,10 +105,12 @@ function validate(body) {
   if (password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) return { error: MSG.password };
   const displayName = cleanDisplayName(rawDisplay);
   if (displayName === null) return { error: MSG.displayName };
-  return { kind, code, username, password, displayName };
+  const ackVersion = cleanAck(body.ackVersion);
+  if (ackVersion === undefined) return { error: BAD_REQUEST };
+  return { kind, code, username, password, displayName, ackVersion };
 }
 
-// 참여 요청 확인. 통과하면 { code, displayName }
+// 참여 요청 확인. 통과하면 { code, displayName, ackVersion }
 function validateJoin(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: BAD_REQUEST };
   const { code: rawCode, displayName: rawDisplay } = body;
@@ -97,7 +119,9 @@ function validateJoin(body) {
   if (!SPACE_CODE_RE.test(code)) return { error: MSG.spaceCode };
   const displayName = cleanDisplayName(rawDisplay);
   if (displayName === null) return { error: MSG.displayName };
-  return { code, displayName };
+  const ackVersion = cleanAck(body.ackVersion);
+  if (ackVersion === undefined) return { error: BAD_REQUEST };
+  return { code, displayName, ackVersion };
 }
 
 // 참여 요청의 로그인 토큰. JWT 모양만 보고, 진짜인지는 Supabase에 묻는다
@@ -185,7 +209,7 @@ async function call(fetchImpl, url, { method = 'GET', headers = {}, body } = {})
 // (값이 apikey와 똑같을 때만 받아 줌). 둘 다 이 프로젝트 주소로만 보낸다.
 const adminHeaders = (secretKey) => ({ apikey: secretKey, authorization: `Bearer ${secretKey}` });
 
-// 시작할 때 한 번: secret key가 이 프로젝트 것인지(관리자 API), friends-signup.sql과 groups.sql을 실행했는지 확인.
+// 시작할 때 한 번: secret key가 이 프로젝트 것인지(관리자 API), friends-signup.sql·groups.sql·public.sql을 실행했는지 확인.
 // → { ok } 또는 { ok: false, retry(다시 해 볼 만한지), reason(짧은 이유, 키는 넣지 않음) }
 async function verifySecretKey({ supabaseUrl, secretKey, fetchImpl = fetch }) {
   const headers = adminHeaders(secretKey);
@@ -220,6 +244,13 @@ async function verifySecretKey({ supabaseUrl, secretKey, fetchImpl = fetch }) {
   if (r.status === 404) return { ok: false, retry: false, reason: '친구용 프로젝트에 supabase/groups.sql을 먼저 실행해 주세요' };
   if (r.status === 401 || r.status === 403) return { ok: false, retry: false, reason: 'secret key로 방 규칙 버전을 확인할 수 없어요 (권한)' };
   if (!(r.ok && typeof r.json === 'number' && r.json >= 1)) return { ok: false, retry: true, reason: `방 규칙 버전 응답 ${r.status}` };
+  // 공개 방 SQL(public.sql)을 실행했는지: 이 서버는 참여를 join_room_for로, 가입 미리 확인을 space_code_info로 한다
+  try {
+    r = await call(fetchImpl, `${supabaseUrl}/rest/v1/rpc/public_rooms_version`, { method: 'POST', headers, body: {} });
+  } catch { return down; }
+  if (r.status === 404) return { ok: false, retry: false, reason: '친구용 프로젝트에 supabase/public.sql을 먼저 실행해 주세요' };
+  if (r.status === 401 || r.status === 403) return { ok: false, retry: false, reason: 'secret key로 공개 방 버전을 확인할 수 없어요 (권한)' };
+  if (!(r.ok && typeof r.json === 'number' && r.json >= 1)) return { ok: false, retry: true, reason: `공개 방 버전 응답 ${r.status}` };
   return { ok: true };
 }
 
@@ -312,17 +343,38 @@ function createSignupApi({ supabaseUrl, publishableKey, secretKey, idDomain, all
     } catch { /* 아래 */ }
     return null;
   }
-  // userId를 방에 넣음 (secret key로 join_couple_for: 방 5명·사람 3방, 이미 그 방 멤버면 같은 방 id, 코드는 그대로 남음)
-  // → { joined: true, coupleId } | { fail: 'invalid_code' | 'room_full' | 'too_many_rooms' | 'invalid_display_name' }
+  // userId를 방에 넣음 (secret key로 join_room_for: 코드 → 이미 멤버 → 방 5명 → 사람 3방 → (공개) 닉네임=아이디 → (공개) 동의.
+  // 이미 그 방 멤버면 같은 방 id, 코드는 그대로 남음)
+  // → { joined: true, coupleId } | { needAck: true, roomName, ackVersion }
+  //   | { fail: 'invalid_code' | 'room_full' | 'too_many_rooms' | 'invalid_display_name' | 'nickname_is_login_id' }
   //   | null(결과를 모름: 오류·시간 초과·이상한 응답)
-  async function joinSpace(userId, code, displayName) {
+  async function joinSpace(userId, code, displayName, ackVersion) {
     let r;
     try {
-      r = await rpcAdmin('join_couple_for', { p_user: userId, p_invite_code: code, p_display_name: displayName });
+      r = await rpcAdmin('join_room_for', { p_user: userId, p_invite_code: code, p_display_name: displayName, p_ack_version: ackVersion });
     } catch { return null; }
-    if (r.ok) return typeof r.json === 'string' && r.json ? { joined: true, coupleId: r.json } : null;
-    const m = /invalid_code|room_full|too_many_rooms|invalid_display_name/.exec(String((r.json && r.json.message) || ''));
+    if (r.ok) {
+      const j = r.json;
+      if (!j || typeof j !== 'object') return null;
+      if ((j.status === 'joined' || j.status === 'already_member') && typeof j.couple_id === 'string' && j.couple_id) {
+        return { joined: true, coupleId: j.couple_id };
+      }
+      if (j.status === 'need_ack' && Number.isInteger(j.ack_version) && j.ack_version >= 1 && j.ack_version <= ACK_MAX) {
+        return { needAck: true, roomName: typeof j.room_name === 'string' ? j.room_name : '', ackVersion: j.ack_version };
+      }
+      return null;
+    }
+    const m = /invalid_code|room_full|too_many_rooms|invalid_display_name|nickname_is_login_id/.exec(String((r.json && r.json.message) || ''));
     return m ? { fail: m[0] } : null;
+  }
+  // 가입 전 방 코드 미리 확인 (space_code_info, 계정을 만들기 전). → { open, public, roomName, ackVersion } | null(모름)
+  async function codeInfo(code) {
+    let r;
+    try { r = await rpcAdmin('space_code_info', { p_code: code }); } catch { return null; }
+    const j = r.json;
+    if (!r.ok || !j || typeof j !== 'object' || typeof j.open !== 'boolean' || typeof j.public !== 'boolean') return null;
+    if (j.open && j.public && !(Number.isInteger(j.ack_version) && j.ack_version >= 1 && j.ack_version <= ACK_MAX)) return null;
+    return { open: j.open, public: j.public, roomName: typeof j.room_name === 'string' ? j.room_name : '', ackVersion: j.ack_version };
   }
   // 로그인 토큰의 주인 (공개 키 + 그 토큰으로 물음). 계정 ID, 토큰이 안 맞으면 '', 확인하지 못하면 null
   async function userOf(token) {
@@ -335,6 +387,11 @@ function createSignupApi({ supabaseUrl, publishableKey, secretKey, idDomain, all
   const done = (session, coupleId = null) => ({ status: 200, body: { ...session, joined: !!coupleId, couple_id: coupleId }, outcome: 'ok' });
   // 닉네임을 DB가 받지 않음(서버가 미리 걸러서 실제로는 안 옴). 코드 확인 전에 나는 오류라 횟수를 돌려줌
   const nameFail = () => ({ status: 400, body: { error: MSG.displayName }, outcome: 'bad_name', refund: true });
+  // 공개 방: 닉네임이 아이디와 같음 / 동의가 없음. 둘 다 맞는 코드에서만 나오고 화면이 고쳐서 다시 보내는 것이라 횟수를 돌려줌
+  const nickFail = () => ({ status: 400, body: { error: MSG.nickIsId, nickIsId: true }, outcome: 'nick_is_id', refund: true });
+  const ackNeeded = (roomName, ackVersion) => ({
+    status: 409, body: { error: MSG.needAck, needAck: true, roomName, ackVersion }, outcome: 'need_ack', refund: true,
+  });
   const badCode = (outcome = 'bad_code') => ({ status: 400, body: { error: MSG.badCode }, outcome });
   const failed = (step) => ({ status: 502, body: { error: MSG.failed }, outcome: `fail:${step}` });
   // 아이디·비밀번호 때문에 실패: 코드는 이미 맞은 것이라(코드를 잡았거나 열린 방) 시도 횟수를 돌려줌(refund)
@@ -373,12 +430,17 @@ function createSignupApi({ supabaseUrl, publishableKey, secretKey, idDomain, all
     }
   }
 
-  // 방 코드: 미리 확인 → 계정 만들기 → 로그인 → 그 사람으로 join_couple_for. 못 들어가면 계정을 지움
+  // 방 코드: 미리 확인(space_code_info) → (공개 방) 닉네임=아이디·동의 확인 → 계정 만들기 → 로그인 → 그 사람으로 join_room_for.
+  // 못 들어가면 계정을 지움. 동의가 없으면 계정을 만들기 전에 409로 돌려보냄
   async function viaSpace(v) {
-    let open;
-    try { open = await rpcAdmin('space_code_open', { p_code: v.code }); } catch { return failed('precheck'); }
-    if (!open.ok) return failed('precheck');
-    if (open.json !== true) return badCode();
+    const info = await codeInfo(v.code);
+    if (!info) return failed('precheck');
+    if (!info.open) return badCode();
+    if (info.public) {
+      // DB의 아이디 = app_metadata.username(= v.username, 소문자). 닉네임은 대소문자를 무시하고 비교
+      if (nickKey(v.displayName) === v.username) return nickFail();
+      if (v.ackVersion !== info.ackVersion) return ackNeeded(info.roomName, info.ackVersion);
+    }
     const newId = randomUUID();
     let made;
     try { made = await createUser(v, newId); } catch { made = { fail: 'create' }; }
@@ -392,9 +454,12 @@ function createSignupApi({ supabaseUrl, publishableKey, secretKey, idDomain, all
     let session = null;
     try { session = await signIn(v); } catch { session = null; }
     if (!session) { await removeUser(userId); return failed('signin'); }
-    const j = await joinSpace(userId, v.code, v.displayName);
+    const j = await joinSpace(userId, v.code, v.displayName, v.ackVersion);
     if (j && j.joined) return done(session, j.coupleId);
     if (j && j.fail === 'invalid_display_name') { await removeUser(userId); return nameFail(); }
+    if (j && j.fail === 'nickname_is_login_id') { await removeUser(userId); return nickFail(); }
+    // 그사이 동의 문구 버전이 바뀜(경쟁): 계정을 지우고 새 문구로 다시 동의받음
+    if (j && j.needAck) { await removeUser(userId); return ackNeeded(j.roomName, j.ackVersion); }
     if (j && j.fail) {
       // 그사이 다른 사람이 먼저 들어가 방이 찼거나(5명) 방이 지워지는 중: 코드가 틀린 것과 같은 답
       // (새 계정이라 too_many_rooms는 나올 수 없지만 나와도 같은 답)
@@ -414,11 +479,14 @@ function createSignupApi({ supabaseUrl, publishableKey, secretKey, idDomain, all
   }
 
   // 앱 안에서 참여 (로그인한 사람. 방이 이미 1~2개 있어도 됨, 이미 그 방 멤버면 같은 방 id로 성공)
-  // join_couple_for가 코드를 먼저 확인하므로 room_full·too_many_rooms도 '코드가 맞았다'는 뜻 → 셈(refund 없음)
+  // join_room_for가 코드를 먼저 확인하므로 room_full·too_many_rooms도 '코드가 맞았다'는 뜻 → 셈(refund 없음).
+  // 공개 방의 need_ack(409)·nickname_is_login_id(400)는 그 뒤에만 나오고 화면이 고쳐서 다시 보내는 것이라 → 돌려줌
   async function joinAs(userId, v) {
     const ok = (coupleId) => ({ status: 200, body: { joined: true, couple_id: coupleId }, outcome: 'ok' });
-    const j = await joinSpace(userId, v.code, v.displayName);
+    const j = await joinSpace(userId, v.code, v.displayName, v.ackVersion);
     if (j && j.joined) return ok(j.coupleId);
+    if (j && j.needAck) return ackNeeded(j.roomName, j.ackVersion);
+    if (j && j.fail === 'nickname_is_login_id') return nickFail();
     if (j && j.fail === 'invalid_code') return { status: 400, body: { error: MSG.joinInvalid }, outcome: 'bad_code' };
     if (j && j.fail === 'room_full') return { status: 400, body: { error: MSG.joinFull }, outcome: 'full' };
     if (j && j.fail === 'too_many_rooms') return { status: 409, body: { error: MSG.tooManyRooms }, outcome: 'too_many_rooms' };
@@ -504,4 +572,7 @@ function createSignupApi({ supabaseUrl, publishableKey, secretKey, idDomain, all
   return { signup: guard('signup', handleSignup), join: guard('join', handleJoin) };
 }
 
-module.exports = { createSignupApi, verifySecretKey, validate, validateJoin, normalizeCode, createLimiter, clientIp, ipKey, MSG };
+module.exports = {
+  createSignupApi, verifySecretKey, validate, validateJoin, normalizeCode, createLimiter, clientIp, ipKey, MSG,
+  call, bearer, adminHeaders, // public.cjs가 같이 씀
+};

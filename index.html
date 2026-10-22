@@ -38,7 +38,7 @@
 :root{
   --bg:#F6F7F4; --surface:#FFFFFF; --sunken:#EEF0EB;
   --ink:#1E2A3A; --muted:#626D7D; --line:#E1E4DE; --line-strong:#C7CCC4;
-  --p1:#0E8C86; --p1-soft:#DDF1EF;
+  --p1:#0E8C86; --p1-soft:#DDF1EF; --p1-ink:#0B6F6A; /* --p1-ink: 작은 글자용(흰 바탕·연한 바탕에서 4.5:1) */
   --p2:#C98208; --p2-soft:#FBEFD6;
   --heart:#E5484D; --danger:#C2362F;
   --r-s:8px; --r-m:14px; --r-l:22px;
@@ -48,7 +48,7 @@
   :root{
     --bg:#12171F; --surface:#1A212B; --sunken:#151B24;
     --ink:#E8ECF1; --muted:#9AA4B4; --line:#29323F; --line-strong:#3B4656;
-    --p1:#3CC2B9; --p1-soft:#14363A;
+    --p1:#3CC2B9; --p1-soft:#14363A; --p1-ink:#3CC2B9;
     --p2:#F0B23E; --p2-soft:#3A2D14;
     --heart:#FF6B70; --danger:#FF7A72;
   }
@@ -213,6 +213,8 @@ textarea.input{resize:vertical;min-height:84px;line-height:1.6}
 .stars path{fill:var(--line-strong)}
 .stars .h{fill:transparent}
 .stars .on path,.stars .half .h{fill:var(--c)}
+/* 나간 멤버('예전 멤버')의 색은 빈 별과 같은 회색이라, 칠한 별만 진한 회색으로 (별점이 보이게) */
+.mc-none .stars .on path,.mc-none .stars .half .h{fill:var(--muted)}
 .note-prev{margin:10px 0 0;font-size:14px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .added{margin-top:10px;font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
 .place-row{display:flex;gap:12px;align-items:flex-start}
@@ -473,6 +475,86 @@ textarea.input.url{min-height:0;resize:none;line-height:1.45}
 .room-card.current{border-color:var(--ink);cursor:default}
 .badge.now{background:var(--ink);color:var(--bg)}
 
+/* ---------- 공개 방 (v0.2.0): 공개 표시, 둘러보기, 읽기 전용 보기, 공개 범위 고르기, 동의 ---------- */
+.badge.pub{background:transparent;color:var(--p1-ink);box-shadow:inset 0 0 0 1px var(--p1)}
+.title .badge,.room-title .badge{display:inline-block;vertical-align:4px;margin-left:6px;letter-spacing:0}
+/* 방 고르기 화면 제목 줄: 오른쪽에 돋보기 */
+.gate-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.gate-head h1{flex:1;min-width:0}
+.gate-head .icon-btn{flex:none;margin-top:-4px}
+/* 읽기 전용 띠: 높이 40px, 360px 폰에서도 한 줄. 닫기는 누르는 영역 44px */
+.visit-band{display:flex;align-items:center;justify-content:space-between;gap:8px;height:40px;margin:0 calc(var(--gutter) * -1);padding:0 0 0 var(--gutter);background:var(--p1-soft);color:var(--ink);font-size:13px;font-weight:700;white-space:nowrap}
+.visit-band>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.visit-band .text-btn{flex:none;height:44px;margin:-2px 0;padding:0 var(--gutter) 0 12px;color:var(--ink)}
+.visit-desc{margin:4px 0 0;font-size:13.5px;color:var(--muted);overflow-wrap:anywhere}
+.visit-note{margin:10px 0 0;padding:10px 14px;border-radius:var(--r-m);background:var(--sunken);font-size:13.5px;color:var(--muted)}
+.seg span{flex:1;text-align:center;border-radius:999px;padding:9px 0;font-weight:700;color:var(--muted)}
+.seg span[aria-current="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.note-text{margin:0;white-space:pre-wrap;word-break:break-word}
+.photo-ph{display:block;width:100%;aspect-ratio:16/10;background:var(--sunken)}
+.viewer-item .photo-ph{width:min(100%,640px);background:#222}
+/* 둘러보기 */
+.ex-head{display:flex;align-items:center;gap:4px;padding:10px 0 6px;margin-left:-8px}
+.ex-head h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-0.03em}
+.ex-count{margin:8px 0 2px;font-size:13px;color:var(--muted)}
+.explore-list{list-style:none;margin:8px 0 0;padding:0 0 48px}
+.explore-list li+li{margin-top:10px}
+.ex-card{display:block;width:100%;min-height:88px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-m);padding:14px 16px}
+.ex-card:active{background:var(--sunken)}
+.ex-top{display:flex;align-items:flex-start;gap:6px;min-width:0}
+.ex-name{min-width:0;font-size:17px;font-weight:750;letter-spacing:-0.02em;line-height:1.35;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ex-top .badge{margin-top:3px}
+.ex-desc{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:4px;font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+.ex-stats{display:block;margin-top:8px;font-size:13px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.ex-foot{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:13px;color:var(--muted);white-space:nowrap;min-width:0}
+/* 방 만들기: 공개 범위 카드 */
+.vis-pick{display:grid;gap:8px}
+.vis-card{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:12px 14px;border:1px solid var(--line-strong);border-radius:var(--r-m);background:var(--surface);cursor:pointer}
+.vis-card input{flex:none;width:18px;height:18px;margin:2px 0 0;accent-color:var(--p1)}
+.vis-card b{display:block;font-size:15px;font-weight:750}
+.vis-card small{display:block;font-size:12.5px;color:var(--muted)}
+.vis-card:has(input:checked){border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.vis-card[aria-disabled="true"]{opacity:.55;cursor:default}
+.pub-box{margin:0 0 12px;padding:12px 14px;border-radius:var(--r-m);background:var(--p1-soft);font-size:13.5px;line-height:1.6}
+.pub-box p{margin:0}
+.pub-box p+p{margin-top:6px}
+.pub-guide{margin:4px 0 0;padding:12px 14px;border-radius:var(--r-m);background:var(--surface);border:1px solid var(--line);font-size:13.5px}
+.pub-guide h4{margin:10px 0 2px;font-size:13.5px}
+.pub-guide h4:first-child{margin-top:0}
+.pub-guide p,.pub-guide ul{margin:0}
+.pub-guide ul{padding-left:18px}
+.text-btn.inline{padding:6px 0;color:var(--p1-ink)}
+.ack-check{display:flex;align-items:center;gap:10px;min-height:44px;margin:4px 0 8px;font-weight:700;cursor:pointer}
+.ack-check input{flex:none;width:20px;height:20px;margin:0;accent-color:var(--p1)}
+.ack-text p{margin:0 0 10px}
+/* 내 방에 담기: 방 고르기 카드(라디오처럼 하나만), 담은 뒤 안내 */
+button.vis-card{width:100%;text-align:left;font:inherit;color:inherit}
+.vis-card .radio{flex:none;width:18px;height:18px;margin-top:2px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--line-strong)}
+.vis-card[aria-checked="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.vis-card[aria-checked="true"] .radio{box-shadow:inset 0 0 0 5px var(--p1)}
+.vis-card .badge{display:inline-block;vertical-align:2px;margin-left:6px}
+.copy-place{margin:2px 0 14px;font-size:15px;font-weight:700;overflow-wrap:anywhere}
+.copy-done{text-align:center;padding:20px 0 4px}
+.copy-done .ok{width:52px;height:52px;margin:0 auto 12px;border-radius:50%;background:var(--p1-soft);color:var(--p1-ink);display:grid;place-items:center}
+.copy-done .ok svg{width:28px;height:28px}
+.copy-done p{margin:0 0 4px;overflow-wrap:anywhere}
+.copy-done .btn{margin-top:10px}
+/* 동의·안내 문장은 낱말 중간에서 줄을 바꾸지 않음 (긴 방 이름은 overflow-wrap이 지킴) */
+.ack-text p,.pub-box p,.pub-guide p,.pub-guide li,.copy-done p,.invite.pub .hint,.sheet-body .hint,.gate .hint{word-break:keep-all;overflow-wrap:anywhere}
+/* 공개 방 첫 멤버 초대 띠: 둘러보기 링크(보기만) / 초대 코드(멤버로 참여) 두 줄 */
+.invite.pub{display:block}
+.invite-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.invite-row+.invite-row{margin-top:10px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--ink) 12%,transparent)}
+.invite-row small{font-size:12.5px;color:var(--muted)}
+.invite.pub .hint{margin-top:10px}
+/* 내 정보: 공개 방 묶음, 초대 코드 다시 만들기 */
+.pub-status{margin:0 0 10px;font-size:14px}
+.pub-actions{display:flex;gap:8px;margin-bottom:12px}
+.pub-actions .btn{flex:1;padding-left:8px;padding-right:8px}
+.desc-label{display:block;margin:0 0 6px;font-size:13px;font-weight:600;color:var(--muted)}
+.desc-text{margin:0;font-size:15px;overflow-wrap:anywhere}
+.regen-btn{display:block;margin:8px auto 0}
+
 /* ---------- toast ---------- */
 #toast{
   position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translate(-50%,20px);
@@ -513,10 +595,25 @@ const SUPABASE_KEY = 'YOUR_KEY';
 const LOGIN_ID_DOMAIN = '';
 // 로그인 화면의 '초대 코드로 가입' (POST /api/signup, 홈 서버에만 있음)
 const SIGNUP_ENABLED = false;
+const PUBLIC_ROOMS_ENABLED = false; // 공개 방 둘러보기 (GET /api/public/*, 홈 서버가 PUBLIC_ROOMS=on일 때 true로 바꿈)
 
 const BUCKET = 'place-photos';
 // 계정 설정 맨 아래에 보이는 빌드 번호 'v버전-배포일(YYMMDD)-무작위 5자(16진수)'. 배포할 때마다 새로 만듦
-const APP_VERSION = 'v0.1.2-261022-081f9';
+const APP_VERSION = 'v0.2.0-261022-bcba1';
+
+/* 공개 방 (docs/public-rooms-design.md §4) */
+const PUBLIC_ACK_VERSION = 1;            // 동의 문구 버전. DB public_ack_version()과 같아야 함 (시험이 비교)
+const PUBLIC_KEY_RE = /^[a-km-np-z2-9]{10}$/; // 공개 키(보기 링크용, 초대 코드와 다름). SQL의 couples_public_key_check와 같은 글자 모음
+const PUBLIC_DESC_MAX = 60;              // 공개 방 소개 글자 수
+// 이름·닉네임·소개에 못 쓰는 글자: 제어 문자, 보이지 않는 글자(U+200B·200C·2060–2064·FEFF), 글자 방향을 바꾸는 글자
+// (U+200E·200F·202A–202E·2066–2069). U+200D(이모지 잇기)는 됨. 서버 signup.cjs·public.sql public_text_ok와 같은 모음
+const BAD_TEXT_RE = /[\u0000-\u001f\u007f-\u009f\u200b\u200c\u200e\u200f\u2028\u2029\u202a-\u202e\u2060-\u2069\ufeff]/;
+const BAD_TEXT_MSG = '보이지 않는 글자나 글자 방향을 바꾸는 기호는 쓸 수 없어요. 다시 입력해 주세요.';
+// 닉네임 = 아이디 비교용: 전각 글자는 보통 글자로, 보이지 않는 글자는 지우고, 소문자 (public.sql public_nick_key와 같음)
+const nickKey = (v) => String(v || '').normalize('NFKC').replace(/[\u00ad\u034f\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, '').trim().toLowerCase();
+const PENDING_KEY = 'group-place:pending-public';    // sessionStorage: 로그인 전에 연 /r/<key>
+const EXPLORE_HINT_KEY = 'group-place:explore-hint'; // localStorage: 돋보기 첫 안내를 봤는지
+const NOTICE_KEY = 'group-place:notice-v020';        // localStorage: '새 기능: 공개 방' 한 번 알림을 봤는지
 
 /* ---------- 작은 도우미 ---------- */
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -592,6 +689,20 @@ function friendly(err) {
   // 그룹 기능용 SQL을 아직 안 돌린 DB (새 함수·칸이 없음)
   if (/couple_members\.color|rename_room|leave_room|set_member_color|begin_room_delete/.test(m) && /does not exist|schema cache|Could not find/i.test(m))
     return '그룹 기능용 SQL(supabase/groups.sql)을 먼저 실행해 주세요.';
+  // 공개 방 (public.sql). 홈 서버 MSG와 같은 글자인 것은 표시. not_owner보다 앞에 둠
+  if (/visibility|public_key|create_room|public_create_status|regenerate_invite_code|set_room_description/.test(m) && /does not exist|schema cache|Could not find/i.test(m))
+    return '공개 방용 SQL(supabase/public.sql)을 먼저 실행해 주세요.';
+  if (/invite_owner_only/.test(m)) return '초대 코드는 방장만 다시 만들 수 있어요.';
+  if (/description_owner_only/.test(m)) return '소개는 방장만 바꿀 수 있어요.';
+  if (/not_public/.test(m)) return '공개 방이 아니에요. 새로고침해 주세요.';
+  if (/invalid_description|couples_description_check/.test(m)) return `소개는 ${PUBLIC_DESC_MAX}자까지 쓸 수 있어요.`;
+  if (/nickname_is_login_id/.test(m)) return '공개 방에서는 아이디와 같은 닉네임을 쓸 수 없어요. 별명을 정해 주세요.'; // = MSG.nickIsId
+  if (/ack_required|need_ack/.test(m)) return '공개 방이에요. 안내를 읽고 동의하면 들어갈 수 있어요.'; // = MSG.needAck
+  if (/public_owner_limit/.test(m)) return '공개 방은 한 사람당 1개까지 만들 수 있어요.';
+  if (/public_create_gap/.test(m)) return '공개 방은 7일에 1개 만들 수 있어요.';
+  if (/public_rooms_full/.test(m)) return '지금은 공개 방을 더 만들 수 없어요.';
+  if (/visibility_immutable|public_key_immutable/.test(m)) return '공개 범위는 바꿀 수 없어요.';
+  if (/invalid_visibility/.test(m)) return '공개 범위를 다시 골라 주세요.';
   // 방 함수 오류 코드 (홈 서버 MSG와 글자까지 같게)
   if (/invalid_code/.test(m)) return '초대 코드를 다시 확인해 주세요.';
   if (/room_full/.test(m)) return '이 방은 이미 5명이 모두 찼어요.';
@@ -639,7 +750,7 @@ const configured = !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_KEY.inclu
 const sb = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 const state = {
   user: null,
-  rooms: [],            // [{id, name, invite_code, created_at}] 내가 든 방 전부 (RLS가 내 방만 줌)
+  rooms: [],            // [{id, name, invite_code, created_at, visibility, description, public_key, public_hidden_at}] 내가 든 방 전부 (RLS가 내 방만 줌)
   allMembers: [],       // [{couple_id, user_id, display_name, role, color, created_at}] 내 방들의 멤버 전부
   roomsLoaded: false,   // 방 목록을 한 번이라도 받았는지 (못 받았으면 시작하기 대신 다시 시도 화면)
   roomId: null,         // 지금 방 id (null이면 방 고르기 또는 시작하기)
@@ -659,8 +770,18 @@ const state = {
   cup: null,            // 진행 중인 월드컵
   cupTab: 'new',        // 월드컵 시트: 'new' 새 월드컵 | 'records' 역대 기록
   cupResults: [],       // 끝낸 월드컵 기록 (사람·연도·카테고리마다 하나)
+  explore: null,        // 공개 방 둘러보기 화면 { status: 'loading'|'ok'|'error', rooms, query, scroll, error }
+  visit: null,          // 공개 방 읽기 전용 보기 { key, from: 'explore'|'direct'|'self', status: 'loading'|'ok'|'error'|'gone',
+                        //   data, members, places, tab: 'visited', category: '전체', query: '', sort: 'rating' }
 };
 const uid = () => state.user && state.user.id;
+/* 읽기 전용(공개 방 둘러보기)은 같은 화면 함수(viewMain·placeCard·detailView…)가 이 표시만 보고 그림 (§4.2).
+   데이터·화면 상태는 아래 접근 함수로: 읽기 전용이면 state.visit 것, 아니면 지금 방 것 */
+const ro = () => !!state.visit;
+const ui = () => (ro() ? state.visit : state); // tab·category·query·sort
+const curPlaces = () => (ro() ? state.visit.places || [] : state.places);
+const isPublicRoom = (r) => !!r && r.visibility === 'public';
+const pubBadge = '<span class="badge pub">공개</span>';
 const MAX_MEMBERS = 5, MAX_ROOMS = 3; // 한 방 5명, 한 사람 3방 (DB 함수·트리거와 같은 숫자)
 /* ---------- 멤버 색 (v0.1.2: 화사한 무지개 24색 + 직접 고른 색) ----------
    DB의 member_colors와 같은 id·순서·값 (supabase/colors.sql, docs/groups-design.md §10.2). 순서 = 색 고르기 화면 순서(빨강 → 장미).
@@ -791,6 +912,11 @@ function colorCls(color) {
 const memberCls = (m) => colorCls(m && m.color);
 // 지금 방의 멤버 한 사람: 이름(방마다 다른 닉네임), 색 클래스, 나인지, 방장인지. 방에 없는 id는 '나간 멤버'(회색)
 function person(id) {
+  // 읽기 전용: 멤버는 응답 안 번호(m1–m5)로 찾음. 없으면(나간 사람) '예전 멤버'. 방장 표시는 없음
+  if (ro()) {
+    const v = (state.visit.members || []).find((x) => x.user_id === id);
+    return v ? { name: v.display_name || '멤버', cls: memberCls(v), me: false, owner: false } : { name: '예전 멤버', cls: 'mc mc-none', me: false, owner: false };
+  }
   const m = state.members.find((x) => x.user_id === id);
   if (!m) return { name: id === uid() ? '나' : '나간 멤버', cls: 'mc mc-none', me: id === uid(), owner: false };
   return { name: m.display_name || (m.user_id === uid() ? '나' : '멤버'), cls: memberCls(m), me: m.user_id === uid(), owner: m.role === 'owner' };
@@ -798,7 +924,7 @@ function person(id) {
 // 방 멤버를 들어온 순서로 (먼저 들어온 사람이 앞)
 const byJoin = (a, b) => String(a.created_at).localeCompare(String(b.created_at)) || String(a.user_id).localeCompare(String(b.user_id));
 const membersOf = (roomId) => state.allMembers.filter((m) => m.couple_id === roomId).sort(byJoin);
-const memberOrder = () => [...state.members];
+const memberOrder = () => [...(ro() ? state.visit.members || [] : state.members)];
 const myMember = (roomId = state.roomId) => state.allMembers.find((m) => m.couple_id === roomId && m.user_id === uid());
 const isOwner = () => { const me = myMember(); return !!me && me.role === 'owner'; };
 
@@ -874,7 +1000,7 @@ async function loadAll() {
 }
 async function loadRoomData(gen) {
   const [c, m] = await Promise.all([
-    sb.from('couples').select('id, name, invite_code, created_at').order('created_at'),
+    sb.from('couples').select('id, name, invite_code, created_at, visibility, description, public_key, public_hidden_at').order('created_at'),
     sb.from('couple_members').select('couple_id, user_id, display_name, role, color, created_at').order('created_at'),
   ]);
   if (gen !== loadGen) return false;
@@ -923,7 +1049,8 @@ const MAX_PHOTOS = 10; // 장소마다 최대 사진 수
 const photoCache = {}; // path → { url, at }
 async function signPhotos() {
   const now = Date.now();
-  const need = state.places.flatMap((p) => p.photos.map((x) => x.path))
+  // 원본 전부 + 목록 카드에 쓰는 대표 사진의 썸네일(있으면)
+  const need = state.places.flatMap((p) => [...p.photos.map((x) => x.path), p.photos[0] && p.photos[0].thumb_path].filter(Boolean))
     .filter((x) => !(photoCache[x] && now - photoCache[x].at < 6 * 3600e3));
   if (!need.length) return;
   const { data, error } = await sb.storage.from(BUCKET).createSignedUrls(need, 12 * 3600);
@@ -931,7 +1058,8 @@ async function signPhotos() {
   data.forEach((d) => { if (d.signedUrl && d.path) photoCache[d.path] = { url: d.signedUrl, at: now }; });
 }
 const signedUrl = (path) => (photoCache[path] ? photoCache[path].url : '');
-const photoUrl = (p) => (p.photos && p.photos[0] ? signedUrl(p.photos[0].path) : ''); // 대표 사진
+// 목록 카드의 대표 사진: 썸네일(320px)이 있으면 그것, 없으면 원본. 읽기 전용이면 서버가 서명해 준 썸네일 URL(없으면 '')
+const photoUrl = (p) => (!p.photos || !p.photos[0] ? '' : ro() ? p.photos[0].thumb || '' : signedUrl(p.photos[0].thumb_path) || signedUrl(p.photos[0].path));
 // 긴 변 1080px JPEG로 줄여서 올림 (휴대폰 원본은 너무 큼)
 // 사진 열기: 먼저 <img>로(사진 방향 정보를 확실히 따름), 안 되면 createImageBitmap으로 한 번 더.
 // 어떤 사진은 열지도 실패하지도 않고 멈춰 있어서 20초가 넘으면 못 여는 사진으로 봄
@@ -959,7 +1087,12 @@ async function shrink(file, max = 1080) {
     return await new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('image_decode'))), 'image/jpeg', 0.82));
   } finally { ph.done(); }
 }
+// 사진 파일 이름: 무작위(추측할 수 없게). randomUUID가 없는 브라우저는 16바이트 16진수
+const photoId = () => (crypto.randomUUID ? crypto.randomUUID()
+  : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join(''));
 // 사진 여러 장을 하나씩 줄여서 올리고 뒤에 이어 붙임 (최대 MAX_PHOTOS장). 한 장이 실패해도 나머지는 계속
+// 큰 사진 '<장소>/<id>.jpg'(1080px) + 썸네일 '<장소>/t/<id>.jpg'(320px, 목록 카드·공개 방 둘러보기용).
+// 썸네일을 못 만들거나 못 올리면 thumb_path 없이 넣고 계속 (둘러보기에서는 회색 자리)
 async function addPhotos(place, files, onProgress = () => {}) {
   const list = [...files].slice(0, Math.max(0, MAX_PHOTOS - place.photos.length));
   let pos = place.photos.reduce((m, x) => Math.max(m, x.position), -1);
@@ -968,11 +1101,19 @@ async function addPhotos(place, files, onProgress = () => {}) {
     onProgress(i + 1, list.length);
     try {
       const blob = await shrink(file);
-      const path = `${place.id}/${Date.now()}-${i}.jpg`;
+      const id = photoId();
+      const path = `${place.id}/${id}.jpg`;
       const up = await sb.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg' });
       if (up.error) throw up.error;
-      const res = await sb.from('place_photos').insert({ place_id: place.id, path, position: ++pos, created_by: uid() });
-      if (res.error) { await sb.storage.from(BUCKET).remove([path]); throw res.error; }
+      let thumb = null;
+      try {
+        const small = await shrink(blob, 320); // 이미 줄인 사진에서 다시 줄임 (원본을 또 열지 않게)
+        const t = `${place.id}/t/${id}.jpg`;
+        const tu = await sb.storage.from(BUCKET).upload(t, small, { contentType: 'image/jpeg' });
+        if (!tu.error) thumb = t;
+      } catch { /* 썸네일 없이 */ }
+      const res = await sb.from('place_photos').insert({ place_id: place.id, path, thumb_path: thumb, position: ++pos, created_by: uid() });
+      if (res.error) { await sb.storage.from(BUCKET).remove([path, thumb].filter(Boolean)); throw res.error; }
       done++;
     } catch (err) { if (!error) { error = err; error.photoName = file.name; } }
   }
@@ -993,7 +1134,7 @@ function photoResultText(r) {
 async function deletePhoto(photo) {
   const { data, error } = await sb.from('place_photos').delete().eq('id', photo.id).select('id');
   if (error) throw error;
-  if (data.length) await sb.storage.from(BUCKET).remove([photo.path]);
+  if (data.length) await sb.storage.from(BUCKET).remove([photo.path, photo.thumb_path].filter(Boolean)); // 썸네일도 같이
 }
 // 대표 사진 = 맨 앞. 지금 맨 앞보다 하나 앞 순서로 옮김
 async function setCover(place, photo) {
@@ -1043,6 +1184,7 @@ function viewLogin() {
     <div class="mark"><i></i><i></i></div>
     <h1>우리의 장소 기록</h1>
     <p class="lead">가고 싶은 곳을 모으고, 다녀온 곳엔 각자 후기를 남겨요.</p>
+    ${pendingKey() ? '<p class="hint" style="margin:-16px 0 16px">공개 방을 보려면 로그인해야 해요. 계정은 초대 코드로만 만들 수 있어요.</p>' : ''}
     <form class="panel" id="login-form" novalidate>
       <label class="field"><span>${id ? '아이디' : '이메일'}</span><input class="input" type="${id ? 'text' : 'email'}" name="email" autocomplete="username"${id ? ' autocapitalize="off" autocorrect="off" spellcheck="false"' : ''} required></label>
       <label class="field"><span>비밀번호</span><input class="input" type="password" name="password" autocomplete="current-password" required></label>
@@ -1083,6 +1225,7 @@ function signupInput(f) {
   if (!SIGNUP_CODE_RE.test(code) && !/^[0-9A-F]{8}$/.test(code)) return { error: '초대 코드를 다시 확인해 주세요. (W로 시작하는 가입 코드나 8자리 방 코드)' };
   if (!/^[a-z0-9][a-z0-9._-]{2,19}$/.test(username) || username.includes('..') || username.endsWith('.')) return { error: '아이디는 영문 소문자·숫자와 . _ - 로 3~20자예요. (맨 앞은 영문이나 숫자)' };
   if (!displayName) return { error: '앱에서 보일 이름을 입력해 주세요.' };
+  if (BAD_TEXT_RE.test(displayName)) return { error: BAD_TEXT_MSG };
   if (password.length < 8 || new TextEncoder().encode(password).length > 72) return { error: '비밀번호는 8~72자로 입력해 주세요.' };
   if (password !== f.password2.value) return { error: '두 비밀번호가 달라요.' };
   return { code, username, displayName, password };
@@ -1096,7 +1239,13 @@ async function postApi(path, body, msg, token) {
     if (token) headers.authorization = `Bearer ${token}`;
     const r = await fetch(path, { method: 'POST', signal: ctl.signal, headers, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || (r.status === 404 ? msg.notFound : msg.failed));
+    if (!r.ok) {
+      // 화면이 409 needAck(공개 방 동의)·nickIsId를 다른 오류와 구별할 수 있게 상태와 본문을 붙임
+      const err = new Error(j.error || (r.status === 404 ? msg.notFound : msg.failed));
+      err.status = r.status;
+      err.body = j && typeof j === 'object' ? j : {};
+      throw err;
+    }
     return j;
   } catch (err) {
     if (err && err.name === 'AbortError') throw new Error(msg.slow);
@@ -1108,14 +1257,32 @@ const signUp = (input) => postApi('/api/signup', input, {
   failed: '가입을 끝내지 못했어요. 잠시 후 다시 시도해 주세요.',
   slow: '응답이 너무 늦어요. 잠시 뒤 로그인해 보거나 다시 시도해 주세요.',
 });
+// 가입 성공 뒤 (가입 폼과 공개 방 동의 시트가 같이 씀): 서버가 가입한 사람으로 로그인해서 받은 토큰을 그대로 씀 (로그인을 한 번 더 하지 않게)
+async function finishSignup(j) {
+  const { data, error } = await sb.auth.setSession({ access_token: j.access_token, refresh_token: j.refresh_token });
+  if (error || !data.user) { authMode = 'login'; render(); $('#login-error').textContent = '가입했어요. 아이디와 비밀번호로 로그인해 주세요.'; return; }
+  state.user = data.user;
+  authMode = 'login';
+  forcePicker = true;
+  // 방 코드로 가입했으면 그 방으로 바로
+  state.roomId = typeof j.couple_id === 'string' ? j.couple_id : null;
+  if (state.roomId) rememberRoom(state.roomId);
+  try { await refresh({ keepSheet: false }); } catch (x) { render(); toast(friendly(x)); return; }
+  const pub = !!(state.couple && isPublicRoom(state.couple) && j.joined);
+  toast(j.joined ? (pub ? '가입했어요. 공개 방에 들어왔어요.' : '가입했어요. 방에 들어왔어요.') : '가입했어요. 이제 방을 만들거나 참여해요.');
+  takePending(); // /r/<key>로 들어왔으면 그 공개 방
+}
 // 친구용: 방 코드로 참여도 홈 서버(POST /api/join)를 거침. 코드 맞히기를 가입과 합쳐 접속한 곳마다 1시간 5번으로 막으려고
 // 친구용 DB는 join_couple을 앱에서 직접 못 부르게 막아 둠(supabase/friends-signup.sql). 결과는 sb.rpc처럼 { error, data: 방 id }
-async function joinViaServer(code, name) {
+// 공개 방이면 서버가 409 { needAck, roomName, ackVersion }을 줌 → 동의 시트에서 ackVersion을 붙여 다시 보냄 (error.body로 구별)
+async function joinViaServer(code, name, ackVersion = null) {
   try {
     const { data } = await sb.auth.getSession();
     const token = data.session && data.session.access_token;
     if (!token) return { error: new Error('로그인이 끝났어요. 다시 로그인해 주세요.') };
-    const j = await postApi('/api/join', { code, displayName: name }, {
+    const body = { code, displayName: name };
+    if (ackVersion != null) body.ackVersion = ackVersion;
+    const j = await postApi('/api/join', body, {
       notFound: '이 사이트에서는 코드로 참여할 수 없어요.',
       failed: '참여하지 못했어요. 잠시 후 다시 시도해 주세요.',
       slow: '응답이 너무 늦어요. 새로고침해서 확인하거나 다시 시도해 주세요.',
@@ -1134,6 +1301,8 @@ function defaultNick() {
 }
 function roomFormHtml(mode, nick) {
   const create = mode === 'create';
+  const pub = create && PUBLIC_ROOMS_ENABLED;
+  if (pub) setTimeout(loadPubStatus, 0); // 폼을 그린 뒤 지금 공개 방을 만들 수 있는지 확인해 카드를 회색으로 (§4.7)
   return `<div class="switcher" role="group" aria-label="방 만들기 또는 참여">
       <button type="button" data-action="room-mode" data-mode="create" aria-pressed="${create}">새 방 만들기</button>
       <button type="button" data-action="room-mode" data-mode="join" aria-pressed="${!create}">코드로 참여</button>
@@ -1142,11 +1311,87 @@ function roomFormHtml(mode, nick) {
       ${create
         ? '<label class="field"><span>방 이름</span><input class="input" name="room" maxlength="30" placeholder="예: 맛집 탐방대" required></label>'
         : '<label class="field"><span>초대 코드</span><input class="input" name="code" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12" placeholder="8자리 코드" required></label>'}
+      ${pub ? visibilityFieldsHtml() : ''}
       <label class="field"><span>이 방에서 쓸 닉네임</span><input class="input" name="name" maxlength="20" placeholder="예: 지훈" value="${esc(nick)}" required>
         <p class="hint">방마다 따로 정해요.</p></label>
+      ${pub ? `<div id="pub-ack" hidden><label class="ack-check"><input type="checkbox" name="ack">이해했어요</label></div>` : ''}
       <button class="btn block" type="submit">${create ? '방 만들기' : '참여하기'}</button>
       <p class="error"></p>
     </form>`;
+}
+/* ---------- 공개 방 만들기: 공개 범위 카드·소개·안내 (§4.7) ---------- */
+// 공개 방에서 무엇이 보이는지 (만들기 폼·동의 시트·안내가 같은 문장을 씀)
+const PUBLIC_SCOPE_TEXT = '공개 방에서는 장소·메모·사진·후기·별점·닉네임을 앱을 쓰는 누구나 볼 수 있어요. 방문 날짜는 월까지만 보여요. 아이디·초대 코드·찜은 보이지 않아요. 화면 캡처는 막을 수 없어요.';
+function visibilityFieldsHtml() {
+  return `<div class="field" role="radiogroup" aria-label="공개 범위" style="margin:0 0 14px">
+      <span style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">공개 범위</span>
+      <div class="vis-pick">
+        <label class="vis-card" data-vis="private"><input type="radio" name="visibility" value="private" checked><span><b>개인 방</b><small>멤버만 볼 수 있어요</small></span></label>
+        <label class="vis-card" data-vis="public"><input type="radio" name="visibility" value="public"><span><b>공개 방</b><small>앱을 쓰는 누구나 둘러볼 수 있어요</small></span></label>
+      </div>
+      <p class="hint" id="pub-reason" hidden></p>
+      <p class="hint">만든 뒤에는 바꿀 수 없어요.</p>
+    </div>
+    <div id="pub-fields" hidden>
+      <label class="field"><span>소개 (선택)</span><input class="input" name="description" maxlength="${PUBLIC_DESC_MAX}" placeholder="예: 둘이 먹어 본 서울 라멘집 모음"></label>
+      <div class="pub-box">
+        <p>${PUBLIC_SCOPE_TEXT}</p>
+        <p>공개 방 닉네임에는 실명 대신 별명을 추천해요.</p>
+        ${publicGuideToggle()}
+      </div>
+    </div>`;
+}
+// '공개 방 안내 보기': 폼·동의 시트 안에서는 그 자리에서 펼침 (시트를 바꾸면 적던 값이 사라지므로)
+const publicGuideToggle = () => `<button type="button" class="text-btn inline" data-action="public-guide" data-inline="1" aria-expanded="false">공개 방 안내 보기</button><div class="pub-guide" hidden>${publicGuideHtml()}</div>`;
+function publicGuideHtml() {
+  return `<h4>무엇이 공개되나요</h4><p>장소 이름·카테고리·주소·지도 링크·함께 쓰는 메모·사진·방문한 달·별점·후기, 그리고 멤버 닉네임과 색이 보여요.</p>
+    <h4>누가 보나요</h4><p>이 앱에 로그인한 사람이에요. 가입은 초대 코드로만 할 수 있어요. 검색 엔진에는 나오지 않아요.</p>
+    <h4>공개되지 않는 것</h4><p>아이디, 초대 코드, 찜, 정확한 날짜, 월드컵 기록은 보이지 않아요.</p>
+    <h4>알아 둘 것</h4><p>화면 캡처는 막을 수 없어요. 공개 범위는 만든 뒤에 바꿀 수 없어요.</p>
+    <h4>지켜 주세요</h4><ul><li>남의 얼굴, 특히 아이 얼굴이 나온 사진은 올리지 않기</li><li>남의 이름·전화번호 같은 개인정보, 욕설, 남이 찍은 사진, 광고는 올리지 않기</li></ul>
+    <h4>문제가 있으면</h4><p>이 앱을 알려 준 운영자에게 알려 주세요. 운영자가 둘러보기에서 숨길 수 있어요.</p>`;
+}
+// 공개 방을 지금 만들 수 있는지 (public_create_status). 30초 안에 다시 그리면 받아 둔 값을 씀. 못 받으면 카드는 그대로(DB가 다시 확인)
+let pubStatus = null, pubStatusAt = 0, pubStatusJob = null;
+function loadPubStatus() {
+  if (!PUBLIC_ROOMS_ENABLED || !sb || !state.user) return;
+  if (pubStatusJob) return;
+  if (Date.now() - pubStatusAt < 30000) { applyPubStatus(); return; }
+  pubStatusJob = Promise.resolve(sb.rpc('public_create_status'))
+    .then(({ data, error }) => { pubStatus = !error && data && typeof data === 'object' ? data : null; })
+    .catch(() => { pubStatus = null; })
+    .finally(() => { pubStatusAt = Date.now(); pubStatusJob = null; applyPubStatus(); });
+}
+function pubReasonText(s) {
+  if (!s || s.allowed !== false) return '';
+  if (s.reason === 'public_owner_limit') return '공개 방은 한 사람당 1개까지 만들 수 있어요.';
+  if (s.reason === 'public_create_gap') {
+    const t = Date.parse(s.next_at), days = Number.isFinite(t) ? Math.max(1, Math.ceil((t - Date.now()) / 86400e3)) : 0;
+    return `공개 방은 7일에 1개 만들 수 있어요${days ? `(${days}일 뒤 가능)` : ''}.`;
+  }
+  if (s.reason === 'public_rooms_full') return '지금은 공개 방을 더 만들 수 없어요.';
+  return ''; // too_many_rooms: 원래 폼 안내(방 3개)로
+}
+// 받아 둔 값을 지금 그려진 만들기 폼에 반영 (폼을 다시 그리지 않아서 적던 값이 그대로)
+function applyPubStatus() {
+  const f = $('#room-form[data-mode=create]');
+  const card = f && f.querySelector('[data-vis=public]');
+  if (!card) return;
+  const why = pubReasonText(pubStatus), input = card.querySelector('input'), reason = $('#pub-reason', f);
+  card.setAttribute('aria-disabled', String(!!why));
+  input.disabled = !!why;
+  if (reason) { reason.textContent = why; reason.hidden = !why; }
+  if (why && input.checked) { f.querySelector('input[name=visibility][value=private]').checked = true; syncVisibility(f); }
+}
+// 개인/공개를 고를 때: 공개면 소개·안내·'이해했어요'를 펼치고, 체크 전에는 만들기 버튼을 막음
+function syncVisibility(f) {
+  const pub = !!f.querySelector('input[name=visibility][value=public]:checked');
+  const box = $('#pub-fields', f), ack = $('#pub-ack', f), btn = f.querySelector('[type=submit]');
+  if (box) box.hidden = !pub;
+  if (ack) ack.hidden = !pub;
+  field(f, 'room').placeholder = pub ? '예: 서울 라멘 지도' : '예: 맛집 탐방대';
+  btn.textContent = pub ? '공개 방 만들기' : '방 만들기';
+  btn.disabled = pub && !(f.elements.namedItem('ack') && f.elements.namedItem('ack').checked);
 }
 function viewOnboard() {
   return `<main class="wrap gate">
@@ -1154,7 +1399,8 @@ function viewOnboard() {
     <h1>방을 만들거나 참여해요</h1>
     <p class="lead">방을 만들고 초대 코드를 보내면 친구가 들어올 수 있어요. 한 방은 ${MAX_MEMBERS}명까지예요.</p>
     <div class="panel">${roomFormHtml(onboardMode, defaultNick())}</div>
-    <button class="text-btn" data-action="logout" style="margin-top:16px;align-self:center">다른 계정으로 로그인</button>
+    ${PUBLIC_ROOMS_ENABLED ? '<button class="text-btn" data-action="explore" style="margin-top:16px;align-self:center;color:var(--p1-ink)">공개 방 둘러보기</button>' : ''}
+    <button class="text-btn" data-action="logout" style="margin-top:${PUBLIC_ROOMS_ENABLED ? 4 : 16}px;align-self:center">다른 계정으로 로그인</button>
   </main>`;
 }
 // 시트 맨 위 왼쪽: 다른 시트에서 넘어왔으면(back) ‹ 뒤로, 아니면 ✕ 닫기
@@ -1167,8 +1413,10 @@ function roomNewView() {
   <div class="sheet-body">${roomFormHtml(mode, defaultNick())}</div>`;
 }
 // 방 바꾸기 시트 (메인의 방 이름을 누르면): 내 방 전부(지금 방 표시) + 새 방 만들기·코드로 참여 (3개면 안내만)
+// 공개 방 둘러보기 돋보기 (방 고르기 화면·방 바꾸기 시트 머리, §4.3)
+const exploreBtn = () => (PUBLIC_ROOMS_ENABLED ? `<button class="icon-btn" data-action="explore" aria-label="공개 방 둘러보기">${ICON.search}</button>` : '');
 function roomsView() {
-  return `<div class="sheet-head">${sheetClose()}<h2 id="sheet-title">방 바꾸기</h2><span style="width:40px"></span></div>
+  return `<div class="sheet-head">${sheetClose()}<h2 id="sheet-title">방 바꾸기</h2>${exploreBtn() || '<span style="width:40px"></span>'}</div>
   <div class="sheet-body">
     <p class="hint" style="margin:4px 0 12px">내 방 ${state.rooms.length}/${MAX_ROOMS}개 · 방을 누르면 그 방으로 바뀌어요.</p>
     <ul class="room-list">${state.rooms.map((r) => roomCard(r, null, r.id === state.roomId)).join('')}</ul>
@@ -1179,7 +1427,7 @@ function roomsView() {
 function roomCard(r, last, current = false) {
   const ms = membersOf(r.id), me = ms.find((m) => m.user_id === uid());
   return `<li><button class="room-card${current ? ' current' : ''}" ${current ? 'data-action="close" aria-current="true"' : `data-action="pick-room" data-id="${esc(r.id)}"`}>
-    <span class="room-top"><span class="room-name">${esc(r.name)}</span>${current ? '<span class="badge now">지금 방</span>' : r.id === last ? '<span class="badge">최근</span>' : ''}</span>
+    <span class="room-top"><span class="room-name">${esc(r.name)}</span>${isPublicRoom(r) ? pubBadge : ''}${current ? '<span class="badge now">지금 방</span>' : r.id === last ? '<span class="badge">최근</span>' : ''}</span>
     <span class="room-meta"><span class="room-dots" aria-hidden="true">${ms.slice(0, MAX_MEMBERS).map((m) => `<i class="dot ${memberCls(m)}"></i>`).join('')}</span>
       <span>${ms.length}/${MAX_MEMBERS}명</span>${me ? `<span>· ${esc(me.display_name)}</span>` : ''}${me && me.role === 'owner' ? '<span class="badge">방장</span>' : ''}</span>
   </button></li>`;
@@ -1192,9 +1440,10 @@ function viewRooms() {
   const last = lastRoom();
   return `<main class="wrap gate">
     <div class="mark"><i></i><i></i></div>
-    <h1>어느 방으로 갈까요?</h1>
+    <div class="gate-head"><h1>어느 방으로 갈까요?</h1>${exploreBtn()}</div>
     <p class="lead">들어간 뒤에도 위쪽 방 이름을 누르면 언제든 바꿀 수 있어요.</p>
     <ul class="room-list">${state.rooms.map((r) => roomCard(r, last)).join('')}</ul>
+    ${PUBLIC_ROOMS_ENABLED && !exploreHintSeen() ? '<p class="hint" style="margin-top:12px">다른 사람들의 공개 방을 둘러볼 수 있어요. 오른쪽 위 돋보기를 눌러 보세요.</p>' : ''}
     ${roomNewButtons()}
     <button class="text-btn" data-action="logout" style="margin-top:16px;align-self:center">다른 계정으로 로그인</button>
   </main>`;
@@ -1225,27 +1474,30 @@ const latestRating = (p, userId) => {
   }
   return null;
 };
+// 읽기 전용이면 방문·담은 날짜가 'YYYY-MM'(월까지만)이라 같은 꼴끼리 비교됨
 const lastDay = (p) => (p.visits[0] ? p.visits[0].visited_on : p.created_at.slice(0, 10));
 function filtered() {
   const list = matched();
-  if (state.tab === 'visited') {
+  const u = ui();
+  if (u.tab === 'visited') {
     // 평점순: 카드에 보이는 평균 평점(소수 한 자리) 높은 순 → 같으면 방문 많은 순 → 그래도 같으면 최근 방문순. 평점 없으면 맨 뒤
     // 최근 방문순: 마지막 방문일(기록이 없으면 담은 날) / 최근 추가순: 장소를 담은 시각
     const shown = (p) => { const a = avgRating(p); return a == null ? -1 : Number(a.toFixed(1)); };
     const desc = (x, y) => (x < y ? 1 : x > y ? -1 : 0);
-    list.sort(state.sort === 'rating'
+    list.sort(u.sort === 'rating'
       ? (a, b) => desc(shown(a), shown(b)) || desc(a.visits.length, b.visits.length) || desc(lastDay(a), lastDay(b))
-      : state.sort === 'added'
+      : u.sort === 'added'
         ? (a, b) => desc(a.created_at, b.created_at)
         : (a, b) => desc(lastDay(a), lastDay(b)));
   }
   return list;
 }
 function matched() {
-  const q = state.query.trim().toLowerCase();
-  return state.places.filter((p) => {
-    if (state.tab === 'fav' ? !p.favorite : p.status !== state.tab) return false;
-    if (state.category !== '전체' && p.category !== state.category) return false;
+  const u = ui();
+  const q = u.query.trim().toLowerCase();
+  return curPlaces().filter((p) => {
+    if (u.tab === 'fav' ? !p.favorite : p.status !== u.tab) return false;
+    if (u.category !== '전체' && p.category !== u.category) return false;
     if (!q) return true;
     return [p.name, p.address, p.shared_note, p.category].some((v) => (v || '').toLowerCase().includes(q))
       || p.reviews.some((r) => (r.body || '').toLowerCase().includes(q));
@@ -1253,7 +1505,7 @@ function matched() {
 }
 // 목록 카드의 별점 칩: 최근 별점을 남긴 멤버만, 들어온 순서로. 멤버가 2명 이하면 별 5개, 3명 이상이면 '닉네임 ★4.5'로 줄임
 function pairTags(p) {
-  const mini = state.members.length > 2;
+  const mini = memberOrder().length > 2;
   return memberOrder().map((m) => {
     const n = latestRating(p, m.user_id);
     if (!n) return '';
@@ -1272,7 +1524,7 @@ function placeCard(p) {
   const tags = p.status === 'visited' ? pairTags(p) : '';
   const lower = p.status === 'visited'
     ? (tags || avg ? `<div class="pair"><div class="pair-tags">${tags}</div>${avg ? `<span class="avg" role="img" aria-label="평균 ${avg.toFixed(1)}점"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR}"/></svg>${avg.toFixed(1)}</span>` : ''}</div>` : '')
-    : `<div class="added ${by.cls}"><i class="dot"></i>${esc(josa(by.name, '이', '가'))} 담음 <span aria-hidden="true">|</span> ${fmtDate(p.created_at)}</div>`;
+    : `<div class="added ${by.cls}"><i class="dot"></i>${esc(josa(by.name, '이', '가'))} 담음 <span aria-hidden="true">|</span> ${ro() ? esc(fmtMonth(p.created_at)) : fmtDate(p.created_at)}</div>`;
   const img = photoUrl(p);
   // 도장은 가장 앞선 것 하나(+나머지 개수), 준우승은 카테고리 옆에 태그 하나(+나머지 개수)
   const { stamps, seconds } = honorsOf(p.id);
@@ -1294,8 +1546,10 @@ function placeCard(p) {
 }
 function listHtml() {
   const list = filtered();
-  const emptyMsg = state.query || state.category !== '전체'
+  const u = ui();
+  const emptyMsg = u.query || u.category !== '전체'
     ? '<strong>조건에 맞는 장소가 없어요</strong>검색어나 카테고리를 바꿔 보세요.'
+    : ro() ? (u.tab === 'visited' ? '<strong>아직 다녀온 곳이 없어요</strong>' : '<strong>가고 싶은 곳이 없어요</strong>')
     : state.tab === 'want_to_go' ? '<strong>가고 싶은 곳을 담아 보세요</strong>오른쪽 아래 버튼으로 첫 장소를 추가해요.'
     : state.tab === 'visited' ? '<strong>아직 다녀온 곳이 없어요</strong>가고 싶은 곳에서 ‘다녀왔어요’를 누르면 여기로 옮겨져요.'
     : '<strong>찜한 곳이 없어요</strong>장소를 열고 하트를 누르면 여기에 모여요.';
@@ -1308,40 +1562,66 @@ function roomTitleBtn(name) {
   const end = [...tail].length <= 10 ? `<span class="tail">${esc(tail)}${ICON.down}</span>` : `${esc(tail)}${ICON.down}`;
   return `<button class="title-btn" data-action="rooms" aria-haspopup="dialog" aria-label="${esc(`${name}, 방 바꾸기와 새 방`)}">${esc(head)}${end}</button>`;
 }
+// 첫 멤버가 들어올 때까지 메인에 보이는 초대 띠 (읽기 전용에서는 부르지 않음).
+// 공개 방이면 두 줄: 둘러보기 링크(보기만) / 초대 코드(멤버로 참여) + 둘의 차이 안내 (§4.11)
+function inviteBand() {
+  const c = state.couple;
+  if (!c.invite_code || state.members.length !== 1) return '';
+  if (!isPublicRoom(c)) return `<div class="invite"><div>친구에게 초대 코드를 보내 주세요<br><b>${esc(c.invite_code)}</b></div><button class="btn small" data-action="copy-code">복사</button></div>`;
+  const link = PUBLIC_ROOMS_ENABLED && PUBLIC_KEY_RE.test(String(c.public_key || ''));
+  return `<div class="invite pub">
+      ${link ? '<div class="invite-row"><div>둘러보기 링크 <small>보기만</small></div><button class="btn small ghost" data-action="share-link">공유</button></div>' : ''}
+      <div class="invite-row"><div>초대 코드 <small>멤버로 참여</small><br><b>${esc(c.invite_code)}</b></div><button class="btn small" data-action="copy-code">복사</button></div>
+      <p class="hint">초대 코드를 받은 사람은 멤버로 들어와 장소를 고치고 지울 수 있어요. 보기만 할 사람에게는 링크를 보내 주세요.</p>
+    </div>`;
+}
+// 메인 목록. 읽기 전용(공개 방 둘러보기)이면 같은 함수가 띠·머리만 바꾸고 고치는 단추(초대 띠·톱니·트로피·찜 탭·장소 추가)는 그리지 않음
 function viewMain() {
-  const want = state.places.filter((p) => p.status === 'want_to_go').length;
-  const visited = state.places.filter((p) => p.status === 'visited').length;
-  const fav = state.places.filter((p) => p.favorite).length;
-  const cats = ['전체', ...new Set([...catNames(), ...state.places.map((p) => p.category)])];
-  const tabBtn = (key, label, n) => `<button role="tab" data-action="tab" data-tab="${key}" aria-selected="${state.tab === key}">${label}<span class="n">${n}</span></button>`;
-  const sortBtn = (key, label) => `<button data-action="sort" data-sort="${key}" aria-pressed="${state.sort === key}">${label}</button>`;
+  const r = ro(), u = ui(), places = curPlaces();
+  if (r && state.visit.status !== 'ok') return visitStateView();
+  const want = places.filter((p) => p.status === 'want_to_go').length;
+  const visited = places.filter((p) => p.status === 'visited').length;
+  const fav = r ? 0 : places.filter((p) => p.favorite).length;
+  const cats = ['전체', ...new Set([...(r ? state.visit.data.categories : catNames()), ...places.map((p) => p.category)])];
+  const tabBtn = (key, label, n) => `<button role="tab" data-action="tab" data-tab="${key}" aria-selected="${u.tab === key}">${label}<span class="n">${n}</span></button>`;
+  const sortBtn = (key, label) => `<button data-action="sort" data-sort="${key}" aria-pressed="${u.sort === key}">${label}</button>`;
   const ordered = memberOrder();
-  return `<div class="top"><div class="wrap">
-      <div class="top-row">
+  const duo = `<div class="duo" aria-label="멤버">${ordered.map((m) => { const w = person(m.user_id); return `<span class="${w.cls}" title="${esc(w.name)}"><i class="dot"></i><span class="nm">${esc(w.name)}</span></span>`; }).join('')}</div>`;
+  const head = r ? visitHeadHtml(duo) : `<div class="top-row">
         <div class="top-head">
-          <h1 class="title">${roomTitleBtn(state.couple.name)}</h1>
-          <div class="duo" aria-label="멤버">${ordered.map((m) => { const w = person(m.user_id); return `<span class="${w.cls}" title="${esc(w.name)}"><i class="dot"></i><span class="nm">${esc(w.name)}</span></span>`; }).join('')}</div>
+          <h1 class="title">${roomTitleBtn(state.couple.name)}${isPublicRoom(state.couple) ? pubBadge : ''}</h1>
+          ${duo}
         </div>
         <div class="top-actions">
           <button class="icon-btn" data-action="cup" aria-label="장소 월드컵">${ICON.trophy}</button>
           <button class="icon-btn" data-action="settings" aria-label="내 정보">${ICON.gear}</button>
         </div>
-      </div>
-      <div class="tabs" role="tablist">${tabBtn('want_to_go', '가고 싶은 곳', want)}${tabBtn('visited', '다녀온 곳', visited)}${tabBtn('fav', '찜', fav)}</div>
+      </div>`;
+  return `<div class="top"><div class="wrap">
+      ${head}
+      <div class="tabs" role="tablist">${tabBtn('want_to_go', '가고 싶은 곳', want)}${tabBtn('visited', '다녀온 곳', visited)}${r ? '' : tabBtn('fav', '찜', fav)}</div>
     </div></div>
     <main class="wrap">
-      ${state.couple.invite_code && state.members.length === 1 ? `<div class="invite"><div>친구에게 초대 코드를 보내 주세요<br><b>${esc(state.couple.invite_code)}</b></div><button class="btn small" data-action="copy-code">복사</button></div>` : ''}
+      ${r ? visitNotesHtml() : inviteBand()}
       <div class="tools">
-        <div class="search"><label class="sr" for="q">검색</label>${ICON.search}<input class="input" id="q" type="search" placeholder="이름, 주소, 메모, 후기 검색" value="${esc(state.query)}"><button type="button" class="search-clear" data-action="clear-search" aria-label="검색어 지우기">${ICON.close}</button></div>
-        <div class="chips" role="group" aria-label="카테고리">${cats.map((c) => `<button class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${state.category === c}">${esc(c)}</button>`).join('')}</div>
-        ${state.tab === 'visited' ? `<div class="sort" role="group" aria-label="정렬">${sortBtn('recent', '최근 방문순')}${sortBtn('added', '최근 추가순')}${sortBtn('rating', '평점순')}</div>` : ''}
+        <div class="search"><label class="sr" for="q">검색</label>${ICON.search}<input class="input" id="q" type="search" placeholder="이름, 주소, 메모, 후기 검색" value="${esc(u.query)}"><button type="button" class="search-clear" data-action="clear-search" aria-label="검색어 지우기">${ICON.close}</button></div>
+        <div class="chips" role="group" aria-label="카테고리">${cats.map((c) => `<button class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${u.category === c}">${esc(c)}</button>`).join('')}</div>
+        ${u.tab === 'visited' ? `<div class="sort" role="group" aria-label="정렬">${sortBtn('recent', '최근 방문순')}${sortBtn('added', '최근 추가순')}${sortBtn('rating', '평점순')}</div>` : ''}
       </div>
       <div id="list-area">${listHtml()}</div>
     </main>
-    <button class="btn fab" data-action="add">${ICON.plus}장소 추가</button>`;
+    ${r ? '' : `<button class="btn fab" data-action="add">${ICON.plus}장소 추가</button>`}`;
 }
 
 /* ---------- 시트: 장소 추가/수정 ---------- */
+// 공개 방에서 쓰는 순간의 한 줄 안내 (§4.11). 지금 방이 공개 방일 때만, 읽기 전용에서는 없음
+const PUB_HINT = {
+  place: '공개 방이라 담은 장소를 누구나 볼 수 있어요.',
+  note: '공개 방이라 메모도 누구나 볼 수 있어요. 예약자 이름·전화번호·비밀번호는 적지 마세요.',
+  photo: '사진도 공개돼요. 얼굴, 특히 아이 사진은 올리지 마세요.',
+  review: '후기와 별점도 공개돼요.',
+};
+const pubHint = (k, style = '') => (!ro() && isPublicRoom(state.couple) ? `<p class="hint pub-hint"${style ? ` style="${style}"` : ''}>${PUB_HINT[k]}</p>` : '');
 const catChip = (c, on) => `<button type="button" class="chip" data-action="pick-cat" data-cat="${esc(c)}" aria-pressed="${on}">${esc(c)}</button>`;
 function selectCat(form, name) {
   form.category.value = name;
@@ -1352,6 +1632,7 @@ function placeForm(p) {
   const cats = [...new Set([...catNames(), v.category])].filter(Boolean);
   return `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">${p ? '정보 수정' : '장소 추가'}</h2><span style="width:40px"></span></div>
   <form class="sheet-body" id="place-form" novalidate>
+    ${p ? '' : pubHint('place', 'margin:0 0 12px')}
     <label class="field"><span>장소 이름</span><input class="input" name="name" maxlength="80" value="${esc(v.name)}" required></label>
     <div class="field"><span style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">카테고리</span>
       <div class="cat-pick" role="radiogroup" aria-label="카테고리">${cats.map((c) => catChip(c, v.category === c)).join('')}<button type="button" class="chip add" data-action="new-cat">+ 새 카테고리</button></div>
@@ -1369,7 +1650,7 @@ function placeForm(p) {
     <label class="field" style="margin-top:14px"><span>함께 쓰는 메모</span><textarea class="input" name="shared_note" maxlength="2000" placeholder="웨이팅, 추천 메뉴, 주차 같은 것들">${esc(v.shared_note)}</textarea></label>
     <label class="field"><span>사진 (선택 · 여러 장 가능)</span><input class="input" type="file" name="photo" accept="image/*" multiple>
       <span class="photo-previews" id="photo-previews"></span>
-      <p class="hint" id="photo-hint">처음 고른 사진이 대표 사진이에요. 최대 ${MAX_PHOTOS}장.</p></label>`}
+      <p class="hint" id="photo-hint">처음 고른 사진이 대표 사진이에요. 최대 ${MAX_PHOTOS}장.</p>${pubHint('photo')}</label>`}
     <button class="btn block" type="submit">${p ? '변경 저장' : '장소 추가'}</button>
     <p class="error" id="form-error"></p>
   </form>`;
@@ -1409,6 +1690,13 @@ function applyShare(form, text) {
   return false;
 }
 
+// 지도 링크 글자: 링크가 없으면 네이버 검색, 구글·카카오 링크면 그 이름, 그 밖은 네이버
+function mapLinkText(u) {
+  if (!u) return '네이버 지도에서 검색';
+  if (isGoogleMaps(u)) return '구글 지도에서 보기';
+  try { if (/^(kko\.to|(place\.|m\.)?map\.kakao\.com)$/.test(new URL(safeUrl(u)).hostname)) return '카카오맵에서 보기'; } catch { /* 네이버로 */ }
+  return '네이버 지도에서 보기';
+}
 // 구글 지도 링크 (해외 장소용). 공유 링크엔 이름·주소가 없을 때가 많아서 서버(api/place.js)가 구글 지도에서 읽어 옴
 function isGoogleMaps(u) {
   let x;
@@ -1480,6 +1768,7 @@ function fillFromGoogle(form, fallback = {}) {
 /* ---------- 시트: 장소 상세 ---------- */
 // 사진 넘겨 보기: 옆으로 밀면 다음 사진, 누르면 크게. 맨 앞이 대표 사진(목록 썸네일)
 function galleryHtml(p) {
+  if (ro()) return visitGalleryHtml(p); // 서버가 서명한 썸네일 (없으면 회색 자리)
   if (!p.photos.length) return '';
   const many = p.photos.length > 1;
   return `<div class="gallery">
@@ -1510,6 +1799,7 @@ function showGallery(i) {
 }
 // 크게 보기: 화면 가득, 사진 전체가 보이게(잘리지 않게). 옆으로 밀어 넘김
 function openViewer(p, i) {
+  if (ro()) { openVisitViewer(p, i); return; } // 누른 사진만 서버에서 큰 사진 URL을 받아 바꿔 넣음
   const root = $('#viewer-root');
   root.innerHTML = `<div class="viewer" role="dialog" aria-modal="true" aria-label="${esc(p.name)} 사진">
     <div class="viewer-track" id="viewer-track">${p.photos.map((ph, k) => `<div class="viewer-item"><img src="${esc(signedUrl(ph.path))}" alt="${esc(p.name)} 사진 ${k + 1}"></div>`).join('')}</div>
@@ -1548,6 +1838,7 @@ function visitCard(p, v, editing) {
         <div class="vrow-head">${who}</div>
         ${rateInput(state.draftRating)}
         <textarea class="input" id="my-review" maxlength="3000" placeholder="어땠는지 남겨 보세요">${esc(mine ? mine.body : '')}</textarea>
+        ${pubHint('review')}
       </div>`;
     }
     const r = reviews.find((x) => x.author_id === id);
@@ -1556,11 +1847,14 @@ function visitCard(p, v, editing) {
       ${r.body ? `<p class="voice-body">${esc(r.body)}</p>` : ''}
     </div>`;
   }).join('') || '<p class="voice-empty">아직 후기가 없어요.</p>';
-  const head = editing
+  // 읽기 전용: 날짜는 월까지만, 후기 쓰기·삭제 단추 없음 (editing도 늘 false)
+  const head = ro()
+    ? `<span class="visit-date">${esc(fmtMonth(v.visited_on))}</span>`
+    : editing
     ? `<label><span class="sr">방문 날짜</span><input class="input date" type="date" id="visit-date" value="${v ? v.visited_on : today()}" max="${today()}" required></label>`
     : `<span class="visit-date">${fmtDay(v.visited_on)}</span><button class="text-btn" data-action="edit-visit" data-visit="${v.id}">${mine ? '내 후기 수정' : '내 후기 쓰기'}</button>`;
   // 다른 멤버 후기가 없는 방문만 통째로 지울 수 있고, 있으면 내 후기만 지움 (DB 정책과 같음)
-  const del = v && !othersWrote ? '<button class="text-btn danger" data-action="delete-visit">방문 삭제</button>'
+  const del = ro() ? '' : v && !othersWrote ? '<button class="text-btn danger" data-action="delete-visit">방문 삭제</button>'
     : mine ? '<button class="text-btn danger" data-action="delete-review">내 후기 삭제</button>' : '';
   const actions = editing ? `<div class="voice-actions">
       <span>${del}</span>
@@ -1571,38 +1865,42 @@ function visitCard(p, v, editing) {
     ${rows}${actions}
   </article>`;
 }
+// 장소 상세. 읽기 전용이면 같은 배치(최종 결정 1)에서 고치는 단추만 빠지고, 머리 오른쪽(하트·정보 수정 자리)에 '내 방에 담기'
 function detailView(p) {
+  const r = ro();
   const link = safeUrl(p.naver_url) || `https://map.naver.com/p/search/${encodeURIComponent(p.name)}`;
-  const showVisits = p.status === 'visited' || p.visits.length > 0;
-  // 방문 기록이 하나도 없으면 새 방문 입력칸을 바로 보여줌
-  const editId = state.editVisit || (p.visits.length ? null : 'new');
+  const showVisits = r ? p.visits.length > 0 : p.status === 'visited' || p.visits.length > 0;
+  // 방문 기록이 하나도 없으면 새 방문 입력칸을 바로 보여줌 (읽기 전용은 입력칸 없음)
+  const editId = r ? null : state.editVisit || (p.visits.length ? null : 'new');
   const { stamps, seconds } = honorsOf(p.id);
   const honors = (stamps.length ? `<div class="honors">${stamps.map((h) => `<div class="honor">${stampHtml(h)}<small>${esc(person(h.user_id).name)}</small></div>`).join('')}</div>` : '')
     + (seconds.length ? `<div class="honor-tags">${seconds.map((h) => secondTag(h, 0, true)).join('')}</div>` : '');
-  return `<div class="sheet-head">
+  return `${r ? visitDetailHead() : `<div class="sheet-head">
       <button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button>
       <div class="right">
         <button class="icon-btn heart-btn" data-action="toggle-fav" aria-pressed="${p.favorite}" aria-label="찜">${ICON.heart(p.favorite)}</button>
         <button class="text-btn" data-action="edit" style="padding-right:10px">정보 수정</button>
       </div>
-    </div>
+    </div>`}
     <div class="sheet-body">
       ${galleryHtml(p)}
       <h2 class="detail-name" id="sheet-title">${esc(p.name)}</h2>
       <div class="detail-meta"><span class="cat">${esc(p.category)}</span><span>${esc(p.address || '주소 없음')}</span></div>
       ${honors}
-      <a class="map-link" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${ICON.pin}${!p.naver_url ? '네이버 지도에서 검색' : isGoogleMaps(p.naver_url) ? '구글 지도에서 보기' : '네이버 지도에서 보기'}</a>
-      <div class="photo-actions">
+      <a class="map-link" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${ICON.pin}${mapLinkText(p.naver_url)}</a>
+      ${r ? visitDetailBody(p) : `<div class="photo-actions">
         ${p.photos.length < MAX_PHOTOS ? '<label class="btn small ghost">사진 추가<input class="sr" type="file" id="photo-input" accept="image/*" multiple></label>' : ''}
         ${p.photos.length > 1 ? '<button class="text-btn" data-action="photo-cover" id="photo-cover" hidden>대표 사진으로</button>' : ''}
         ${p.photos.length ? `<button class="text-btn danger" data-action="remove-photo">${p.photos.length > 1 ? '이 사진 삭제' : '사진 삭제'}</button>` : ''}
       </div>
+      ${p.photos.length < MAX_PHOTOS ? pubHint('photo', 'margin:6px 0 0') : ''}
       <div class="seg" role="group" aria-label="방문 상태">
         <button data-action="set-status" data-status="want_to_go" aria-pressed="${p.status === 'want_to_go'}">가고 싶은 곳</button>
         <button data-action="set-status" data-status="visited" aria-pressed="${p.status === 'visited'}">다녀왔어요</button>
       </div>
       <section class="block">
         <h3>함께 쓰는 메모</h3>
+        ${pubHint('note', 'margin:-4px 0 8px')}
         <textarea class="input" id="shared-note" maxlength="2000" placeholder="멤버 모두 고칠 수 있는 메모예요">${esc(p.shared_note)}</textarea>
         <div class="block-row"><button class="btn small ghost" data-action="save-note">메모 저장</button></div>
       </section>
@@ -1611,7 +1909,7 @@ function detailView(p) {
         ${editId === 'new' ? visitCard(p, null, true) : ''}
         ${p.visits.map((v) => visitCard(p, v, editId === v.id)).join('')}
       </section>` : `<p class="hint" style="margin-top:18px">‘다녀왔어요’로 바꾸면 방문한 날짜와 각자 별점·후기를 남길 수 있어요.</p>`}
-      <div class="danger-zone"><span class="by ${person(p.created_by).cls}"><i class="dot"></i><span>${esc(josa(person(p.created_by).name, '이', '가'))} ${fmtDate(p.created_at)}에 담음</span></span><button class="text-btn danger" data-action="delete-place">장소 삭제</button></div>
+      <div class="danger-zone"><span class="by ${person(p.created_by).cls}"><i class="dot"></i><span>${esc(josa(person(p.created_by).name, '이', '가'))} ${fmtDate(p.created_at)}에 담음</span></span><button class="text-btn danger" data-action="delete-place">장소 삭제</button></div>`}
     </div>`;
 }
 
@@ -1792,6 +2090,7 @@ const honorOrder = (a, b) => (a.year === b.year ? 0 : a.year === 'all' ? -1 : b.
 // 같은 월드컵에서 여러 멤버가 같은 곳을 골랐으면 도장도 여러 개 (합치지 않음)
 let honorCache = { src: null, map: new Map() };
 function honorsOf(placeId) {
+  if (ro()) return { stamps: [], seconds: [] }; // 월드컵 기록은 공개하지 않음
   if (honorCache.src !== state.cupResults) {
     const map = new Map();
     const slot = (id) => { if (!map.has(id)) map.set(id, { stamps: [], seconds: [] }); return map.get(id); };
@@ -2143,8 +2442,11 @@ function settingsView() {
       <h3 style="margin:18px 0 2px">멤버<span class="member-count">${n}/${MAX_MEMBERS}명</span></h3>
       <ul class="member-list">${memberOrder().map(memberRow).join('')}</ul>
     </div>
+    ${isPublicRoom(room) ? publicGroupHtml(room) : ''}
     ${room.invite_code ? `<div class="settings-group"><h3>초대 코드</h3><div class="code-box">${esc(room.invite_code)}</div><button class="btn block ghost" data-action="copy-code">코드 복사</button>
-      <p class="hint">${full ? `${MAX_MEMBERS}명이 모두 찼어요. 누가 나가면 다시 들어올 수 있어요.` : `이 코드로 ${MAX_MEMBERS}명까지 들어올 수 있어요.`}</p></div>` : ''}
+      ${isOwner() ? '<button class="text-btn regen-btn" data-action="regen-code">초대 코드 다시 만들기</button>' : ''}
+      <p class="hint">${full ? `${MAX_MEMBERS}명이 모두 찼어요. 누가 나가면 다시 들어올 수 있어요.` : `이 코드로 ${MAX_MEMBERS}명까지 들어올 수 있어요.`}${isOwner() ? '' : ' 초대 코드는 방장이 다시 만들 수 있어요.'}</p>
+      ${isPublicRoom(room) ? '<p class="hint">초대 코드를 받은 사람은 멤버로 들어와 장소를 고치고 지울 수 있어요. 보기만 할 사람에게는 둘러보기 링크를 보내 주세요.</p>' : ''}</div>` : ''}
     <form class="settings-group" id="name-form" novalidate>
       <h3>이 방에서 쓰는 닉네임</h3>
       <div class="row"><label class="field"><span class="sr">닉네임</span><input class="input" name="name" maxlength="20" value="${esc(me ? me.display_name : '')}" required></label><button class="btn small" type="submit" style="min-height:46px">닉네임 저장</button></div>
@@ -2175,6 +2477,21 @@ function settingsView() {
     <div class="danger-zone"><span>${n > 1 ? '내 후기와 월드컵 기록은 지워지고, 담은 장소는 남아요.' : '혼자 남은 방이라 나가면 방이 지워져요.'}</span><button class="text-btn danger" data-action="leave-room">이 방에서 나가기</button></div>
   </div>`;
 }
+// 내 정보의 '공개 방' 묶음 (공개 방에서만, §4.11): 상태 한 줄, 방문자에게 보이는 모습·둘러보기 링크, 소개(방장만 고침), 안내
+function publicGroupHtml(room) {
+  const status = room.public_hidden_at ? '관리자가 둘러보기에서 숨겼어요. 멤버는 그대로 쓸 수 있어요.'
+    : !state.places.length ? '장소를 담으면 둘러보기 목록에 나와요.' : '둘러보기 목록에 보여요.';
+  const link = PUBLIC_ROOMS_ENABLED && PUBLIC_KEY_RE.test(String(room.public_key || ''));
+  return `<div class="settings-group"><h3>공개 방</h3>
+      <p class="pub-status">${status}</p>
+      ${link ? `<div class="pub-actions"><button class="btn small ghost" data-action="visit-self">방문자에게 보이는 모습</button><button class="btn small ghost" data-action="share-link">둘러보기 링크 공유</button></div>` : ''}
+      ${isOwner()
+        ? `<form id="room-desc-form" novalidate><label for="room-desc" class="desc-label">소개</label><div class="row"><div class="field"><input class="input" id="room-desc" name="description" maxlength="${PUBLIC_DESC_MAX}" value="${esc(room.description || '')}" placeholder="예: 둘이 먹어 본 서울 라멘집 모음"></div><button class="btn small" type="submit" style="min-height:46px">소개 저장</button></div>
+          <p class="hint">둘러보기 목록에 방 이름과 함께 보여요. ${PUBLIC_DESC_MAX}자까지.</p></form>`
+        : `<p class="desc-label">소개</p><p class="desc-text">${room.description ? esc(room.description) : '<span class="hint">소개가 없어요.</span>'}</p><p class="hint">소개는 방장만 바꿀 수 있어요.</p>`}
+      <button class="text-btn inline" data-action="public-guide">공개 방 안내 보기</button>
+    </div>`;
+}
 /* ---------- 시트: 계정 설정 (내 정보에서 넘어옴. 로그인 정보·비밀번호 변경·로그아웃·버전) ---------- */
 function accountView() {
   const id = loginId(state.user.email);
@@ -2196,6 +2513,41 @@ function accountView() {
   </div>`;
 }
 
+/* ---------- 공개 방 (멤버 쪽): 둘러보기 링크, 초대 코드 다시 만들기, 한 번 알림 ---------- */
+// 지금 방의 둘러보기 링크 /r/<공개 키>. 공유 창이 있으면 그것, 없거나 실패하면 복사 (공유 창을 그냥 닫은 것은 그대로 둠)
+async function shareLink() {
+  const r = state.couple;
+  if (!r || !isPublicRoom(r) || !PUBLIC_KEY_RE.test(String(r.public_key || ''))) return;
+  const url = `${location.origin}/r/${r.public_key}`;
+  if (navigator.share) {
+    try { await navigator.share({ title: r.name, url }); return; } catch (x) { if (x && x.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(url); toast('둘러보기 링크를 복사했어요.'); } catch { toast(url, 6000); }
+}
+// 방장만 (모든 방, 최종 결정 7). 예전 코드는 바로 못 쓰게 되고, 이미 들어온 멤버는 그대로
+async function regenCode(btn) {
+  const roomId = state.roomId;
+  if (!state.couple || !isOwner()) return;
+  if (!confirm('초대 코드를 새로 만들까요? 지금 코드는 바로 못 쓰게 되고, 아직 안 들어온 친구에게는 새 코드를 다시 보내야 해요. 이미 들어온 멤버는 그대로예요.')) return;
+  await busy(btn, async () => {
+    const { data, error } = await sb.rpc('regenerate_invite_code', { p_couple: roomId });
+    if (error) { toast(friendly(error)); return; }
+    // 다시 불러오기 전에 받은 코드부터 바로 보이게 (메인의 초대 띠·내 정보 모두 state.couple을 읽음)
+    const room = state.rooms.find((r) => r.id === roomId);
+    if (room && typeof data === 'string' && /^[0-9A-F]{8}$/.test(data)) room.invite_code = data;
+    if (state.roomId === roomId) { render(); if (state.sheet && state.sheet.type === 'settings') renderSheet(); }
+    try { await refresh(); } catch { /* 받은 코드로 이미 보임 */ }
+    if (state.sheet && state.sheet.type === 'settings') renderSheet();
+    toast('새 초대 코드를 만들었어요.');
+  });
+}
+// 로그인 뒤 한 번만: 공개 방이 생겼다는 알림 (방이 있는 사람에게만, §4.11 흐름 E)
+function publicNotice() {
+  if (!PUBLIC_ROOMS_ENABLED || !state.user || !state.rooms.length || state.visit) return;
+  try { if (localStorage.getItem(NOTICE_KEY)) return; localStorage.setItem(NOTICE_KEY, '1'); } catch { return; } // 못 남기면 매번 뜨니 아예 안 띄움
+  toast('새 기능: 공개 방. 지금 방은 그대로 개인 방이에요. 방 선택 화면이나 방 이름(⌄)의 돋보기로 둘러볼 수 있어요.', 5000);
+}
+
 /* ---------- 나가기 ---------- */
 // 멤버가 남아 있으면 내 후기·월드컵 기록만 지우고 나감(방장이면 가장 먼저 들어온 멤버가 방장).
 // 혼자 남았으면 방이 통째로 지워짐: 사진 파일은 SQL로 못 지우니 Storage에서 먼저 지우고 나감
@@ -2205,11 +2557,15 @@ async function leaveRoom(btn) {
   const room = state.couple;
   if (!room || room.id !== start) return; // 그사이 방이 바뀜
   const roomId = room.id, name = room.name;
-  const alone = state.members.length <= 1;
+  const alone = state.members.length <= 1, pub = isPublicRoom(room);
   if (alone) {
-    if (!confirm(`‘${name}’에서 나가면 방이 없어져요. 장소·사진·후기·월드컵 기록이 모두 지워지고 되돌릴 수 없어요.`)) return;
+    if (!confirm(pub
+      ? `‘${name}’에서 나가면 이 공개 방과 둘러보기 링크가 사라져요. 장소·사진·후기·월드컵 기록이 모두 지워지고 되돌릴 수 없어요.`
+      : `‘${name}’에서 나가면 방이 없어져요. 장소·사진·후기·월드컵 기록이 모두 지워지고 되돌릴 수 없어요.`)) return;
     if (!confirm(`정말 ‘${name}’ 방을 지울까요?`)) return;
-  } else if (!confirm(`‘${name}’에서 나갈까요? 내가 남긴 후기와 월드컵 기록은 지워지고, 내가 담은 장소와 사진은 방에 남아요.${isOwner() ? ' 방장은 가장 먼저 들어온 멤버에게 넘어가요.' : ''}`)) return;
+  } else if (!confirm(`‘${name}’에서 나갈까요? 내가 남긴 후기와 월드컵 기록은 지워지고, 내가 담은 장소와 사진은 방에 남아요.${isOwner() ? ' 방장은 가장 먼저 들어온 멤버에게 넘어가요.' : ''}`
+    // 공개 방: 남는 장소·사진은 계속 공개되고 '예전 멤버'로 보임 (§4.11)
+    + (pub ? ' 공개 방이라 내가 담은 장소와 올린 사진은 남아 계속 공개되고, 공개 화면에는 ‘예전 멤버’로 보여요. 내리고 싶은 사진은 나가기 전에 지워 주세요.' : ''))) return;
   await busy(btn, async () => {
     if (alone) {
       // 이때부터 15분 동안 이 방 코드로는 들어올 수 없음 (사진을 지우는 사이 누가 들어오지 않게)
@@ -2253,12 +2609,582 @@ async function leaveRoom(btn) {
   });
 }
 
+/* readOnly */
+/* ---------- 공개 방: 둘러보기와 읽기 전용 보기 (docs/public-rooms-design.md §4.2–4.6, §4.12) ----------
+   여기부터 아래 '/readOnly' 표시까지는 둘러보는 사람에게만 그리는 것이라 방 초대 정보·찜·고치는 단추를 넣지 않는다(시험이 확인).
+   서버(GET /api/public/*)가 준 값은 모두 아래 정리 함수를 거쳐 모양·길이를 맞추고, 화면에 넣을 때는 esc()·safeUrl()·imgUrl()을 거친다. */
+// 읽기 전용에서 누를 수 있는 것만. click 위임 맨 앞에서 이 목록 밖의 data-action은 아무 일도 하지 않음 (§4.2)
+const VISIT_ACTIONS = ['visit-close', 'visit-retry', 'tab', 'cat', 'sort', 'clear-search', 'open', 'close', 'view-photo', 'close-viewer', 'copy-open', 'copy-room', 'copy-status', 'copy-save', 'copy-create', 'explore-back'];
+// 'YYYY-MM' → '2026년 9월' (공개 방은 날짜를 월까지만 줌)
+const fmtMonth = (m) => { const x = /^(\d{4})-(\d{2})/.exec(String(m || '')); return x ? `${x[1]}년 ${Number(x[2])}월` : ''; };
+const pubStr = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
+const pubCount = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
+const MONTH_RE = /^\d{4}-\d{2}$/;
+const MEMBER_NO_RE = /^m[1-5]$/; // 응답 안에서만 쓰는 멤버 번호
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const pp = (w, a, b) => josa(w, a, b).slice(String(w).length); // 조사만: pp('라멘', '과', '와') → '과'
+// 사진 주소: https(서버가 서명한 Storage 주소), 개발용 http://localhost, 작은 data: 그림(가짜 Supabase)만
+function imgUrl(u) {
+  const s = String(u || '');
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(s)) return s;
+  try { const x = new URL(s); return x.protocol === 'https:' || (x.protocol === 'http:' && /^(localhost|127\.0\.0\.1)$/.test(x.hostname)) ? x.href : ''; } catch { return ''; }
+}
+// 공개 방 지도 링크: 아는 지도 주소(네이버·구글·카카오)만 (서버 public.cjs mapUrl과 같은 규칙). 아니면 null → 네이버 지도 검색 링크로.
+// 남이 넣은 낚시 주소가 '네이버 지도에서 보기'로 보이거나 '내 방에 담기'로 내 방에 들어오지 않게
+function publicMapUrl(v) {
+  let u;
+  try { u = new URL(String(v || '')); } catch { return null; }
+  if (!/^https?:$/.test(u.protocol) || u.username || u.password || u.port || String(v).length > 2000) return null;
+  const h = u.hostname;
+  const ok = /^(naver\.me|(m\.)?map\.naver\.com|(m\.|pcmap\.)?place\.naver\.com|maps\.app\.goo\.gl|kko\.to|(place\.|m\.)?map\.kakao\.com)$/.test(h)
+    || (h === 'goo.gl' && /^\/maps(\/|$)/.test(u.pathname))
+    || (/^(www\.|maps\.)?google\.(com|[a-z]{2}|co\.[a-z]{2}|com\.[a-z]{2})$/.test(h) && (h.startsWith('maps.') || /^\/maps(\/|$)/.test(u.pathname)));
+  if (!ok) return null;
+  u.protocol = 'https:';
+  return u.href;
+}
+// 홈 서버의 공개 API (GET, 지금 로그인 토큰을 붙임). 실패해도 던지지 않고 { ok, status, body }
+async function getPublic(path) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 20000);
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data.session && data.session.access_token;
+    const r = await fetch(path, { signal: ctl.signal, headers: token ? { authorization: `Bearer ${token}` } : {} });
+    const j = await r.json().catch(() => null);
+    return { ok: r.ok, status: r.status, body: j && typeof j === 'object' ? j : {} };
+  } catch { return { ok: false, status: 0, body: {} }; }
+  finally { clearTimeout(timer); }
+}
+// 서버 오류 문구는 로그인·횟수 제한일 때만 그대로 보여 줌. 나머지는 정해진 문구
+const pubError = (r) => ([401, 429].includes(r.status) ? pubStr(r.body.error, 200) : '');
+
+/* 받은 방 JSON → 기존 장소 모양 (§4.2 visitPlace). 날짜는 'YYYY-MM' 그대로(lastDay·정렬이 같은 꼴끼리 비교), 찜은 늘 false */
+function visitPlace(x) {
+  if (!x || typeof x !== 'object' || !UUID_RE.test(String(x.id))) return null;
+  const visits = (Array.isArray(x.visits) ? x.visits : []).filter((v) => v && MONTH_RE.test(v.month)).map((v, vi) => ({
+    id: `${x.id}:${vi}`,
+    visited_on: v.month,
+    // 나간 사람(by: null)의 후기는 줄마다 따로 '예전 멤버'로 (같은 줄로 합치지 않게 번호를 붙임)
+    reviews: (Array.isArray(v.reviews) ? v.reviews : []).filter((r) => r && typeof r === 'object').map((r, ri) => ({
+      author_id: MEMBER_NO_RE.test(r.by) ? r.by : `gone-${vi}-${ri}`,
+      rating: typeof r.rating === 'number' && r.rating > 0 && r.rating <= 5 ? r.rating : null,
+      body: pubStr(r.body, 3000),
+    })),
+  }));
+  const photos = (Array.isArray(x.photos) ? x.photos : []).slice(0, 3).map((ph, i) => ({ thumb: imgUrl(ph && ph.thumb_url), i }));
+  return {
+    id: x.id, name: pubStr(x.name, 80) || '이름 없는 장소', category: pubStr(x.category, 20) || '기타', address: pubStr(x.address, 200) || null,
+    naver_url: publicMapUrl(x.map_url), status: x.status === 'visited' ? 'visited' : 'want_to_go', favorite: false,
+    shared_note: pubStr(x.shared_note, 2000), created_by: MEMBER_NO_RE.test(x.added_by) ? x.added_by : null,
+    created_at: MONTH_RE.test(x.added_month) ? x.added_month : '',
+    visits, reviews: visits.flatMap((v) => v.reviews), photos, photoCount: Math.max(pubCount(x.photo_count), photos.length),
+  };
+}
+function visitData(d) {
+  const members = (Array.isArray(d.members) ? d.members : []).filter((m) => m && MEMBER_NO_RE.test(m.m))
+    .map((m, i) => ({ user_id: m.m, display_name: pubStr(m.name, 20) || '멤버', color: typeof m.color === 'string' ? m.color : null, role: 'member', created_at: String(i) }));
+  return {
+    data: {
+      name: pubStr(d.name, 30) || '공개 방', description: pubStr(d.description, PUBLIC_DESC_MAX),
+      truncated: d.truncated === true, photos_paused: d.photos_paused === true,
+      categories: (Array.isArray(d.categories) ? d.categories : []).filter((c) => typeof c === 'string' && c).map((c) => c.slice(0, 20)),
+    },
+    members,
+    places: d.places.map(visitPlace).filter(Boolean),
+  };
+}
+
+/* 읽기 전용 화면 조각 (viewMain·detailView가 부름) */
+function visitBand() {
+  return `<div class="visit-band"><span>${state.visit.from === 'self' ? '방문자에게 보이는 모습' : '둘러보는 중'} · 읽기 전용</span><button class="text-btn" data-action="visit-close">닫기</button></div>`;
+}
+// 머리: 방 이름(버튼 아님) + 공개 표시, 소개, 멤버 칩. 오른쪽 아이콘 없음
+function visitHeadHtml(duo) {
+  const d = state.visit.data;
+  return `${visitBand()}
+      <div class="top-row"><div class="top-head">
+        <h1 class="title">${esc(d.name)}${pubBadge}</h1>
+        ${d.description ? `<p class="visit-desc">${esc(d.description)}</p>` : ''}
+        ${duo}
+      </div></div>`;
+}
+function visitNotesHtml() {
+  const d = state.visit.data;
+  return (d.truncated ? '<p class="visit-note">앱에서는 300곳까지만 보여요.</p>' : '')
+    + (d.photos_paused ? '<p class="visit-note">지금은 사진 보기가 잠시 멈췄어요. 나중에 다시 보여요.</p>' : '');
+}
+// 불러오는 중 / 없는 방 / 실패
+function visitStateView() {
+  const v = state.visit;
+  const body = v.status === 'loading' ? '<div class="empty-state">불러오는 중…</div>'
+    : v.status === 'gone' ? `<div class="empty-state"><strong>이 공개 방을 찾을 수 없어요</strong>지워졌거나 지금은 볼 수 없는 방이에요.<div style="margin-top:16px"><button class="btn small ghost" data-action="visit-close">닫기</button></div></div>`
+    : `<div class="empty-state"><strong>지금은 공개 방을 불러올 수 없어요</strong>${esc(v.error || '잠시 후 다시 시도해 주세요.')}<div style="margin-top:16px"><button class="btn small" data-action="visit-retry">다시 시도</button></div></div>`;
+  return `<div class="top"><div class="wrap">${visitBand()}</div></div><main class="wrap">${body}</main>`;
+}
+// 상세 머리: 닫기 + (하트·정보 수정 자리에) '내 방에 담기' 하나
+function visitDetailHead() {
+  return `<div class="sheet-head">
+      <button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button>
+      <div class="right"><button class="text-btn" data-action="copy-open" style="padding-right:10px;color:var(--p1-ink)">내 방에 담기</button></div>
+    </div>`;
+}
+// 상세 아래쪽: 상태(누를 수 없음), 함께 쓰는 메모(있을 때만), 방문 기록(있을 때만), 담은 사람·달
+function visitDetailBody(p) {
+  const by = person(p.created_by), month = fmtMonth(p.created_at);
+  return `<div class="seg" role="group" aria-label="방문 상태">
+        <span aria-current="${p.status === 'want_to_go'}">가고 싶은 곳</span>
+        <span aria-current="${p.status === 'visited'}">다녀왔어요</span>
+      </div>
+      ${p.shared_note ? `<section class="block"><h3>함께 쓰는 메모</h3><p class="note-text">${esc(p.shared_note)}</p></section>` : ''}
+      ${p.visits.length ? `<section class="block">
+        <div class="block-head"><h3>방문 기록<span class="n">${p.visits.length}</span></h3></div>
+        ${p.visits.map((v) => visitCard(p, v, false)).join('')}
+      </section>` : ''}
+      <div class="danger-zone"><span class="by ${by.cls}"><i class="dot"></i><span>${p.created_by ? `${esc(josa(by.name, '이', '가'))} ${month ? `${esc(month)}에 ` : ''}담음` : '예전 멤버가 담음'}</span></span></div>`;
+}
+// 상세 사진: 썸네일(없거나 한도가 찼으면 회색 자리). 4장째부터는 '사진 N장 더 있어요'
+function visitGalleryHtml(p) {
+  if (!p.photos.length) return '';
+  const many = p.photos.length > 1, more = p.photoCount - p.photos.length;
+  return `<div class="gallery">
+    <div class="gallery-track" id="gallery">${p.photos.map((ph, i) => `<button type="button" class="gallery-item" data-action="view-photo" data-i="${i}" aria-label="사진 ${i + 1} 크게 보기">
+      ${ph.thumb ? `<img src="${esc(ph.thumb)}" alt="${esc(p.name)} 사진 ${i + 1}"${i ? ' loading="lazy"' : ''}>` : '<span class="photo-ph" aria-hidden="true"></span>'}</button>`).join('')}</div>
+    ${many ? `<span class="gallery-count" id="gallery-count" aria-live="polite">1 / ${p.photos.length}</span>` : ''}
+  </div>${more > 0 ? `<p class="hint" style="margin:0 0 4px">사진 ${more}장 더 있어요</p>` : ''}`;
+}
+// 크게 보기: 먼저 썸네일로 띄우고, 누른 사진만 큰 사진 URL(10분)을 받아 바꿔 넣음. 받은 URL은 8분 동안 다시 씀
+const visitLarge = new Map(); // '<키>|<장소 id>|<번호>' → { url, at }
+function openVisitViewer(p, i) {
+  const key = state.visit.key;
+  const big = (k) => { const c = visitLarge.get(`${key}|${p.id}|${k}`); return c && Date.now() - c.at < 8 * 60e3 ? c.url : ''; };
+  const item = (ph, k) => { const src = big(k) || ph.thumb; return src ? `<img src="${esc(src)}" alt="${esc(p.name)} 사진 ${k + 1}">` : '<span class="photo-ph" aria-hidden="true"></span>'; };
+  const root = $('#viewer-root');
+  root.innerHTML = `<div class="viewer" role="dialog" aria-modal="true" aria-label="${esc(p.name)} 사진">
+    <div class="viewer-track" id="viewer-track">${p.photos.map((ph, k) => `<div class="viewer-item" data-i="${k}">${item(ph, k)}</div>`).join('')}</div>
+    <button class="icon-btn viewer-close" data-action="close-viewer" aria-label="닫기">${ICON.close}</button>
+    ${p.photos.length > 1 ? `<span class="viewer-count" id="viewer-count">${i + 1} / ${p.photos.length}</span>` : ''}
+  </div>`;
+  const t = $('#viewer-track');
+  t.scrollLeft = i * t.clientWidth;
+  $('.viewer-close', root).focus();
+  syncHistory();
+  if (!big(i)) loadLargePhoto(p, i);
+}
+async function loadLargePhoto(p, i) {
+  const v = state.visit;
+  const r = await getPublic(`/api/public/rooms/${encodeURIComponent(v.key)}/photo?place=${encodeURIComponent(p.id)}&i=${i}`);
+  if (state.visit !== v) return;
+  const url = r.ok ? imgUrl(r.body.url) : '';
+  if (!url) { toast(pubStr(r.body.error, 200) || '사진을 불러오지 못했어요.'); return; }
+  visitLarge.set(`${v.key}|${p.id}|${i}`, { url, at: Date.now() });
+  const box = $(`#viewer-track [data-i="${i}"]`);
+  if (box) box.innerHTML = `<img src="${esc(url)}" alt="${esc(p.name)} 사진 ${i + 1}">`;
+}
+
+/* 썸네일: 방 응답에는 장소마다 대표 하나만 오고, 2·3번째는 상세를 열 때 /thumbs로 받음 (서버가 사람마다 하루 한도를 셈).
+   받은 URL은 '<장소 id>|<번호>' → { url, at }로 기억해 다시 받은 방 응답에 null이 와도 25분 동안은 그대로 씀
+   (서버는 30분 이상 남은 URL만 주므로 그 안에는 만료되지 않음). 보이던 사진이 회색으로 바뀌지 않게 */
+const THUMB_KEEP_MS = 25 * 60e3;
+function keepThumbs(v) {
+  const t = Date.now();
+  for (const p of v.places) {
+    p.photos.forEach((ph, i) => {
+      const k = `${p.id}|${i}`, c = v.thumbs.get(k);
+      if (ph.thumb) { if (!c || c.url !== ph.thumb) v.thumbs.set(k, { url: ph.thumb, at: t }); }
+      else if (c && t - c.at < THUMB_KEEP_MS) ph.thumb = c.url;
+    });
+  }
+}
+async function loadVisitThumbs(id) {
+  const v = state.visit;
+  if (!v || v.status !== 'ok') return;
+  const p = v.places.find((x) => x.id === id);
+  const asked = v.thumbsAsked.get(id);
+  if (!p || p.photos.length < 2 || p.photos.every((ph) => ph.thumb) || (asked && Date.now() - asked < THUMB_KEEP_MS)) return;
+  v.thumbsAsked.set(id, Date.now());
+  const r = await getPublic(`/api/public/rooms/${encodeURIComponent(v.key)}/thumbs?place=${encodeURIComponent(id)}`);
+  if (state.visit !== v || !r.ok || !Array.isArray(r.body.thumbs)) return;
+  const t = Date.now();
+  r.body.thumbs.slice(0, 3).forEach((u, i) => { const url = imgUrl(u); if (url) v.thumbs.set(`${id}|${i}`, { url, at: t }); });
+  keepThumbs(v);
+  // 열려 있는 상세의 회색 자리만 사진으로 바꿈 (넘기던 위치는 그대로)
+  const cur = v.places.find((x) => x.id === id), track = $('#gallery');
+  if (!cur || !track || !state.sheet || state.sheet.type !== 'detail' || state.sheet.id !== id) return;
+  cur.photos.forEach((ph, i) => {
+    const b = track.querySelector(`[data-i="${i}"]`);
+    if (b && ph.thumb && !b.querySelector('img')) b.innerHTML = `<img src="${esc(ph.thumb)}" alt="${esc(cur.name)} 사진 ${i + 1}" loading="lazy">`;
+  });
+}
+
+/* 읽기 전용 보기 열기·닫기 (§4.4). 마지막 방(ROOM_KEY)은 바꾸지 않음 */
+function openVisit(key, from) {
+  if (!PUBLIC_KEY_RE.test(String(key || ''))) { toast('이 공개 방을 찾을 수 없어요.'); return; }
+  // 내 방이면 둘러보기 대신 그 방으로 ('방문자에게 보이는 모습'만 예외)
+  const mine = state.rooms.find((r) => r.public_key === key);
+  if (mine && from !== 'self') {
+    if (state.explore) closeExplore({ reload: false });
+    switchRoom(mine.id).catch((err) => toast(friendly(err)));
+    return;
+  }
+  if (state.explore && from === 'explore') state.explore.scroll = window.scrollY;
+  loadGen++; // 늦게 끝난 내 방 불러오기가 이 화면을 덮지 않게 (닫을 때 다시 불러옴)
+  cancelGoogle();
+  state.sheet = null;
+  $('#viewer-root').innerHTML = '';
+  drawSheet();
+  state.visit = { key, from, status: 'loading', data: null, members: [], places: [], error: '', tab: 'visited', sort: 'rating', category: '전체', query: '',
+    loadedAt: 0, thumbs: new Map(), thumbsAsked: new Map() };
+  render();
+  window.scrollTo(0, 0);
+  syncHistory();
+  loadVisit();
+}
+// silent: 다른 앱에 다녀왔을 때 다시 받기. 이미 받은 화면이 있으면 실패해도 그대로 두고 알림만
+async function loadVisit(silent = false) {
+  const v = state.visit;
+  if (!v) return;
+  if (!silent) { v.status = 'loading'; render(); }
+  const r = await getPublic(`/api/public/rooms/${encodeURIComponent(v.key)}`);
+  if (state.visit !== v) return; // 그사이 닫았거나 다른 방을 엶
+  const d = r.body;
+  if (r.ok && (d.key == null || d.key === v.key) && Array.isArray(d.places)) {
+    const first = !v.data;
+    Object.assign(v, visitData(d), { status: 'ok', error: '', loadedAt: Date.now() });
+    keepThumbs(v);
+    // 기본은 '다녀온 곳'이지만, 처음 열었는데 다녀온 곳이 하나도 없으면 '가고 싶은 곳'부터 (빈 화면 대신)
+    if (first && !v.places.some((p) => p.status === 'visited') && v.places.length) v.tab = 'want_to_go';
+    if (v.category !== '전체' && !v.data.categories.includes(v.category) && !v.places.some((p) => p.category === v.category)) v.category = '전체';
+  } else if (silent && v.data && r.status !== 404) {
+    toast(pubError(r) || '지금은 공개 방을 불러올 수 없어요. 잠시 후 다시 시도해 주세요.');
+    return;
+  } else {
+    v.status = r.status === 404 ? 'gone' : 'error';
+    v.error = pubError(r);
+  }
+  if (v.status !== 'ok' && state.sheet) { state.sheet = null; $('#viewer-root').innerHTML = ''; drawSheet(); }
+  render();
+  if (state.sheet && state.sheet.type === 'detail') { drawSheet(); loadVisitThumbs(state.sheet.id); } // 다시 받은 내용으로
+  syncHistory({ push: false });
+}
+function closeVisit() {
+  const v = state.visit;
+  if (!v) return;
+  cancelGoogle();
+  state.sheet = null;
+  $('#viewer-root').innerHTML = '';
+  drawSheet();
+  state.visit = null;
+  render(); // 'explore' → 둘러보기 목록, 'self' → 메인, 'direct' → 마지막 방·방 고르기·시작하기 (chooseRoom 규칙)
+  window.scrollTo(0, v.from === 'explore' && state.explore ? state.explore.scroll || 0 : 0);
+  syncHistory();
+  if (!state.explore && state.user) refresh({ keepSheet: false }).catch((err) => toast(friendly(err)));
+}
+
+/* 둘러보기 화면 (§4.3). 검색은 받은 목록을 이 폰에서만 거름 (서버로 보내지 않음) */
+function exploreRoom(x) {
+  if (!x || typeof x !== 'object' || !PUBLIC_KEY_RE.test(String(x.key))) return null;
+  return {
+    key: x.key, name: pubStr(x.name, 30) || '공개 방', description: pubStr(x.description, PUBLIC_DESC_MAX),
+    member_count: pubCount(x.member_count), colors: (Array.isArray(x.colors) ? x.colors : []).filter((c) => typeof c === 'string').slice(0, MAX_MEMBERS),
+    place_count: pubCount(x.place_count), visited_count: pubCount(x.visited_count), review_count: pubCount(x.review_count),
+    active: ACTIVE_TEXT[x.active] ? x.active : null,
+  };
+}
+// 마지막 활동은 서버가 묶음으로만 줌 (방문 날짜를 월까지만 보이는 것과 맞춤): 7일 안 / 31일 안 / 그 전
+const ACTIVE_TEXT = { week: '최근 7일 안 활동', month: '최근 한 달 안 활동', older: '한 달 넘게 활동 없음' };
+const activeText = (a) => ACTIVE_TEXT[a] || '';
+function exploreCard(r) {
+  const mine = state.rooms.some((x) => x.public_key === r.key);
+  const active = activeText(r.active);
+  return `<li><button class="ex-card" data-action="explore-open" data-key="${esc(r.key)}">
+    <span class="ex-top"><span class="ex-name">${esc(r.name)}</span>${pubBadge}${mine ? '<span class="badge now">내 방</span>' : ''}</span>
+    ${r.description ? `<span class="ex-desc">${esc(r.description)}</span>` : ''}
+    <span class="ex-stats">장소 ${r.place_count} · 다녀온 곳 ${r.visited_count} · 후기 ${r.review_count}</span>
+    <span class="ex-foot"><span class="room-dots" aria-hidden="true">${r.colors.map((c) => `<i class="dot ${colorCls(c)}"></i>`).join('')}</span><span>멤버 ${r.member_count}명</span>${active ? `<span aria-hidden="true">·</span><span>${active}</span>` : ''}</span>
+  </button></li>`;
+}
+function exploreListHtml() {
+  const ex = state.explore;
+  if (ex.status === 'loading') return '<div class="empty-state">불러오는 중…</div>';
+  if (ex.status === 'error') return `<div class="empty-state"><strong>지금은 공개 방을 불러올 수 없어요</strong>${esc(ex.error || '잠시 후 다시 시도해 주세요.')}<div style="margin-top:16px"><button class="btn small" data-action="explore-retry">다시 시도</button></div></div>`;
+  if (!ex.rooms.length) {
+    return `<div class="empty-state"><strong>아직 공개 방이 없어요</strong>공개 방을 만들면 여기에 보여요.${state.rooms.length < MAX_ROOMS ? '<div style="margin-top:16px"><button class="btn small" data-action="explore-create">새 방 만들기</button></div>' : ''}</div>`;
+  }
+  const q = ex.query.trim(), words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const list = words.length ? ex.rooms.filter((r) => { const hay = `${r.name} ${r.description}`.toLowerCase(); return words.every((w) => hay.includes(w)); }) : ex.rooms;
+  if (!list.length) return `<div class="empty-state">‘${esc(q)}’${pp(q, '과', '와')} 맞는 공개 방이 없어요. 다른 낱말로 찾아보세요.</div>`;
+  return `<ul class="explore-list">${list.map(exploreCard).join('')}</ul>`;
+}
+function viewExplore() {
+  const ex = state.explore, ok = ex.status === 'ok' && ex.rooms.length > 0;
+  return `<div class="top"><div class="wrap">
+      <div class="ex-head"><button class="icon-btn" data-action="explore-back" aria-label="뒤로">${ICON.back}</button><h1>공개 방 둘러보기</h1></div>
+      ${ok ? `<div class="search"><label class="sr" for="explore-q">공개 방 찾기</label>${ICON.search}<input class="input" id="explore-q" type="search" placeholder="방 이름·소개로 찾기" value="${esc(ex.query)}" autocomplete="off"><button type="button" class="search-clear" data-action="explore-clear" aria-label="검색어 지우기">${ICON.close}</button></div>
+      <p class="ex-count">공개 방 ${ex.rooms.length}곳 · 최근 활동순</p>` : ''}
+    </div></div>
+    <main class="wrap"><div id="explore-list">${exploreListHtml()}</div></main>`;
+}
+function exploreHintSeen() { try { return localStorage.getItem(EXPLORE_HINT_KEY) === '1'; } catch { return false; } }
+function openExplore() {
+  if (!PUBLIC_ROOMS_ENABLED || !state.user) return;
+  try { localStorage.setItem(EXPLORE_HINT_KEY, '1'); } catch { /* 안내가 한 번 더 보일 뿐 */ }
+  cancelGoogle();
+  state.sheet = null; // 방 바꾸기 시트에서 눌렀으면 시트를 닫고
+  $('#viewer-root').innerHTML = '';
+  drawSheet();
+  state.explore = { status: 'loading', rooms: [], query: '', scroll: 0, error: '' };
+  render();
+  window.scrollTo(0, 0);
+  syncHistory();
+  loadExplore();
+}
+async function loadExplore() {
+  const ex = state.explore;
+  if (!ex) return;
+  if (ex.status !== 'loading') { ex.status = 'loading'; if (!state.visit) render(); }
+  const r = await getPublic('/api/public/rooms');
+  if (state.explore !== ex) return;
+  if (r.ok && Array.isArray(r.body.rooms)) { ex.rooms = r.body.rooms.map(exploreRoom).filter(Boolean); ex.status = 'ok'; }
+  else { ex.status = 'error'; ex.error = pubError(r); }
+  if (!state.visit) render();
+}
+// 닫으면 원래 화면(방 고르기·시작하기·메인)으로. 그사이 바뀌었을 수 있는 내 방을 다시 받음
+function closeExplore({ reload = true } = {}) {
+  if (!state.explore || state.visit) return;
+  state.explore = null;
+  render();
+  window.scrollTo(0, 0);
+  syncHistory();
+  if (reload && state.user) refresh({ keepSheet: false }).catch(() => {});
+}
+/* /r/<key> 링크 (§4.12): 시작할 때 키를 sessionStorage에 두고 주소는 '/'로. 로그인하고 첫 불러오기가 끝나면 엶 */
+function pendingKey() {
+  try { const k = sessionStorage.getItem(PENDING_KEY); return k && PUBLIC_KEY_RE.test(k) ? k : null; } catch { return null; }
+}
+function takePending() {
+  const key = pendingKey();
+  try { sessionStorage.removeItem(PENDING_KEY); } catch { /* 다음에 한 번 더 열릴 뿐 */ }
+  if (!key || !state.user) return;
+  if (!PUBLIC_ROOMS_ENABLED) { toast('지금은 공개 방을 볼 수 없어요.'); return; }
+  openVisit(key, 'direct');
+}
+
+/* 내 방에 담기 (시트 copy, §4.8 · 최종 결정 2): 둘러보는 방의 장소 하나를 내가 든 방에 새 장소로 넣음.
+   옮기는 것: 이름·주소·지도 링크·카테고리(규칙은 copyCategory) + 메모 ‘<공개 방 이름>’에서 담음. 사진·방문·후기·찜은 옮기지 않음.
+   새 함수 없이 평소 '장소 추가'와 같은 길(RLS: 그 방 멤버 + created_by = 나)로 넣는다. 방 목록에는 이름·공개 표시만 그린다 */
+function openCopy(placeId) {
+  const last = lastRoom();
+  const target = state.rooms.some((r) => r.id === last) ? last : state.rooms[0] ? state.rooms[0].id : null;
+  openSheet('copy', placeId, { back: 'detail', target, status: 'want_to_go', done: null }); // 방이 하나여도 시트로 확인받음
+}
+function copyView() {
+  const s = state.sheet, p = curPlaces().find((x) => x.id === s.id);
+  const head = `<div class="sheet-head">${sheetClose()}<h2 id="sheet-title">내 방에 담기</h2><span style="width:40px"></span></div>`;
+  if (s.done) {
+    return `${head}<div class="sheet-body"><div class="copy-done">
+      <div class="ok">${CHECK}</div>
+      <p><b>‘${esc(s.done.roomName)}’에 담았어요.</b></p>
+      <p class="hint">${s.done.status === 'visited' ? '다녀온 곳' : '가고 싶은 곳'}에 들어갔어요. 메모에 어디서 담았는지 적어 두었어요.</p>
+      <button class="btn block" data-action="visit-close" data-go="${esc(s.done.roomId)}" data-place="${esc(s.done.placeId)}" data-status="${esc(s.done.status)}">그 방에서 보기</button>
+      <button class="btn block ghost" data-action="close">계속 둘러보기</button>
+    </div></div>`;
+  }
+  // 내 방이 없으면(시작하기 화면의 '공개 방 둘러보기'로 온 사람) 방 만들기로 가는 단추 하나
+  if (!state.rooms.length) {
+    return `${head}<div class="sheet-body"><p class="hint" style="margin:8px 0 0">담을 방이 아직 없어요. 먼저 방을 만들거나 초대 코드로 참여해 주세요.</p>
+      <button class="btn block" data-action="copy-create" style="margin-top:16px">새 방 만들기</button></div>`;
+  }
+  const room = state.rooms.find((r) => r.id === s.target);
+  const card = (r) => {
+    const n = membersOf(r.id).length;
+    return `<button type="button" class="vis-card" role="radio" aria-checked="${r.id === s.target}" data-action="copy-room" data-id="${esc(r.id)}">
+      <i class="radio" aria-hidden="true"></i><span><b>${esc(r.name)}${isPublicRoom(r) ? pubBadge : ''}</b><small>멤버 ${n}명</small></span></button>`;
+  };
+  const seg = (k, label) => `<button type="button" data-action="copy-status" data-status="${k}" aria-pressed="${s.status === k}">${label}</button>`;
+  return `${head}<div class="sheet-body">
+    <p class="copy-place">${esc(p ? p.name : '')}</p>
+    <div class="field" style="margin:0"><span style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">어느 방에 담을까요?</span>
+      <div class="vis-pick" role="radiogroup" aria-label="담을 방">${state.rooms.map(card).join('')}</div></div>
+    <div class="seg" role="group" aria-label="상태">${seg('want_to_go', '가고 싶은 곳')}${seg('visited', '다녀왔어요')}</div>
+    <p class="hint">카테고리는 그 방에 같은 이름이 있으면 그대로, 없으면 ‘기타’로 담겨요. ‘기타’도 없으면 그 방 맨 아래 카테고리로 들어가요. 메모에는 ‘${esc(state.visit && state.visit.data ? state.visit.data.name : '')}’에서 담음이 들어가요. 사진·방문·후기는 옮기지 않아요.</p>
+    ${isPublicRoom(room) ? '<p class="hint">공개 방이라 담은 장소를 누구나 볼 수 있어요.</p>' : ''}
+    <button class="btn block" data-action="copy-save" style="margin-top:16px"${room ? '' : ' disabled'}>담기</button>
+  </div>`;
+}
+// 같은 장소인지 볼 때: 앞뒤 공백 빼고, 공백 여러 개는 하나로, 소문자
+const placeKey = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+// 담을 카테고리: 원래 이름이 그 방에 있으면 그것 → '기타' → 맨 아래(position이 가장 큰) 카테고리 → 하나도 없으면 '기타'를 만듦
+async function copyCategory(target, want) {
+  const { data, error } = await sb.from('categories').select('name, position').eq('couple_id', target).order('position');
+  if (error) throw error;
+  const list = data || [];
+  if (list.some((c) => c.name === want)) return want;
+  if (list.some((c) => c.name === '기타')) return '기타';
+  if (list.length) return list.reduce((a, b) => (b.position >= a.position ? b : a)).name;
+  const made = await sb.from('categories').insert({ couple_id: target, name: '기타', position: 0 });
+  if (made.error && !/categories_couple_name_key|duplicate key/i.test(made.error.message || '')) throw made.error; // 그사이 누가 만들었으면 그대로 씀
+  return '기타';
+}
+async function copySave() {
+  const s = state.sheet, v = state.visit;
+  if (!s || s.type !== 'copy' || s.done || !v || v.status !== 'ok') return;
+  const p = v.places.find((x) => x.id === s.id);
+  const room = state.rooms.find((r) => r.id === s.target);
+  if (!p) { goBackSheet(); return; }
+  if (!room) { toast('담을 방을 골라 주세요.'); return; }
+  const target = room.id, status = s.status === 'visited' ? 'visited' : 'want_to_go';
+  // 1) 같은 장소(이름 + 주소, 둘 다 빈 주소도 같음)가 이미 있으면 담지 않음
+  const have = await sb.from('places').select('id, name, address').eq('couple_id', target);
+  if (have.error) throw have.error;
+  if ((have.data || []).some((x) => placeKey(x.name) === placeKey(p.name) && placeKey(x.address) === placeKey(p.address))) {
+    toast(`‘${room.name}’에 이미 있는 장소예요.`);
+    return;
+  }
+  // 2) 카테고리, 3) 넣기
+  const category = await copyCategory(target, p.category);
+  const { data, error } = await sb.from('places').insert({
+    couple_id: target, name: p.name, address: p.address || null, category, naver_url: safeUrl(p.naver_url) || null,
+    status, shared_note: `‘${v.data.name}’에서 담음`, created_by: uid(),
+  }).select('id').single();
+  if (error) throw error;
+  // 담았다는 안내는 시트 안에(그 방으로 가는 단추와 함께). 그사이 시트를 닫았으면 알림만
+  if (state.sheet !== s) { toast(`‘${room.name}’에 담았어요.`); return; }
+  s.done = { roomId: target, roomName: room.name, placeId: data && data.id, status };
+  drawSheet();
+  const go = $('#sheet-root [data-go]');
+  if (go) go.focus();
+}
+// 내 방이 없을 때 '새 방 만들기': 둘러보기를 모두 닫고 시작하기 화면(방 만들기)으로
+function copyCreate() {
+  cancelGoogle();
+  state.sheet = null;
+  $('#viewer-root').innerHTML = '';
+  drawSheet();
+  state.visit = null;
+  state.explore = null;
+  onboardMode = 'create';
+  render();
+  window.scrollTo(0, 0);
+  syncHistory();
+}
+// 담은 뒤 '그 방에서 보기': 둘러보기를 모두 닫고 그 방으로 가서 담은 장소를 엶
+async function openCopied(roomId, placeId, status) {
+  if (!state.rooms.some((r) => r.id === roomId)) { closeVisit(); return; }
+  cancelGoogle();
+  state.sheet = null;
+  $('#viewer-root').innerHTML = '';
+  drawSheet();
+  state.visit = null;
+  state.explore = null;
+  state.tab = status === 'visited' ? 'visited' : 'want_to_go';
+  window.scrollTo(0, 0);
+  syncHistory();
+  await switchRoom(roomId);
+  if (state.roomId === roomId && placeId && state.places.some((x) => x.id === placeId)) openSheet('detail', placeId);
+}
+/* /readOnly */
+
+/* ---------- 시트: 공개 방 동의 (참여·가입이 같이 씀, §4.9) ---------- */
+// from: 'join'(앱 안 참여, 코드·닉네임을 시트에 둠) | 'signup'(가입 폼은 로그인 화면에 그대로 둠)
+function openAck(from, info) {
+  const s = state.sheet;
+  // 새 방 시트에서 왔으면 ‹·취소·뒤로 가기로 그 폼으로 돌아감 (적던 코드·닉네임을 다시 채움)
+  const prev = s && s.type === 'room-new' ? { back: s.back || null } : null;
+  openSheet('public-ack', null, {
+    from, code: info.code || '', name: info.name || '',
+    roomName: pubStr(info.roomName, 30), ackVersion: Number.isInteger(info.ackVersion) && info.ackVersion > 0 ? info.ackVersion : PUBLIC_ACK_VERSION,
+    prev, back: prev ? 'room-new' : null,
+  });
+}
+function publicAckView() {
+  const s = state.sheet;
+  const room = s.roomName || '이 방', nick = s.name || '내 닉네임';
+  return `<div class="sheet-head">${sheetClose()}<h2 id="sheet-title">공개 방이에요</h2><span style="width:40px"></span></div>
+  <div class="sheet-body ack-text">
+    <p>‘${esc(room)}’${pp(room, '은', '는')} 앱을 쓰는 누구나 둘러볼 수 있는 방이에요. 이 방에 남기는 장소·메모·사진·후기와 닉네임 ‘${esc(nick)}’${pp(nick, '이', '가')} 공개돼요. 방문 날짜는 월까지만, 아이디·초대 코드·찜은 보이지 않아요.</p>
+    <p>나가면 내 후기는 지워지지만, 내가 담은 장소와 사진은 방에 남아요.</p>
+    <p>공개 방 닉네임에는 실명 대신 별명을 추천해요.</p>
+    ${publicGuideToggle()}
+    <button class="btn block" data-action="ack-accept" style="margin-top:16px">${s.from === 'signup' ? '동의하고 가입' : '동의하고 참여'}</button>
+    <button class="btn block ghost" data-action="close" style="margin-top:8px">취소</button>
+    <p class="error" id="ack-error"></p>
+  </div>`;
+}
+function publicGuideView() {
+  return `<div class="sheet-head">${sheetClose()}<h2 id="sheet-title">공개 방 안내</h2><span style="width:40px"></span></div>
+  <div class="sheet-body"><div class="pub-guide" style="border:0;background:none;padding:4px 0 0">${publicGuideHtml()}</div></div>`;
+}
+// 동의 시트에서 실패: 폼으로 돌아가 그 자리에 문구를 보여 줌 (닉네임=아이디 등)
+function ackFail(msg) {
+  const s = state.sheet;
+  if (s && s.prev) goBackSheet(); else closeSheet();
+  const err = s && s.from === 'signup' ? $('#signup-error') : $('#room-form .error');
+  if (err) err.textContent = msg; else toast(msg);
+}
+// 서버가 다시 needAck(그사이 문구 버전이 바뀜)를 주면 새 문구로 다시 그림
+function ackAgain(body) {
+  const s = state.sheet;
+  s.roomName = pubStr(body.roomName, 30) || s.roomName;
+  if (Number.isInteger(body.ackVersion) && body.ackVersion > 0) s.ackVersion = body.ackVersion;
+  drawSheet();
+  const e = $('#ack-error');
+  if (e) e.textContent = '안내 문구가 바뀌었어요. 다시 읽고 동의해 주세요.';
+}
+async function acceptAck() {
+  const s = state.sheet;
+  if (!s || s.type !== 'public-ack') return;
+  if (s.from === 'join') {
+    const { data, error } = await joinViaServer(s.code, s.name, s.ackVersion);
+    if (state.sheet !== s) return;
+    if (error) {
+      if (error.body && error.body.needAck) ackAgain(error.body);
+      else ackFail(friendly(error));
+      return;
+    }
+    try { await switchRoom(typeof data === 'string' && data ? data : null); } catch (x) { toast(friendly(x)); return; }
+    toast('공개 방에 들어왔어요.');
+    return;
+  }
+  const f = $('#signup-form');
+  if (!f) { closeSheet(); return; }
+  const input = signupInput(f);
+  if (input.error) { ackFail(input.error); return; }
+  let j;
+  try { j = await signUp({ ...input, ackVersion: s.ackVersion }); } catch (x) {
+    if (state.sheet !== s) return;
+    if (x.body && x.body.needAck) ackAgain(x.body); else ackFail(friendly(x));
+    return;
+  }
+  closeSheet();
+  await finishSignup(j);
+}
+// 넘어온 시트에서 ‹·취소·뒤로 가기: 원래 시트로. 돌아갈 수 없으면 false (그때는 그냥 닫음)
+function goBackSheet() {
+  const s = state.sheet;
+  if (!s || !s.back) return false;
+  if (s.type === 'public-ack' && s.prev) {
+    const { code, name } = s;
+    openSheet('room-new', null, { mode: 'join', back: s.prev.back });
+    const f = $('#room-form');
+    if (f) { field(f, 'code').value = code; field(f, 'name').value = name; }
+    return true;
+  }
+  if (s.back === 'detail') { if (!curPlaces().some((x) => x.id === s.id)) return false; openSheet('detail', s.id); return true; }
+  if (!state.couple) return false; // 내 정보·방 바꾸기는 지금 방이 있어야
+  openSheet(s.back);
+  return true;
+}
+
 /* ---------- 렌더링 ---------- */
 let screen = 'loading';
 function render() {
   const app = $('#app');
   if (!configured) { screen = 'config'; app.innerHTML = viewConfig(); return; }
   if (!state.user) { screen = 'login'; app.innerHTML = SIGNUP_ENABLED && authMode === 'signup' ? viewSignup() : viewLogin(); return; }
+  // 공개 방 읽기 전용 보기 → 둘러보기 → (내 방 화면들) 순서로 고름
+  if (state.visit) { screen = 'visit'; app.innerHTML = viewMain(); return; }
+  if (state.explore) { screen = 'explore'; app.innerHTML = viewExplore(); return; }
   // 방 목록을 아직 못 받았거나, 고른 방의 장소를 불러오는 중
   if (state.roomId ? state.loadedRoom !== state.roomId || !state.couple : !state.roomsLoaded) { screen = 'loading'; app.innerHTML = viewLoading(); return; }
   if (!state.rooms.length) { screen = 'onboard'; app.innerHTML = viewOnboard(); return; }
@@ -2277,19 +3203,22 @@ function openSheet(type, id, extra = {}) {
   if (type === 'settings') customDraft = null; // 직접 고르기 칸은 닫힌 채로 시작
   renderSheet();
   const first = $('#sheet-root input:not([type=hidden]), #sheet-root textarea');
-  // 상세·내 정보·계정 설정·방 바꾸기는 보러 여는 시트라 입력 칸에 커서를 두지 않음 (휴대폰에서 키보드가 바로 올라오지 않게)
-  if (first && !['detail', 'settings', 'account', 'rooms'].includes(type)) first.focus(); else { const c = $('#sheet-root [data-action=close]'); c && c.focus(); }
+  // 상세·내 정보·계정 설정·방 바꾸기·공개 방 안내·동의는 보러 여는 시트라 입력 칸에 커서를 두지 않음 (휴대폰에서 키보드가 바로 올라오지 않게)
+  if (first && !['detail', 'settings', 'account', 'rooms', 'public-ack', 'public-guide'].includes(type)) first.focus(); else { const c = $('#sheet-root [data-action=close]'); c && c.focus(); }
 }
 /* ---------- 뒤로 가기 (안드로이드 뒤로 버튼, 브라우저 뒤로) ----------
    층(시트 → 정보 수정 → 사진 크게 보기)이 열릴 때마다 방문 기록을 하나씩 쌓아서, 뒤로 가기는 맨 위 층만 닫음.
    다 닫힌 상태에서 누르면 앱을 떠남.
    ✕·저장·삭제처럼 앱이 직접 닫을 때는 쌓아 둔 기록도 같이 되돌림 (그때 오는 popstate는 무시).
    기록은 화면을 누른 그 순간에만 쌓음: 누르지 않았는데 쌓으면 크롬이 그 기록을 건너뛰어 앱이 바로 꺼질 수 있음 */
-const layers = [];         // 기록을 쌓아 둔 층: 'sheet' | 'edit' | 'sub'(다른 시트에서 넘어온 시트: 내 정보 → 계정 설정·방 만들기, 방 바꾸기 → 방 만들기) | 'viewer'
+// 'explore'(공개 방 둘러보기) | 'visit'(읽기 전용 보기)는 화면 층: 둘러보기 → 방 → 상세 → 사진에서 뒤로 가기를 누르면 한 층씩 닫힘
+const layers = [];         // 기록을 쌓아 둔 층: 'explore' | 'visit' | 'sheet' | 'edit' | 'sub'(다른 시트에서 넘어온 시트: 내 정보 → 계정 설정·방 만들기, 방 바꾸기 → 방 만들기, 새 방 → 공개 방 동의) | 'viewer'
 let skipPops = 0;          // 앱이 직접 되돌린 횟수만큼 popstate 무시
 let closingByBack = false; // 뒤로 가기로 닫는 중 (이때는 기록을 건드리지 않음)
 function wantedLayers() {
   const want = [];
+  if (state.explore) want.push('explore');
+  if (state.visit) want.push('visit');
   if (state.sheet) {
     want.push('sheet');
     if (state.sheet.type === 'edit') want.push('edit');
@@ -2323,7 +3252,9 @@ window.addEventListener('popstate', () => {
       const kind = layers.pop();
       if (kind === 'viewer') closeViewer();
       else if (kind === 'edit') { if (state.sheet && state.sheet.type === 'edit') openSheet('detail', state.sheet.id); }
-      else if (kind === 'sub') { if (state.sheet && state.sheet.back && state.couple) openSheet(state.sheet.back); }
+      else if (kind === 'sub') goBackSheet();
+      else if (kind === 'visit') closeVisit();
+      else if (kind === 'explore') closeExplore();
       else closeSheet(); // 하던 월드컵은 지우지 않음 → 트로피를 다시 누르면 이어서
     }
   } finally { closingByBack = false; }
@@ -2366,8 +3297,14 @@ function drawSheet() {
     inner = roomsView();
   }
   else if (s.type === 'cup') inner = state.cup ? cupView() : state.cupTab === 'records' ? cupRecordsView() : cupSetupView();
+  else if (s.type === 'public-ack') inner = publicAckView();
+  else if (s.type === 'public-guide') inner = publicGuideView();
+  else if (s.type === 'copy') {
+    if (!ro()) { closeSheet(); return; } // 둘러보기를 닫은 뒤
+    inner = copyView();
+  }
   else if (s.type === 'detail') {
-    const p = state.places.find((x) => x.id === s.id);
+    const p = curPlaces().find((x) => x.id === s.id); // 읽기 전용이면 둘러보는 방의 장소
     if (!p) { closeSheet(); toast('삭제된 장소예요.'); return; }
     // 입력 중인 글이 새로고침으로 날아가지 않게 보존
     const same = root.dataset.view === `detail:${p.id}`;
@@ -2417,10 +3354,52 @@ document.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const a = el.dataset.action;
+  // 읽기 전용(공개 방 둘러보기)에서는 허용 목록 밖의 단추는 아무 일도 하지 않음 (숨기기를 빠뜨린 단추가 있어도)
+  if (ro() && !VISIT_ACTIONS.includes(a)) return;
   const placeId = state.sheet && state.sheet.id;
-  const p = placeId && state.places.find((x) => x.id === placeId);
+  const p = placeId && curPlaces().find((x) => x.id === placeId);
   try {
     switch (a) {
+      /* 공개 방: 둘러보기·읽기 전용 보기·동의 */
+      case 'explore': openExplore(); break;
+      case 'explore-back': closeExplore(); break;
+      case 'explore-retry': await loadExplore(); break;
+      case 'explore-open': openVisit(el.dataset.key, 'explore'); break;
+      case 'explore-clear': {
+        const q = $('#explore-q');
+        if (q) q.value = '';
+        if (state.explore) { state.explore.query = ''; $('#explore-list').innerHTML = exploreListHtml(); }
+        break;
+      }
+      case 'explore-create':
+        closeExplore({ reload: false });
+        if (!state.rooms.length) { onboardMode = 'create'; render(); } else if (state.rooms.length < MAX_ROOMS) openSheet('room-new', null, { mode: 'create' });
+        break;
+      // 담은 뒤의 '그 방에서 보기'도 같은 단추(data-go = 담은 방): 둘러보기를 닫고 그 방으로
+      case 'visit-close': if (el.dataset.go) await openCopied(el.dataset.go, el.dataset.place, el.dataset.status); else closeVisit(); break;
+      case 'copy-open': if (p && ro()) openCopy(p.id); break;
+      case 'copy-room': if (state.sheet && state.sheet.type === 'copy' && !state.sheet.done) { state.sheet.target = el.dataset.id; drawSheet(); } break;
+      case 'copy-status': if (state.sheet && state.sheet.type === 'copy' && !state.sheet.done) { state.sheet.status = el.dataset.status === 'visited' ? 'visited' : 'want_to_go'; drawSheet(); } break;
+      case 'copy-save': await busy(el, copySave); break;
+      case 'copy-create': if (ro() && !state.rooms.length) copyCreate(); break;
+      case 'visit-self': if (state.couple && isPublicRoom(state.couple)) openVisit(state.couple.public_key, 'self'); break;
+      case 'share-link': await shareLink(); break;
+      case 'regen-code': await regenCode(el); break;
+      case 'visit-retry': await loadVisit(); break;
+      case 'public-guide': {
+        // 폼·동의 시트 안에서는 그 자리에서 펼침, 그 밖에서는 안내 시트
+        if (el.dataset.inline) {
+          const box = el.nextElementSibling, open = el.getAttribute('aria-expanded') === 'true';
+          if (box) box.hidden = open;
+          el.setAttribute('aria-expanded', String(!open));
+          el.textContent = open ? '공개 방 안내 보기' : '공개 방 안내 접기';
+        } else {
+          keepSettingsScroll();
+          openSheet('public-guide', null, { back: state.sheet && state.sheet.type === 'settings' ? 'settings' : null });
+        }
+        break;
+      }
+      case 'ack-accept': await busy(el, acceptAck); break;
       case 'room-mode': {
         // 만들기 ↔ 참여 전환. 적어 둔 닉네임은 그대로
         const nick = $('#room-form') && field($('#room-form'), 'name').value;
@@ -2451,17 +3430,17 @@ document.addEventListener('click', async (e) => {
       case 'set-color': await setMyColor(el.dataset.color); break;
       case 'auth-mode': authMode = el.dataset.mode; render(); window.scrollTo(0, 0); break;
       case 'logout': await sb.auth.signOut(); break;
-      case 'tab': state.tab = el.dataset.tab; render(); break;
-      case 'cat': state.category = el.dataset.cat; render(); break;
-      case 'sort': state.sort = el.dataset.sort; render(); break;
-      case 'clear-search': $('#q').value = ''; state.query = ''; $('#list-area').innerHTML = listHtml(); markStampsSeen(); break;
-      case 'open': openSheet('detail', el.dataset.id); break;
+      case 'tab': ui().tab = el.dataset.tab; render(); break;
+      case 'cat': ui().category = el.dataset.cat; render(); break;
+      case 'sort': ui().sort = el.dataset.sort; render(); break;
+      case 'clear-search': $('#q').value = ''; ui().query = ''; $('#list-area').innerHTML = listHtml(); markStampsSeen(); break;
+      case 'open': openSheet('detail', el.dataset.id); if (ro()) loadVisitThumbs(el.dataset.id); break;
       case 'add': openSheet('add'); break;
       case 'settings': openSheet('settings'); break;
       case 'close': {
         const s = state.sheet;
         if (s && s.type === 'edit') { openSheet('detail', s.id); break; }
-        if (s && s.back && state.couple) { openSheet(s.back); break; } // 넘어온 시트(계정 설정·방 만들기)는 원래 시트로
+        if (s && s.back && goBackSheet()) break; // 넘어온 시트(계정 설정·방 만들기·공개 방 동의)는 원래 시트로
         // 월드컵을 하던 중이면 한 번 물어봄. ✕로 닫으면 그만두는 것 (뒤로 가기로 닫으면 이어서 할 수 있게 남겨 둠)
         if (s && s.type === 'cup' && state.cup && !state.cup.champion && state.cup.history.length && !confirm('월드컵을 그만할까요? 지금까지 고른 건 사라져요.')) break;
         if (s && s.type === 'cup') state.cup = null;
@@ -2609,7 +3588,7 @@ document.addEventListener('click', async (e) => {
       case 'delete-place': {
         if (!confirm(`${josa(p.name, '을', '를')} 삭제할까요? 방문 기록과 멤버들의 후기도 함께 지워져요.`)) break;
         // 사진 권한은 장소 존재 여부로 확인하므로 장소보다 먼저 지움 (사진 표 줄은 장소와 같이 지워짐)
-        if (p.photos.length) await sb.storage.from(BUCKET).remove(p.photos.map((x) => x.path));
+        if (p.photos.length) await sb.storage.from(BUCKET).remove(p.photos.flatMap((x) => [x.path, x.thumb_path]).filter(Boolean)); // 썸네일도 같이
         const sheet = state.sheet;
         const { error } = await sb.from('places').delete().eq('couple_id', state.roomId).eq('id', p.id);
         if (error) throw error;
@@ -2653,7 +3632,9 @@ document.addEventListener('scroll', (e) => {
 }, true);
 
 document.addEventListener('input', (e) => {
-  if (e.target.id === 'q') { state.query = e.target.value; $('#list-area').innerHTML = listHtml(); markStampsSeen(); }
+  if (e.target.id === 'q') { ui().query = e.target.value; $('#list-area').innerHTML = listHtml(); markStampsSeen(); }
+  // 공개 방 둘러보기 검색: 받은 목록을 이 폰에서만 거르고 목록만 다시 그림 (입력 중인 커서 그대로)
+  if (e.target.id === 'explore-q' && state.explore) { state.explore.query = e.target.value; $('#explore-list').innerHTML = exploreListHtml(); }
   // 직접 고르기: 색 판을 움직이면 색 코드 칸도, 색 코드를 치면 (6자리가 되는 순간) 색 판도 같이
   if (e.target.id === 'custom-color') syncCustom(e.target.value, 'well');
   if (e.target.id === 'custom-hex') syncCustom(e.target.value, 'hex');
@@ -2685,6 +3666,9 @@ document.addEventListener('paste', (e) => {
 
 document.addEventListener('change', async (e) => {
   const t = e.target;
+  if (ro()) return; // 읽기 전용: 사진 올리기·카테고리 이름 바꾸기 없음
+  // 방 만들기: 개인/공개 고르기, '이해했어요' 체크
+  if (t.form && t.form.id === 'room-form' && (t.name === 'visibility' || t.name === 'ack')) { syncVisibility(t.form); return; }
   if (t.name === 'photo' && t.form && t.form.id === 'place-form') {
     // 고른 사진 미리보기 (최대 장수까지, 첫 장에 '대표')
     const box = $('#photo-previews');
@@ -2713,6 +3697,9 @@ document.addEventListener('keydown', (e) => {
   // Esc: 크게 보던 사진이 있으면 그것만 닫음
   if (e.key === 'Escape' && closeViewer()) { e.preventDefault(); return; }
   if (e.key === 'Escape' && state.sheet) { e.preventDefault(); $('[data-action=close]', $('#sheet-root')).click(); }
+  // 시트가 없으면 읽기 전용 보기 → 둘러보기 순서로 닫음
+  else if (e.key === 'Escape' && state.visit) { e.preventDefault(); closeVisit(); }
+  else if (e.key === 'Escape' && state.explore) { e.preventDefault(); closeExplore(); }
   // 카테고리 입력칸의 Enter는 장소 폼 제출 대신 추가 / 이름 바꾸기 (한글 조합 중 Enter는 무시)
   if (e.key === 'Enter' && !e.isComposing && e.target instanceof Element) {
     const box = e.target.closest('.new-cat');
@@ -2724,6 +3711,7 @@ document.addEventListener('keydown', (e) => {
 
 document.addEventListener('submit', async (e) => {
   e.preventDefault();
+  if (ro()) return; // 읽기 전용: 보내는 폼 없음
   const f = e.target;
   const btn = f.querySelector('[type=submit]');
   if (f.id === 'login-form') {
@@ -2737,6 +3725,8 @@ document.addEventListener('submit', async (e) => {
       state.roomId = null;
       forcePicker = true; // 방이 2개 이상이면 방 고르기 화면부터
       try { await refresh({ keepSheet: false }); } catch (x) { err.textContent = friendly(x); }
+      if (pendingKey()) takePending(); // /r/<key>로 들어왔으면 그 공개 방
+      else publicNotice();
     });
   }
   if (f.id === 'signup-form') {
@@ -2745,18 +3735,12 @@ document.addEventListener('submit', async (e) => {
     if (input.error) { err.textContent = input.error; return; }
     await busy(btn, async () => {
       let j;
-      try { j = await signUp(input); } catch (x) { err.textContent = friendly(x); return; }
-      // 서버가 가입한 사람으로 로그인해서 받은 토큰을 그대로 씀 (로그인을 한 번 더 하지 않게)
-      const { data, error } = await sb.auth.setSession({ access_token: j.access_token, refresh_token: j.refresh_token });
-      if (error || !data.user) { authMode = 'login'; render(); $('#login-error').textContent = '가입했어요. 아이디와 비밀번호로 로그인해 주세요.'; return; }
-      state.user = data.user;
-      authMode = 'login';
-      forcePicker = true;
-      // 방 코드로 가입했으면 그 방으로 바로
-      state.roomId = typeof j.couple_id === 'string' ? j.couple_id : null;
-      if (state.roomId) rememberRoom(state.roomId);
-      try { await refresh({ keepSheet: false }); } catch (x) { render(); toast(friendly(x)); return; }
-      toast(j.joined ? '가입했어요. 방에 들어왔어요.' : '가입했어요. 이제 방을 만들거나 참여해요.');
+      try { j = await signUp(input); } catch (x) {
+        // 공개 방 코드: 서버가 계정을 만들기 전에 409 needAck → 동의 시트 (입력값은 폼에 그대로)
+        if (x.body && x.body.needAck) { openAck('signup', { name: input.displayName, roomName: x.body.roomName, ackVersion: x.body.ackVersion }); return; }
+        err.textContent = friendly(x); return;
+      }
+      await finishSignup(j);
     });
   }
   if (f.id === 'room-form') {
@@ -2769,19 +3753,40 @@ document.addEventListener('submit', async (e) => {
     if (create && !roomName) { err.textContent = '방 이름을 입력해 주세요.'; return; }
     if (!create && !code) { err.textContent = '초대 코드를 입력해 주세요.'; return; }
     if (!name) { err.textContent = '닉네임을 입력해 주세요.'; return; }
+    if (BAD_TEXT_RE.test(roomName) || BAD_TEXT_RE.test(name)) { err.textContent = BAD_TEXT_MSG; return; }
+    // 공개 방 만들기 (§4.7): 소개 60자, '이해했어요' 체크, 닉네임이 내 아이디와 같으면 바로 알려 줌 (DB도 다시 확인)
+    const pub = create && PUBLIC_ROOMS_ENABLED && !!f.querySelector('input[name=visibility][value=public]:checked');
+    const description = pub && field(f, 'description') ? field(f, 'description').value.trim() : '';
+    if (pub) {
+      if ([...description].length > PUBLIC_DESC_MAX) { err.textContent = `소개는 ${PUBLIC_DESC_MAX}자까지 쓸 수 있어요.`; return; }
+      if (BAD_TEXT_RE.test(description)) { err.textContent = BAD_TEXT_MSG; return; }
+      if (!(field(f, 'ack') && field(f, 'ack').checked)) { err.textContent = '공개 방 안내를 읽고 ‘이해했어요’에 체크해 주세요.'; return; }
+      const email = String((state.user && state.user.email) || '');
+      const myId = loginId(email) || email.split('@')[0];
+      if (myId && nickKey(name) === myId.toLowerCase()) { err.textContent = friendly(new Error('nickname_is_login_id')); return; }
+    }
     await busy(btn, async () => {
-      const { data, error } = create
+      const { data, error } = pub
+        ? await sb.rpc('create_room', { p_display_name: name, p_room_name: roomName, p_visibility: 'public', p_description: description, p_ack_version: PUBLIC_ACK_VERSION })
+        : create
         ? await sb.rpc('create_couple', { p_display_name: name, p_couple_name: roomName })
         : SIGNUP_ENABLED ? await joinViaServer(code, name) // 친구용: 서버가 횟수를 세고 참여시킴
           : await sb.rpc('join_couple', { p_invite_code: code, p_display_name: name });
-      if (error) { err.textContent = friendly(error); return; }
+      if (error) {
+        // 공개 방 코드: 서버가 409 needAck → 동의 시트 (동의하면 같은 요청을 ackVersion과 함께 다시 보냄)
+        if (!create && error.body && error.body.needAck) { openAck('join', { code, name, roomName: error.body.roomName, ackVersion: error.body.ackVersion }); return; }
+        if (pub) pubStatusAt = 0; // 한도에 걸렸으면 다음에 그릴 때 다시 확인
+        err.textContent = friendly(error); return;
+      }
+      if (pub) pubStatusAt = 0;
       try { await switchRoom(typeof data === 'string' && data ? data : null); } catch (x) { toast(friendly(x)); return; }
-      toast(create ? '방을 만들었어요. 초대 코드를 보내 주세요.' : '방에 들어왔어요.');
+      toast(pub ? '공개 방을 만들었어요.' : create ? '방을 만들었어요. 초대 코드를 보내 주세요.' : '방에 들어왔어요.');
     });
   }
   if (f.id === 'room-name-form') {
     const roomId = state.roomId, name = field(f, 'room').value.trim();
     if (!name) { toast('방 이름을 1~30자로 입력해 주세요.'); return; }
+    if (BAD_TEXT_RE.test(name)) { toast(BAD_TEXT_MSG); return; }
     if (state.couple && name === state.couple.name) return;
     await busy(btn, async () => {
       const { error } = await sb.rpc('rename_room', { p_couple: roomId, p_name: name });
@@ -2830,9 +3835,23 @@ document.addEventListener('submit', async (e) => {
       }
     });
   }
+  if (f.id === 'room-desc-form') {
+    const roomId = state.roomId, description = field(f, 'description').value.trim();
+    if ([...description].length > PUBLIC_DESC_MAX) { toast(`소개는 ${PUBLIC_DESC_MAX}자까지 쓸 수 있어요.`); return; }
+    if (BAD_TEXT_RE.test(description)) { toast(BAD_TEXT_MSG); return; }
+    if (state.couple && description === (state.couple.description || '')) return;
+    await busy(btn, async () => {
+      const { error } = await sb.rpc('set_room_description', { p_couple: roomId, p_description: description });
+      if (error) { toast(friendly(error)); return; }
+      try { await refresh(); } catch (x) { toast(friendly(x)); return; }
+      if (state.sheet && state.sheet.type === 'settings') renderSheet();
+      toast(description ? '소개를 저장했어요.' : '소개를 지웠어요.');
+    });
+  }
   if (f.id === 'name-form') {
     const name = field(f, 'name').value.trim();
     if (!name) return;
+    if (BAD_TEXT_RE.test(name)) { toast(BAD_TEXT_MSG); return; }
     await busy(btn, async () => {
       // 닉네임은 방마다 따로: 지금 방의 내 줄만 바꿈 (방 조건이 없으면 내가 든 모든 방이 바뀜)
       const { error } = await sb.from('couple_members').update({ display_name: name }).eq('couple_id', state.roomId).eq('user_id', uid());
@@ -2856,7 +3875,12 @@ document.addEventListener('submit', async (e) => {
 
 // 다른 앱에 갔다 돌아오면 다른 멤버가 바꾼 내용을 다시 불러옴
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && state.user && state.roomId) refresh().catch(() => {});
+  // 공개 방을 둘러보는 중이면 그 방 JSON만 다시 받음 (내 방 불러오기 대신)
+  // 지도 앱에 다녀올 때마다 받지 않게, 마지막으로 받은 지 5분이 지났을 때만 (서버가 사진 한도를 세므로)
+  if (document.visibilityState === 'visible' && state.user && state.visit) {
+    if (state.visit.status === 'ok' && Date.now() - (state.visit.loadedAt || 0) > 5 * 60e3) loadVisit(true);
+  }
+  else if (document.visibilityState === 'visible' && state.user && state.roomId) refresh().catch(() => {});
   if (document.visibilityState === 'visible' && $('#place-form')) warmGoogle(); // 구글 지도에서 링크를 복사해 돌아온 참
 });
 
@@ -2864,6 +3888,14 @@ document.addEventListener('visibilitychange', () => {
 (async function start() {
   // 화면을 연 채로 새로고침했으면 그때 쌓였던 기록 위치에서 맨 처음 자리로 돌아감 (새로고침하면 화면은 닫혀 있으니까)
   if (history.state && history.state.ourPlaces) { skipPops++; history.go(-history.state.ourPlaces); }
+  // 공개 방 보기 링크 /r/<key>: 키는 이 탭의 sessionStorage에 두고 주소는 '/'로 (로그인하고 첫 불러오기가 끝나면 엶, §4.12)
+  else {
+    const m = /^\/r\/([a-km-np-z2-9]{10})$/.exec(location.pathname);
+    if (m) {
+      try { sessionStorage.setItem(PENDING_KEY, m[1]); } catch { /* 못 남기면 로그인 뒤 열리지 않을 뿐 */ }
+      try { history.replaceState(null, '', '/'); } catch { /* 주소만 그대로 남음 */ }
+    }
+  }
   if (!configured) { render(); return; }
   sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
@@ -2871,7 +3903,10 @@ document.addEventListener('visibilitychange', () => {
       Object.assign(state, {
         user: null, rooms: [], allMembers: [], roomsLoaded: false, roomId: null, couple: null, members: [], loadedRoom: null, loadError: false,
         places: [], categories: [], sheet: null, cup: null, cupSetup: null, cupResults: [], cupTab: 'new', query: '', category: '전체',
+        explore: null, visit: null,
       });
+      pubStatus = null; pubStatusAt = 0;
+      visitLarge.clear();
       forcePicker = false;
       onboardMode = 'create';
       authMode = 'login';
@@ -2887,6 +3922,8 @@ document.addEventListener('visibilitychange', () => {
     try { await loadAll(); } catch (err) { state.loadError = true; toast(friendly(err)); }
   }
   render();
+  if (state.user && pendingKey()) takePending(); // 로그인한 채로 /r/<key>를 열었으면 그 공개 방
+  else if (state.user) publicNotice();
 })();
 </script>
 </body>

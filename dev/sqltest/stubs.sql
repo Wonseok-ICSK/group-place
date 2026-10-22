@@ -46,7 +46,8 @@ create table storage.buckets (
 create table storage.objects (
   id uuid primary key default gen_random_uuid(),
   bucket_id text references storage.buckets (id),
-  name text
+  name text,
+  metadata jsonb -- Supabase처럼 { "size": <바이트>, … } (public_room_view가 사진 크기를 봄)
 );
 alter table storage.objects enable row level security;
 grant select, insert, delete on storage.objects to authenticated;

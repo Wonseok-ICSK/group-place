@@ -1,12 +1,16 @@
 // 친구용 홈 서버: Vercel이 하던 일(정적 파일 + POST /api/place)과 친구용 '초대 코드로 가입'(POST /api/signup),
-// 앱 안에서 방 코드로 참여(POST /api/join, 친구용 DB는 join_couple을 앱에서 직접 못 부름)를 맡는다.
+// 앱 안에서 방 코드로 참여(POST /api/join, 친구용 DB는 join_couple을 앱에서 직접 못 부름),
+// 공개 방 둘러보기(GET /api/public/rooms…, /r/<공개 키> 링크, public.cjs, docs/public-rooms-design.md §3)를 맡는다.
 // 로그인·데이터·사진은 친구용 Supabase 프로젝트가 맡고, 이 서버는 그 주소와 공개 키를 index.html에 넣어 줄 뿐이다.
 // 저장소의 index.html에는 자리표시값이 들어 있고, 보낼 때만 아래 줄들을 설정값으로 바꾼다. 파일 자체는 고치지 않는다.
-//   const SUPABASE_URL / const SUPABASE_KEY / og:url / og:image / const LOGIN_ID_DOMAIN / const SIGNUP_ENABLED
+//   const SUPABASE_URL / const SUPABASE_KEY / og:url / og:image / const LOGIN_ID_DOMAIN / const SIGNUP_ENABLED / const PUBLIC_ROOMS_ENABLED
 // 환경 변수(/etc/our-places/env): SUPABASE_URL, SUPABASE_KEY(Publishable key), PUBLIC_ORIGIN, PORT(기본 8090),
 //   LOGIN_ID_DOMAIN(아이디 로그인용 주소, 예: id.example.com. 이미 만든 아이디 계정이 이 주소로 되어 있으니 바꾸지 않는다)
 // 선택(/etc/our-places/secret.env, set-secret.sh가 씀): SUPABASE_SECRET_KEY. 있으면 확인한 뒤에만 가입과 앱 안 코드 참여를 켠다
 //   (없으면 친구용 앱에서는 방 코드로 참여가 안 된다. 방 만들기는 된다).
+// 공개 방(선택, /etc/our-places/env): PUBLIC_ROOMS=on|off(기본 off, 끄기 스위치), PUBLIC_PHOTOS=on|off(기본 on, 둘러보기 사진만 끔),
+//   PUBLIC_ANON은 off만(로그인 없이 보기는 아직 켜지 않음, on이면 시작하지 않음). 공개 방은 secret key 확인이 끝나야 켠다.
+//   사진 한도 카운터는 STATE_DIRECTORY(서비스의 StateDirectory=our-places)에 저장한다. 없으면 메모리에만.
 // 127.0.0.1에서만 받고, 밖에서는 Cloudflare Tunnel 같은 리버스 프록시(PUBLIC_ORIGIN)로만 들어온다.
 'use strict';
 const http = require('node:http');
@@ -14,6 +18,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { createSignupApi, verifySecretKey } = require('./signup.cjs');
+const { createPublicApi } = require('./public.cjs');
+const pagesLib = require('./pages.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const HOST = '127.0.0.1';
@@ -42,13 +48,13 @@ if (!/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(LO
 // secret key는 없거나 틀려도 사이트는 연다(가입만 꺼 둔다). 이유만 남기고 키 값은 어디에도 남기지 않는다.
 let signupOff = SECRET_KEY ? '' : 'secret key 없음';
 if (SECRET_KEY && !/^sb_secret_[A-Za-z0-9_-]{10,200}$/.test(SECRET_KEY)) signupOff = 'SUPABASE_SECRET_KEY가 sb_secret_… 형식이 아니에요';
+let PUBLIC;
+try { PUBLIC = pagesLib.publicConfig(process.env); } catch (e) { fail(e.message); }
 
 // index.html: 정해진 줄이 정확히 하나씩 있을 때만 바꾼다. 앱이 바뀌어 못 찾으면 자리표시값 그대로 뜨지 않게 아예 멈춘다.
 const raw = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 function replaceOnce(src, re, value, what) {
-  const count = (src.match(new RegExp(re.source, 'g')) || []).length;
-  if (count !== 1) fail(`index.html에서 ${what} 줄을 정확히 하나 찾지 못했어요 (${count}개)`);
-  return src.replace(re, () => value); // 함수로 넘겨 값 속 $ 문자를 그대로 둔다
+  try { return pagesLib.replaceOnce(src, re, value, what); } catch (e) { return fail(e.message); }
 }
 let html = raw;
 html = replaceOnce(html, /const SUPABASE_URL = '[^'\n]*';/, `const SUPABASE_URL = '${SUPABASE_URL}';`, 'SUPABASE_URL');
@@ -69,10 +75,10 @@ const realSite = /YOUR-SITE/.test(originalSite) ? '' : originalSite;
 for (const [old, fresh, what] of [[originalRef, SUPABASE_URL, '원래 Supabase 프로젝트 ID'], [realKey, SUPABASE_KEY, '원래 공개 키'], [realSite, PUBLIC_ORIGIN, '원래 사이트 주소']]) {
   if (old && !fresh.includes(old) && html.includes(old)) fail(`보낼 index.html에 ${what}가 남아 있어요`);
 }
-// 가입 화면(SIGNUP_ENABLED)은 secret key 확인이 끝나야 켠다: 끈 화면으로 시작했다가, 확인되면 켠 화면으로 바꾼다.
-const SIGNUP_RE = /const SIGNUP_ENABLED = (?:true|false);/;
-const pageSignupOff = Buffer.from(replaceOnce(html, SIGNUP_RE, 'const SIGNUP_ENABLED = false;', 'SIGNUP_ENABLED'), 'utf8');
-const pageSignupOn = Buffer.from(replaceOnce(html, SIGNUP_RE, 'const SIGNUP_ENABLED = true;', 'SIGNUP_ENABLED'), 'utf8');
+// 가입 화면(SIGNUP_ENABLED)과 공개 방(PUBLIC_ROOMS_ENABLED)은 secret key 확인이 끝나야 켠다:
+// 둘 다 끈 화면으로 시작했다가, 확인되면 켠 화면으로 바꾼다(네 벌을 미리 만듦).
+let pages;
+try { pages = pagesLib.buildPages(html); } catch (e) { fail(e.message); }
 
 // 보낼 파일은 시작할 때 전부 메모리에 올린다. 목록에 없는 경로는 404라서 저장소의 다른 파일(.git, api 소스 등)은 나가지 않는다.
 const TYPES = { '.html': 'text/html; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml' };
@@ -80,11 +86,13 @@ const files = new Map();
 function addFile(urlPath, body, ext, cache) {
   files.set(urlPath, { body, type: TYPES[ext], cache });
 }
+let currentPage = null; // /r/<공개 키>도 같은 화면을 낸다
 function setPage(page) {
+  currentPage = page;
   addFile('/', page, '.html', 'no-cache');
   addFile('/index.html', page, '.html', 'no-cache');
 }
-setPage(pageSignupOff);
+setPage(pages.get(false, false));
 addFile('/manifest.json', fs.readFileSync(path.join(ROOT, 'manifest.json')), '.json', 'public, max-age=3600');
 addFile('/og.png', fs.readFileSync(path.join(ROOT, 'og.png')), '.png', 'public, max-age=86400');
 for (const name of fs.readdirSync(path.join(ROOT, 'icons'))) {
@@ -101,6 +109,12 @@ const api = signupOff ? null : createSignupApi({
   supabaseUrl: SUPABASE_URL, publishableKey: SUPABASE_KEY, secretKey: SECRET_KEY, idDomain: LOGIN_ID_DOMAIN, allowedOrigin: PUBLIC_ORIGIN,
 });
 let signupReady = false;
+// 공개 방 API: PUBLIC_ROOMS=on이고 secret key가 있을 때만 만든다(없으면 /api/public/*는 404). 로그인 없이 보기는 늘 끔
+const publicApi = PUBLIC.rooms && api ? createPublicApi({
+  supabaseUrl: SUPABASE_URL, publishableKey: SUPABASE_KEY, secretKey: SECRET_KEY,
+  photos: PUBLIC.photos, allowAnonymous: false, stateDir: PUBLIC.stateDir, isReady: () => publicReady,
+}) : null;
+let publicReady = false;
 const RETRY_MS = [30_000, 120_000, 600_000, 1_800_000, 3_600_000]; // 연결 문제면 점점 길게 다시 확인(마지막 값으로 계속)
 async function enableSignup(attempt = 0) {
   let r;
@@ -111,8 +125,10 @@ async function enableSignup(attempt = 0) {
   }
   if (r.ok) {
     signupReady = true;
-    setPage(pageSignupOn);
+    publicReady = !!publicApi;
+    setPage(pages.get(true, publicReady));
     console.log('초대 코드로 가입: 켬');
+    if (publicApi) console.log(`공개 방: 켬 (사진 ${PUBLIC.photos ? '켬' : '끔'})`);
     return;
   }
   if (!r.retry) { console.error(`초대 코드로 가입: 꺼 둠 (${r.reason})`); return; }
@@ -125,6 +141,7 @@ const SECURITY = {
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'strict-origin-when-cross-origin',
   'x-frame-options': 'DENY',
+  'x-robots-tag': 'noindex, nofollow', // 검색 엔진에 나오지 않게 (공개 방 링크·API 포함 모든 응답)
 };
 
 function sendText(res, status, text, extra = {}) {
@@ -132,8 +149,18 @@ function sendText(res, status, text, extra = {}) {
   res.end(text);
 }
 
+function sendJson(res, status, body, extra = {}) {
+  res.writeHead(status, { ...SECURITY, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...extra });
+  res.end(JSON.stringify(body));
+}
+
 const server = http.createServer((req, res) => {
   const pathname = (req.url || '/').split('?')[0];
+  res.setHeader('x-robots-tag', SECURITY['x-robots-tag']); // signup.cjs·api/place.js가 쓰는 응답에도
+  if (pathname === '/api/public' || pathname.startsWith('/api/public/')) {
+    if (!publicApi) return sendJson(res, 404, { error: '찾을 수 없어요' });
+    return void publicApi.handle(req, res); // 메서드·준비·키 형식·횟수·로그인·캐시·사진 한도는 public.cjs가 한다
+  }
   if (pathname === '/api/place') {
     if (Number(req.headers['content-length'] || 0) > 8192) return sendText(res, 413, '요청이 너무 커요');
     for (const [k, v] of Object.entries(SECURITY)) res.setHeader(k, v);
@@ -151,6 +178,11 @@ const server = http.createServer((req, res) => {
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') return sendText(res, 405, 'GET만 받아요', { allow: 'GET, HEAD' });
   if (pathname === '/healthz') return sendText(res, 200, 'ok');
+  // 공개 방 보기 링크: 형식이 맞으면 지금 화면(스위치와 상관없이, 꺼져 있으면 화면이 안내). 다른 /r/…는 404
+  if (pagesLib.isRoomLink(pathname)) {
+    res.writeHead(200, { ...SECURITY, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache', 'content-length': currentPage.length });
+    return void res.end(req.method === 'HEAD' ? undefined : currentPage);
+  }
   const file = files.get(pathname);
   if (!file) return sendText(res, 404, '찾을 수 없어요');
   res.writeHead(200, { ...SECURITY, 'content-type': file.type, 'cache-control': file.cache, 'content-length': file.body.length });
@@ -163,9 +195,12 @@ server.listen(PORT, HOST, () => {
   console.log(`our-places 친구용 서버: http://${HOST}:${PORT} (Supabase ${new URL(SUPABASE_URL).hostname}, 공개 주소 ${PUBLIC_ORIGIN}, 아이디 로그인 @${LOGIN_ID_DOMAIN}, 파일 ${files.size}개)`);
   if (api) enableSignup();
   else console.log(`초대 코드로 가입: 꺼 둠 (${signupOff})`);
+  if (!PUBLIC.rooms) console.log('공개 방: 꺼 둠 (PUBLIC_ROOMS=off)');
+  else if (!api) console.log(`공개 방: 꺼 둠 (${signupOff})`);
 });
 for (const signal of ['SIGTERM', 'SIGINT']) {
   process.on(signal, () => {
+    if (publicApi) publicApi.close(); // 사진 한도 카운터를 파일에 저장
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 5_000).unref();
   });
