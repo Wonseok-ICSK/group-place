@@ -12,14 +12,15 @@
   <img alt="PWA" src="https://img.shields.io/badge/PWA-홈_화면_앱-1f6f5c">
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Auth·Postgres·Storage-3ecf8e">
   <img alt="Node" src="https://img.shields.io/badge/Node-20+-339933">
-  <img alt="Status" src="https://img.shields.io/badge/status-초기_모델_개발_중-d9822b">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.1.0-1f6f5c">
+  <img alt="Status" src="https://img.shields.io/badge/status-MVP_시험_중-d9822b">
 </p>
 
 <p align="center">
-  <img src="docs/images/01-list.jpg" width="23%" alt="장소 목록">
-  <img src="docs/images/03-detail.jpg" width="23%" alt="장소 상세">
-  <img src="docs/images/04-reviews.jpg" width="23%" alt="방문별 후기">
-  <img src="docs/images/10-records.jpg" width="23%" alt="월드컵 기록">
+  <img src="docs/images/room-picker.jpg" width="23%" alt="방 고르기">
+  <img src="docs/images/main.jpg" width="23%" alt="5명 방의 장소 목록">
+  <img src="docs/images/reviews.jpg" width="23%" alt="닉네임별 방문 후기">
+  <img src="docs/images/colors.jpg" width="23%" alt="내 색 고르기">
 </p>
 
 > 화면은 예시 데이터로 찍었습니다. 사진은 예시용으로 생성한 이미지이고, 실제 사용자 정보는 들어 있지 않습니다.
@@ -28,36 +29,37 @@
 
 <a href="promo/promo-30s.mp4"><img src="promo/storyboard.jpg" alt="30초 홍보 영상 스토리보드 (누르면 영상)" width="100%"></a>
 
-30초 세로 영상: [promo/promo-30s.mp4](promo/promo-30s.mp4). 실제 앱 화면을 예시 데이터로 조작해 녹화했습니다.
+30초 세로 영상: [promo/promo-30s.mp4](promo/promo-30s.mp4). 실제 앱 화면을 예시 데이터로 조작해 녹화했습니다(그룹 기능 이전 화면).
 
 ## 지금 되는 것
 
 | 기능 | 내용 |
 |---|---|
+| 방(그룹) | 방 하나에 최대 5명, 한 사람이 최대 3개 방까지. 로그인하면 방을 고르고, 내 정보에서 다른 방으로 바꿈. 방 이름은 만들 때 정하고 방장만 바꿈 |
+| 멤버 색 | 40가지 색 중 방 안에서 겹치지 않게 처음엔 무작위로 정해지고, 내 정보에서 바꿈. 후기·별점·도장에 그 색이 쓰임 |
+| 초대 코드 | 첫 멤버가 들어올 때까지 메인 화면에 보이고, 그 뒤로는 멤버 모두가 내 정보에서 확인. 5명이 차 있을 때만 참여가 막힘 |
+| 나가기 | 내 정보 맨 아래. 내 후기와 월드컵 기록은 지워지고 담은 장소·사진은 남음. 방장이 나가면 가장 먼저 들어온 멤버가 방장, 마지막 한 명이 나가면 방이 지워짐 |
 | 장소 담기 | 이름, 카테고리, 지도 링크, 주소, 함께 쓰는 메모, 사진 최대 10장. 네이버 지도 공유 문구나 구글 지도 링크를 붙여넣으면 이름·주소가 자동으로 채워짐 |
 | 세 가지 목록 | 가고 싶은 곳 / 다녀온 곳 / 찜. 검색과 카테고리 필터, 최근 방문·추가·평점순 정렬 |
-| 방문 기록 | 같은 곳을 여러 번 가도 방문마다 날짜와 사람별 별점(0.5점 단위)·후기 |
-| 장소 월드컵 | 연도·카테고리별로 다녀온 곳을 1:1로 골라 최고의 장소 뽑기, 명예의 전당 |
+| 방문 기록 | 같은 곳을 여러 번 가도 방문마다 날짜와 멤버별 별점(0.5점 단위)·후기(닉네임으로 표시) |
+| 장소 월드컵 | 연도·카테고리별로 다녀온 곳을 1:1로 골라 최고의 장소 뽑기. 각자 고른 1위에 그 사람 색 도장 |
 | 아이디 로그인 | 이메일 없이 아이디 + 비밀번호 (메일을 보내지 않음) |
-| 초대 코드 가입 | 관리자가 만든 1회용 가입 코드(`W-XXXX-XXXX`) 또는 공간의 8자리 초대 코드로 직접 가입. 코드 맞히기는 접속한 곳마다 시간당 5회로 제한 |
+| 초대 코드 가입 | 관리자가 만든 1회용 가입 코드(`W-XXXX-XXXX`) 또는 방의 8자리 초대 코드로 직접 가입. 틀린 코드는 접속한 곳마다 시간당 5회까지(성공은 세지 않음) |
 | 기타 | 다크 모드, 홈 화면에 추가하면 앱처럼 열림, 다른 앱에 다녀오면 최신 내용 다시 불러오기 |
 
 <p align="center">
-  <img src="docs/images/02-rating.jpg" width="19%" alt="별점 입력">
-  <img src="docs/images/05-edit.jpg" width="19%" alt="장소 편집">
-  <img src="docs/images/07-duel.jpg" width="19%" alt="월드컵 대결">
-  <img src="docs/images/09-winner.jpg" width="19%" alt="월드컵 우승">
-  <img src="docs/images/11-stamped-list.jpg" width="19%" alt="도장이 찍힌 목록">
+  <img src="docs/images/room-new.jpg" width="23%" alt="새 방 만들기">
+  <img src="docs/images/cup-records.jpg" width="23%" alt="월드컵 기록">
+  <img src="docs/images/leave.jpg" width="23%" alt="방에서 나가기">
+  <img src="docs/images/dark-main.jpg" width="23%" alt="다크 모드">
 </p>
 
-## 만들고 있는 것 (초기 모델)
+## 다음에 만들 것
 
-자세한 결정 사항과 순서는 [docs/plan.md](docs/plan.md)에 있습니다.
+결정 사항과 순서는 [docs/plan.md](docs/plan.md), 그룹 기능 설계는 [docs/groups-design.md](docs/groups-design.md)에 있습니다.
 
-- 방(그룹) 최대 5명, 한 사람이 최대 3개 방까지 참여, 로그인 후 방 선택과 방 전환
-- 멤버마다 고를 수 있는 색(약 40가지, 처음엔 무작위), 닉네임 기반 후기
-- 방 이름은 만들 때 정하고 관리자만 변경, 초대 코드는 멤버 모두가 설정 화면에서 확인
 - 공개 방: 만들 때 공개/개인을 정하고(나중에 못 바꿈), 방 선택 화면의 검색으로 공개 방을 찾아 읽기 전용으로 보기
+- 앱 이름·아이콘을 그룹용으로, 서버 서비스·경로 이름 정리
 - 그다음: 사진 트래픽 줄이기(썸네일), 계정 삭제, 약관·개인정보 처리방침, 안드로이드 앱(TWA)
 
 ## 구성
@@ -77,12 +79,12 @@ flowchart LR
 | 서버 | `deploy/home/server.cjs` | 정해진 파일만 메모리에서 보내고, 설정값을 화면에 넣음. 127.0.0.1에서만 받음 |
 | 가입 | `deploy/home/signup.cjs` | `POST /api/signup`, `POST /api/join`. secret key는 이 서버에만 있음 |
 | 지도 | `api/place.js` | 구글 지도 링크 → 장소 이름·주소 (로그인한 사람만) |
-| DB | `supabase/schema.sql` → `friends-keepalive.sql` → `friends-signup.sql` | 표, 함수, 권한, RLS, 사진 저장소. 순서대로 실행 |
+| DB | `supabase/schema.sql` → `friends-keepalive.sql` → `friends-signup.sql` → `groups.sql` | 표, 함수, 권한, RLS, 사진 저장소, 여러 방·5명 규칙. 순서대로 실행 (되돌리기는 `groups_rollback.sql`, 자세한 것은 `docs/groups-design.md` §6) |
 | 배포 | `deploy/home/install.sh`, `deploy.ps1`, `*.service`, `*.timer` | 커밋 단위 릴리스, 실패하면 이전 릴리스로 되돌림, 하루 한 번 무료 프로젝트 깨우기 |
 
 ## 직접 설치하기
 
-1. **Supabase**: 새 프로젝트를 만들고 SQL Editor에서 `supabase/schema.sql`, `supabase/friends-keepalive.sql`, `supabase/friends-signup.sql`을 차례로 실행합니다. Authentication에서 **Allow new users to sign up은 끕니다**(가입은 서버가 초대 코드를 확인한 뒤 관리자 API로 만듭니다). Site URL에는 앱 주소를 넣습니다.
+1. **Supabase**: 새 프로젝트를 만들고 SQL Editor에서 `supabase/schema.sql`, `supabase/friends-keepalive.sql`, `supabase/friends-signup.sql`, `supabase/groups.sql`을 차례로 실행합니다. Authentication에서 **Allow new users to sign up은 끕니다**(가입은 서버가 초대 코드를 확인한 뒤 관리자 API로 만듭니다). Site URL에는 앱 주소를 넣습니다.
 2. **서버**(Ubuntu, Node 20+): 저장소 맨 위 폴더에서
    ```powershell
    pwsh -File deploy/home/deploy.ps1 -Target <ssh 대상> -SupabaseUrl https://<프로젝트 ID>.supabase.co -SupabaseKey sb_publishable_...
@@ -108,6 +110,8 @@ flowchart LR
 
 ```bash
 node --test deploy/home/*.test.cjs      # 가입 API 테스트 (가짜 Supabase)
+cd dev/sqltest && npm install && npm test   # SQL 시험: PGlite로 schema.sql → … → groups.sql 실행, 권한·제한 확인
+node dev/mock/serve.mjs                 # 가짜 Supabase로 화면 띄우기 (dev/mock/shoot.py로 화면 캡처)
 bash scripts/leak-check.sh              # 커밋 전 비밀 값·다른 배포 값 검사
 git config core.hooksPath .githooks     # 커밋할 때 leak-check 자동 실행
 ```

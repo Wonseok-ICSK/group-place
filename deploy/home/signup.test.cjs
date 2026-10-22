@@ -12,6 +12,8 @@ const DOMAIN = 'id.example.com';
 const ORIGIN = 'https://places.example.com';
 const INVITE = 'W23456789';
 const SPACE = 'ABCDEF12';
+const ROOM_A = 'aaaaaaaa-0000-4000-8000-00000000000a'; // SPACE 코드의 방 id
+const ROOM_FULL = 'ffffffff-0000-4000-8000-00000000000f'; // FFFF0000: 이미 5명
 const PW = 'correct-horse-9';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 // 가짜 로그인 토큰: JWT처럼 점 세 조각
@@ -40,15 +42,36 @@ function fakeRes() {
 
 // ---------- 가짜 Supabase ----------
 // invites: 코드 → 'open' | 'claimed' | 'used:<id>' | 'revoked' | 'expired'
-// spaces: 공간 코드 → 멤버 수
+// spaces: 방 코드 → { id, n(멤버 수), deleting(마지막 멤버가 지우는 중) }
+// members: user id → Set<방 id> (groups.sql: 한 사람이 방 3개까지)
 // over: { '<METHOD> <경로>': (c, db, base) => 응답 } 로 바꿔 끼움 (base는 원래 동작)
 function fakeSupabase({ over = {} } = {}) {
   const db = {
     invites: new Map([[INVITE, 'open'], ['W33333333', 'revoked'], ['W44444444', 'expired']]),
-    spaces: new Map([[SPACE, 1], ['FFFF0000', 2]]),
+    spaces: new Map([[SPACE, { id: ROOM_A, n: 1, deleting: false }], ['FFFF0000', { id: ROOM_FULL, n: 5, deleting: false }]]),
     users: new Map(), // id → { email, password, meta, app }
-    members: new Map(), // user id → 공간 코드
+    members: new Map(),
     seq: 0,
+    // 방 하나 더 (멤버 n명, 그중 누구도 테스트 사용자는 아님) → 방 id
+    addRoom(code, n = 1) {
+      const id = `00000000-0000-4000-9000-${code.toLowerCase().padStart(12, '0')}`;
+      this.spaces.set(code, { id, n, deleting: false });
+      return id;
+    },
+    // 테스트 사용자를 그 코드의 방에 넣음 (없는 방이면 만듦)
+    addMember(userId, code) {
+      if (!this.spaces.has(code)) this.addRoom(code, 0);
+      const room = this.spaces.get(code);
+      room.n++;
+      const mine = this.members.get(userId) || new Set();
+      mine.add(room.id);
+      this.members.set(userId, mine);
+      return room.id;
+    },
+    codeOf(roomId) {
+      for (const [code, room] of this.spaces) if (room.id === roomId) return code;
+      return '';
+    },
   };
   const calls = [];
   const isAdmin = (h) => h.apikey === SECRET && h.authorization === `Bearer ${SECRET}`;
@@ -76,9 +99,10 @@ function fakeSupabase({ over = {} } = {}) {
     },
     'POST /rest/v1/rpc/space_code_open': (c) => {
       if (!isAdmin(c.headers)) return deny;
-      const n = db.spaces.get(c.body.p_code);
-      return { status: 200, body: n !== undefined && n < 2 };
+      const room = db.spaces.get(c.body.p_code);
+      return { status: 200, body: !!room && room.n < 5 && !room.deleting };
     },
+    'POST /rest/v1/rpc/groups_schema_version': (c) => (isAdmin(c.headers) ? { status: 200, body: 1 } : deny),
     'POST /auth/v1/admin/users': (c) => {
       if (!isAdmin(c.headers)) return deny;
       if ([...db.users.values()].some((u) => u.email === c.body.email)) {
@@ -102,29 +126,46 @@ function fakeSupabase({ over = {} } = {}) {
     },
     // 친구용 DB에서는 앱(authenticated)이 직접 못 부름 (friends-signup.sql)
     'POST /rest/v1/rpc/join_couple': () => ({ status: 401, body: { code: '42501', message: 'permission denied for function join_couple' } }),
+    // groups.sql §2.5.1 순서: 사용자 → 닉네임 → 코드(지우는 중인 방은 없는 코드) → 이미 그 방이면 같은 id → 방 3개 → 5명
     'POST /rest/v1/rpc/join_couple_for': (c) => {
       if (!isAdmin(c.headers)) return deny;
       const id = c.body.p_user;
       if (!id) return raise('not_authenticated');
-      if (db.members.has(id)) return raise('already_in_couple');
-      const n = db.spaces.get(c.body.p_invite_code);
-      if (n === undefined) return raise('invalid_code');
-      if (n >= 2) return raise('couple_full');
-      db.spaces.set(c.body.p_invite_code, n + 1);
-      db.members.set(id, c.body.p_invite_code);
-      return { status: 200, body: 'couple-id' };
+      const name = String(c.body.p_display_name ?? '').trim();
+      if (!name || [...name].length > 20) return raise('invalid_display_name');
+      const room = db.spaces.get(String(c.body.p_invite_code ?? '').trim().toUpperCase());
+      if (!room || room.deleting) return raise('invalid_code');
+      const mine = db.members.get(id) || new Set();
+      if (mine.has(room.id)) return { status: 200, body: room.id };
+      if (mine.size >= 3) return raise('too_many_rooms');
+      if (room.n >= 5) return raise('room_full');
+      room.n++;
+      mine.add(room.id);
+      db.members.set(id, mine);
+      return { status: 200, body: room.id };
     },
+    // PostgREST처럼: 끼워 넣은 표(couples)의 조건은 !inner일 때만 부모 줄(couple_members)을 거른다
     'GET /rest/v1/couple_members': (c) => {
       if (!isAdmin(c.headers)) return deny;
-      const id = new URL(`${SUPA}${c.path}`).searchParams.get('user_id').replace(/^eq\./, '');
-      return { status: 200, body: db.members.has(id) ? [{ couple_id: 'couple-id' }] : [] };
+      const q = new URL(`${SUPA}${c.path}`).searchParams;
+      const id = (q.get('user_id') || '').replace(/^eq\./, '');
+      const want = q.has('couples.invite_code') ? q.get('couples.invite_code').replace(/^eq\./, '') : null;
+      const inner = /couples!inner\(/.test(q.get('select') || '');
+      const rows = [];
+      for (const roomId of db.members.get(id) || []) {
+        const code = db.codeOf(roomId);
+        if (want === null || code === want) rows.push({ couple_id: roomId, couples: { invite_code: code } });
+        else if (!inner) rows.push({ couple_id: roomId, couples: null });
+      }
+      return { status: 200, body: rows };
     },
     'DELETE /auth/v1/admin/users/:id': (c) => {
       if (!isAdmin(c.headers)) return deny;
       const id = decodeURIComponent(c.path.split('?')[0].split('/').pop());
       const had = db.users.delete(id);
-      // 계정을 지우면 공간 멤버(on delete cascade)와 코드의 used_by(on delete set null)도 같이 정리됨
-      if (db.members.has(id)) { db.spaces.set(db.members.get(id), db.spaces.get(db.members.get(id)) - 1); db.members.delete(id); }
+      // 계정을 지우면 방 멤버(on delete cascade)와 코드의 used_by(on delete set null)도 같이 정리됨
+      for (const roomId of db.members.get(id) || []) db.spaces.get(db.codeOf(roomId)).n--;
+      db.members.delete(id);
       for (const [code, st] of db.invites) if (st === `used:${id}`) db.invites.set(code, 'claimed');
       return { status: had ? 200 : 404, body: {} };
     },
@@ -156,6 +197,7 @@ function setup({ over, clock } = {}) {
   const api = s.createSignupApi({
     supabaseUrl: SUPA, publishableKey: PUB, secretKey: SECRET, idDomain: DOMAIN, allowedOrigin: ORIGIN,
     fetchImpl: sb.fetchImpl, now: clock || (() => t.now), log: (m) => logs.push(String(m)),
+    accountLimits: { perIp: 3 }, // 아래 시험들은 IP마다 하루 3개로 세는 방식을 확인한다(실제 기본값은 6)
   });
   const seen = [];
   async function post(body, opts = {}) {
@@ -171,7 +213,7 @@ function setup({ over, clock } = {}) {
     seen.push(res.text);
     return res;
   }
-  // 로그인했고 아직 공간이 없는 친구
+  // 로그인한 친구 (방은 sb.db.addMember로 넣음)
   function seedUser(id = '11111111-2222-4333-8444-555555555555', email = `friend@${DOMAIN}`) {
     sb.db.users.set(id, { email, password: PW });
     return { id, token: tokenOf(id) };
@@ -309,16 +351,100 @@ test('cf-connecting-ip가 없으면 소켓 주소로 셈', async () => {
   assert.equal((await post(form(), { ip: '' })).status, 429);
 });
 
-test('코드는 맞고 아이디가 이미 있으면(409) 횟수를 세지 않음, 틀린 코드는 그대로 셈', async () => {
+test('성공은 코드 맞히기 횟수에 안 셈: 같은 IP에서 가입 3번 200, 4번째는 계정 제한 429, 코드 맞히기는 5번 그대로 남음', async () => {
+  const { post, join, seedUser, sb, logs, t } = setup();
+  const u = seedUser();
+  sb.db.invites.set('W55555555', 'open');
+  sb.db.addRoom('B0000001', 1);
+  const codes = [INVITE, SPACE, 'B0000001'];
+  for (const [i, code] of codes.entries()) {
+    const r = await post(form({ code, username: `user${i}` }));
+    assert.equal(r.status, 200, `성공 ${i}`);
+  }
+  const before = sb.calls.length;
+  const fourth = await post(form({ code: 'W55555555', username: 'user3' }));
+  assert.equal(fourth.status, 429);
+  assert.match(fourth.json.error, /시도가 너무 많아요/);
+  assert.equal(sb.calls.length, before); // 막힌 가입은 Supabase까지 가지 않음
+  assert.equal(sb.db.invites.get('W55555555'), 'open');
+  assert.ok(logs.includes('signup invite limited:account_ip'));
+  assert.equal((await post(form({ code: 'W9999999A', username: 'guess' }))).status, 429); // 오늘은 이 IP에서 가입이 막힘
+  // 코드 맞히기 횟수(참여와 나눠 씀)는 하나도 안 썼음: 틀린 코드 5번까지 400, 6번째 429
+  for (let i = 0; i < 5; i++) assert.equal((await join(joinForm({ code: '99999999' }), { token: u.token })).status, 400);
+  assert.equal((await join(joinForm({ code: '99999999' }), { token: u.token })).status, 429);
+  assert.equal(logs.filter((l) => / ok$/.test(l)).length, 3);
+  t.now += 24 * 3600_000; // 하루 지나면 둘 다 풀림
+  assert.equal((await post(form({ code: 'W55555555', username: 'user4' }))).status, 200);
+});
+
+test('계정 제한: 방 코드 가입→나가기를 되풀이해도 같은 IP에서 4번째 계정은 429', async () => {
+  const { post, sb, logs } = setup();
+  for (let i = 0; i < 3; i++) {
+    assert.equal((await post(form({ code: SPACE, username: `loop${i}` }))).status, 200, `가입 ${i}`);
+    sb.db.spaces.get(SPACE).n = 1; // 새 계정이 leave_room으로 나간 셈: 자리는 다시 빔
+  }
+  const r = await post(form({ code: SPACE, username: 'loop3' }));
+  assert.equal(r.status, 429);
+  assert.equal(sb.db.users.size, 3);
+  assert.ok(logs.includes('signup space limited:account_ip'));
+  assert.equal((await post(form({ code: SPACE, username: 'other' }), { ip: '198.51.100.77' })).status, 200); // 다른 IP는 됨
+});
+
+test('계정 제한: IP가 달라도 전체 하루 20개까지 (성공은 코드 맞히기 전체 30번에는 안 셈)', async () => {
+  const { post, sb, logs } = setup();
+  for (let r = 0; r < 5; r++) sb.db.addRoom(`D000000${r}`, 0);
+  for (let i = 0; i < 20; i++) {
+    const code = `D000000${Math.floor(i / 4)}`;
+    assert.equal((await post(form({ code, username: `many${i}` }), { ip: `198.51.100.${i}` })).status, 200, `가입 ${i}`);
+  }
+  sb.db.addRoom('D0000009', 0);
+  const r = await post(form({ code: 'D0000009', username: 'many20' }), { ip: '192.0.2.1' });
+  assert.equal(r.status, 429);
+  assert.ok(logs.includes('signup space limited:account_global'));
+  assert.equal(sb.db.users.size, 20);
+});
+
+test('계정 제한: 실패(틀린 코드·약한 비밀번호·닉네임 거절·찬 방)로 계정이 안 남으면 안 셈', async () => {
   const { post, sb } = setup();
+  for (let i = 0; i < 4; i++) assert.equal((await post(form({ code: 'W9999999A', username: `bad${i}` }))).status, 400);
+  // 코드 맞히기는 4번 썼지만 계정 수는 0: 다른 IP에서 계정 3개는 그대로 됨
+  for (let i = 0; i < 3; i++) assert.equal((await post(form({ code: SPACE, username: `ok${i}` }), { ip: '198.51.100.5' })).status, 200);
+  assert.equal(sb.db.users.size, 3);
+  const weak = setup({ over: { 'POST /auth/v1/admin/users': () => ({ status: 422, body: { error_code: 'weak_password', msg: 'x' } }) } });
+  for (let i = 0; i < 4; i++) assert.equal((await weak.post(form({ code: SPACE }))).status, 400);
+  assert.equal((await weak.post(form({ code: 'W9999999A' }))).status, 400); // 약한 비밀번호 4번 뒤에도 429 아님
+});
+
+test('제한: 성공은 전체 30번에도 들어가지 않음', async () => {
+  const { post, sb } = setup();
+  sb.db.addRoom('C0000001', 0);
+  for (let i = 0; i < 30; i++) assert.equal((await post(form({ code: 'W9999999A' }), { ip: `198.51.100.${i}` })).status, 400);
+  assert.equal((await post(form({ code: 'C0000001', username: 'late' }), { ip: '192.0.2.1' })).status, 429); // 전체가 찼음
+  const fresh = setup();
+  for (let i = 0; i < 4; i++) assert.equal((await fresh.post(form({ code: SPACE, username: `ok${i}` }), { ip: `198.51.100.${i}` })).status, 200);
+  for (let i = 0; i < 30; i++) assert.equal((await fresh.post(form({ code: 'W9999999A' }), { ip: `203.0.113.${i}` })).status, 400);
+  assert.equal((await fresh.post(form({ code: 'W9999999A' }), { ip: '192.0.2.1' })).status, 429);
+});
+
+test('코드는 맞고 아이디가 이미 있으면(409) 코드 맞히기 횟수는 안 셈, 계정 제한에는 셈(아이디 알아보기 막기)', async () => {
+  const { post, join, seedUser, sb, logs } = setup();
+  const u = seedUser('99999999-2222-4333-8444-555555555555', `other@${DOMAIN}`);
   sb.db.users.set('existing', { email: `minsu@${DOMAIN}`, password: 'x' });
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 2; i++) {
     assert.equal((await post(form())).status, 409, `가입 코드 ${i}`);
     assert.equal(sb.db.invites.get(INVITE), 'open');
   }
-  for (let i = 0; i < 6; i++) assert.equal((await post(form({ code: SPACE }))).status, 409, `공간 코드 ${i}`);
-  for (let i = 0; i < 5; i++) assert.equal((await post(form({ code: 'W9999999A' }))).status, 400);
-  assert.equal((await post(form({ username: 'fresh' }))).status, 429);
+  assert.equal((await post(form({ code: SPACE }))).status, 409, '방 코드');
+  const r = await post(form({ code: SPACE }));
+  assert.equal(r.status, 429); // 계정 제한(IP마다 하루 3번)
+  assert.ok(logs.includes('signup space limited:account_ip'));
+  // 코드 맞히기 횟수는 그대로 남아 있음: 틀린 코드 5번까지 400, 6번째 429
+  for (let i = 0; i < 5; i++) assert.equal((await join(joinForm({ code: '99999999' }), { token: u.token })).status, 400);
+  assert.equal((await join(joinForm({ code: '99999999' }), { token: u.token })).status, 429);
+  assert.ok(logs.includes('join limited:ip'));
+  // 다른 IP에서는 중복 확인이 다시 되지만, 그 IP도 하루 3번까지
+  for (let i = 0; i < 3; i++) assert.equal((await post(form(), { ip: '198.51.100.40' })).status, 409);
+  assert.equal((await post(form(), { ip: '198.51.100.40' })).status, 429);
 });
 
 test('약한 비밀번호·쓸 수 없는 아이디도 횟수를 세지 않음', async () => {
@@ -336,6 +462,7 @@ test('가입 코드로 가입: 아이디 계정, 메일 인증 없음, 계정 ID
   const r = await post(form({ code: 'w-2345-6789', username: 'MinSu' }));
   assert.equal(r.status, 200);
   assert.equal(r.json.joined, false);
+  assert.equal(r.json.couple_id, null); // 방은 앱에서 만든다
   assert.match(r.json.access_token, /^at\./);
   assert.match(r.json.refresh_token, /^rt-/);
   assert.equal(r.headers['cache-control'], 'no-store');
@@ -359,10 +486,12 @@ test('가입 코드로 가입: 아이디 계정, 메일 인증 없음, 계정 ID
   assert.equal(again.json.error, s.MSG.badCode);
 });
 
-test('쓸 수 없는 코드(없음·취소·만료·이미 씀·찬 공간)는 모두 같은 문구', async () => {
+test('쓸 수 없는 코드(없음·취소·만료·이미 씀·5명 찬 방·지우는 중인 방)는 모두 같은 문구', async () => {
   const { post, sb } = setup();
   sb.db.invites.set('W55555555', 'used:someone');
-  const codes = ['W9999999A', 'W33333333', 'W44444444', 'W55555555', 'FFFF0000', '00000000'];
+  sb.db.addRoom('DE1E7E00', 1);
+  sb.db.spaces.get('DE1E7E00').deleting = true;
+  const codes = ['W9999999A', 'W33333333', 'W44444444', 'W55555555', 'FFFF0000', 'DE1E7E00', '00000000'];
   const answers = [];
   for (const [i, code] of codes.entries()) answers.push(await post(form({ code }), { ip: `198.51.100.${i}` }));
   for (const r of answers) {
@@ -484,13 +613,15 @@ test('가입 코드: claim 자체가 실패(SQL 없음 등)하면 502, 계정은
   assert.equal(sb.db.users.size, 0);
 });
 
-// ---------- 공간 코드로 가입 ----------
-test('공간 코드로 가입: 바로 그 공간에 들어감 (secret key로 join_couple_for, 그 사람 ID로)', async () => {
+// ---------- 방 코드로 가입 ----------
+test('방 코드로 가입: 바로 그 방에 들어감 (secret key로 join_couple_for, 그 사람 ID로), 응답에 방 id', async () => {
   const { post, sb, logs } = setup();
+  sb.db.spaces.get(SPACE).n = 4;
   const r = await post(form({ code: 'abcd-ef12', username: 'partner', displayName: '지훈' }));
   assert.equal(r.status, 200);
   assert.equal(r.json.joined, true);
-  assert.equal(sb.db.spaces.get(SPACE), 2);
+  assert.equal(r.json.couple_id, ROOM_A);
+  assert.equal(sb.db.spaces.get(SPACE).n, 5);
   assert.deepEqual(sb.paths(), [
     'POST /rest/v1/rpc/space_code_open', 'POST /auth/v1/admin/users', 'POST /auth/v1/token', 'POST /rest/v1/rpc/join_couple_for',
   ]);
@@ -499,25 +630,26 @@ test('공간 코드로 가입: 바로 그 공간에 들어감 (secret key로 joi
   assert.deepEqual(join.body, { p_user: id, p_invite_code: SPACE, p_display_name: '지훈' });
   assert.equal(join.headers.apikey, SECRET);
   assert.deepEqual(logs, ['signup space ok']);
-  // 공간이 찼으니 같은 코드로는 더 못 들어감
-  const third = await post(form({ code: SPACE, username: 'third' }));
-  assert.equal(third.status, 400);
-  assert.equal(third.json.error, s.MSG.badCode);
+  // 5명이 찼으니 같은 코드로는 더 못 들어감 (계정도 안 만듦)
+  const sixth = await post(form({ code: SPACE, username: 'sixth' }));
+  assert.equal(sixth.status, 400);
+  assert.equal(sixth.json.error, s.MSG.badCode);
+  assert.equal(sb.db.users.size, 1);
 });
 
-test('공간 코드: 이미 쓰는 아이디면 409, 공간은 그대로', async () => {
+test('방 코드: 이미 쓰는 아이디면 409, 방은 그대로', async () => {
   const { post, sb } = setup();
   sb.db.users.set('existing', { email: `partner@${DOMAIN}`, password: 'x' });
   const r = await post(form({ code: SPACE, username: 'partner' }));
   assert.equal(r.status, 409);
-  assert.equal(sb.db.spaces.get(SPACE), 1);
+  assert.equal(sb.db.spaces.get(SPACE).n, 1);
   assert.ok(!sb.paths().includes('POST /rest/v1/rpc/join_couple_for'));
 });
 
-test('공간 코드: 그사이 공간이 참(경쟁) → 계정 지우고 같은 일반 문구', async () => {
+test('방 코드: 그사이 방이 5명으로 참(경쟁) → 계정 지우고 같은 일반 문구', async () => {
   const { post, sb, logs } = setup({
     over: {
-      'POST /rest/v1/rpc/join_couple_for': () => ({ status: 400, body: { code: 'P0001', message: 'couple_full' } }),
+      'POST /rest/v1/rpc/join_couple_for': () => ({ status: 400, body: { code: 'P0001', message: 'room_full' } }),
     },
   });
   const r = await post(form({ code: SPACE, username: 'partner' }));
@@ -528,7 +660,29 @@ test('공간 코드: 그사이 공간이 참(경쟁) → 계정 지우고 같은
   assert.deepEqual(logs, ['signup space bad_code_raced']);
 });
 
-test('공간 코드: 참여 응답이 끊겼지만 실제로 들어갔으면 성공', async () => {
+test('방 코드: DB가 닉네임을 거절하면 계정 지우고 이름 문구, 횟수는 안 셈', async () => {
+  const { post, sb, logs } = setup({
+    over: { 'POST /rest/v1/rpc/join_couple_for': () => ({ status: 400, body: { code: 'P0001', message: 'invalid_display_name' } }) },
+  });
+  for (let i = 0; i < 7; i++) {
+    const r = await post(form({ code: SPACE, username: `partner${i}` }));
+    assert.equal(r.status, 400);
+    assert.equal(r.json.error, s.MSG.displayName);
+  }
+  assert.equal(sb.db.users.size, 0);
+  assert.equal(logs[0], 'signup space bad_name');
+});
+
+test('방 코드: 응답이 끊겼고 확인해 보니 그 방에 없으면 계정 지우고 502', async () => {
+  const { post, sb, logs } = setup({ over: { 'POST /rest/v1/rpc/join_couple_for': () => { throw new Error('timeout'); } } });
+  const r = await post(form({ code: SPACE, username: 'partner' }));
+  assert.equal(r.status, 502);
+  assert.equal(r.json.error, s.MSG.failed);
+  assert.equal(sb.db.users.size, 0);
+  assert.deepEqual(logs, ['signup space fail:join']);
+});
+
+test('방 코드: 참여 응답이 끊겼지만 실제로 그 방에 들어갔으면 성공 (방 id도 줌)', async () => {
   const { post, sb } = setup({
     over: {
       'POST /rest/v1/rpc/join_couple_for': (c, db, base) => { base(c); throw new Error('timeout'); },
@@ -537,11 +691,17 @@ test('공간 코드: 참여 응답이 끊겼지만 실제로 들어갔으면 성
   const r = await post(form({ code: SPACE, username: 'partner' }));
   assert.equal(r.status, 200);
   assert.equal(r.json.joined, true);
+  assert.equal(r.json.couple_id, ROOM_A);
   assert.equal(sb.db.users.size, 1);
-  assert.equal(sb.db.spaces.get(SPACE), 2);
+  assert.equal(sb.db.spaces.get(SPACE).n, 2);
+  const check = sb.calls.find((c) => c.path.startsWith('/rest/v1/couple_members'));
+  const q = new URL(`${SUPA}${check.path}`).searchParams;
+  assert.equal(q.get('select'), 'couple_id,couples!inner(invite_code)');
+  assert.equal(q.get('couples.invite_code'), `eq.${SPACE}`);
+  assert.equal(check.headers.apikey, SECRET);
 });
 
-test('공간 코드: 참여 응답도 끊기고 멤버 확인도 실패 → 계정을 지우지 않음 (상대 공간이 코드 없이 남지 않게)', async () => {
+test('방 코드: 참여 응답도 끊기고 멤버 확인도 실패 → 계정을 지우지 않음 (들어갔을 수도 있으니)', async () => {
   const { post, sb, logs } = setup({
     over: {
       'POST /rest/v1/rpc/join_couple_for': (c, db, base) => { base(c); throw new Error('timeout'); },
@@ -552,21 +712,21 @@ test('공간 코드: 참여 응답도 끊기고 멤버 확인도 실패 → 계�
   assert.equal(r.status, 502);
   assert.equal(r.json.error, s.MSG.joinUnknown);
   assert.equal(sb.db.users.size, 1);
-  assert.equal(sb.db.spaces.get(SPACE), 2);
+  assert.equal(sb.db.spaces.get(SPACE).n, 2);
   assert.ok(!sb.paths().some((p) => p.startsWith('DELETE ')));
   assert.deepEqual(logs, ['signup cleanup skipped:join_unknown', 'signup space fail:join_unknown']);
 });
 
-test('공간 코드: 참여 실패(서버 오류) → 계정 지움', async () => {
+test('방 코드: 참여 실패(서버 오류) → 계정 지움', async () => {
   const { post, sb, logs } = setup({ over: { 'POST /rest/v1/rpc/join_couple_for': () => ({ status: 500, body: { message: 'x' } }) } });
   const r = await post(form({ code: SPACE, username: 'partner' }));
   assert.equal(r.status, 502);
   assert.equal(sb.db.users.size, 0);
-  assert.equal(sb.db.spaces.get(SPACE), 1);
+  assert.equal(sb.db.spaces.get(SPACE).n, 1);
   assert.deepEqual(logs, ['signup space fail:join']);
 });
 
-test('공간 코드: 로그인 실패 → 계정 지움, 참여는 안 함', async () => {
+test('방 코드: 로그인 실패 → 계정 지움, 참여는 안 함', async () => {
   const { post, sb } = setup({ over: { 'POST /auth/v1/token': () => ({ status: 503, body: {} }) } });
   const r = await post(form({ code: SPACE, username: 'partner' }));
   assert.equal(r.status, 502);
@@ -574,14 +734,14 @@ test('공간 코드: 로그인 실패 → 계정 지움, 참여는 안 함', asy
   assert.ok(!sb.paths().includes('POST /rest/v1/rpc/join_couple_for'));
 });
 
-test('공간 코드: 계정은 만들어졌는데 응답이 끊김 → 미리 정한 ID로 지움, 공간은 그대로', async () => {
+test('방 코드: 계정은 만들어졌는데 응답이 끊김 → 미리 정한 ID로 지움, 방은 그대로', async () => {
   const { post, sb, logs } = setup({
     over: { 'POST /auth/v1/admin/users': (c, db, base) => { base(c); throw new Error('timeout'); } },
   });
   const r = await post(form({ code: SPACE, username: 'partner' }));
   assert.equal(r.status, 502);
   assert.equal(sb.db.users.size, 0);
-  assert.equal(sb.db.spaces.get(SPACE), 1);
+  assert.equal(sb.db.spaces.get(SPACE).n, 1);
   assert.ok(!sb.paths().includes('POST /auth/v1/token'));
   assert.deepEqual(logs, ['signup space fail:create']);
 });
@@ -604,10 +764,10 @@ test('참여: 로그인한 사람을 확인하고 secret key로 그 사람을 �
   const u = seedUser();
   const r = await join(joinForm({ code: 'abcd-ef12' }), { token: u.token });
   assert.equal(r.status, 200);
-  assert.deepEqual(r.json, { joined: true });
+  assert.deepEqual(r.json, { joined: true, couple_id: ROOM_A });
   assert.equal(r.headers['cache-control'], 'no-store');
-  assert.equal(sb.db.members.get(u.id), SPACE);
-  assert.equal(sb.db.spaces.get(SPACE), 2);
+  assert.deepEqual([...sb.db.members.get(u.id)], [ROOM_A]);
+  assert.equal(sb.db.spaces.get(SPACE).n, 2);
   assert.deepEqual(sb.paths(), ['GET /auth/v1/user', 'POST /rest/v1/rpc/join_couple_for']);
   const who = sb.calls[0];
   assert.equal(who.headers.apikey, PUB);
@@ -616,7 +776,7 @@ test('참여: 로그인한 사람을 확인하고 secret key로 그 사람을 �
   assert.deepEqual(logs, ['join ok']);
 });
 
-test('참여: 틀린 코드·찬 공간·이미 공간 있음 문구', async () => {
+test('참여: 틀린 코드·5명 찬 방·방 3개 초과 문구', async () => {
   const { join, sb, seedUser } = setup();
   const u = seedUser();
   let r = await join(joinForm({ code: '99999999' }), { token: u.token });
@@ -625,10 +785,33 @@ test('참여: 틀린 코드·찬 공간·이미 공간 있음 문구', async () 
   r = await join(joinForm({ code: 'FFFF0000' }), { token: u.token });
   assert.equal(r.status, 400);
   assert.equal(r.json.error, s.MSG.joinFull);
-  sb.db.members.set(u.id, 'FFFF0000');
+  for (const code of ['A0000001', 'A0000002', 'A0000003']) sb.db.addMember(u.id, code);
   r = await join(joinForm(), { token: u.token });
   assert.equal(r.status, 409);
-  assert.equal(r.json.error, s.MSG.joinAlready);
+  assert.equal(r.json.error, s.MSG.tooManyRooms);
+  assert.equal(sb.db.spaces.get(SPACE).n, 1);
+  assert.equal(sb.db.members.get(u.id).size, 3);
+});
+
+test('참여: 방이 이미 1~2개 있어도 들어감, 같은 방에 다시 보내면 같은 방 id로 200 (아무것도 안 바뀜)', async () => {
+  const { join, sb, seedUser, logs } = setup();
+  const u = seedUser();
+  const first = sb.db.addMember(u.id, 'A0000001');
+  const second = sb.db.addMember(u.id, 'A0000002');
+  let r = await join(joinForm(), { token: u.token });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json, { joined: true, couple_id: ROOM_A });
+  assert.deepEqual([...sb.db.members.get(u.id)], [first, second, ROOM_A]);
+  assert.equal(sb.db.spaces.get(SPACE).n, 2);
+  // 방 3개가 됐어도 이미 들어간 방이면 성공 (too_many_rooms보다 먼저 봄)
+  r = await join(joinForm({ code: 'a000 0001' }), { token: u.token });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json, { joined: true, couple_id: first });
+  assert.equal(sb.db.spaces.get('A0000001').n, 1);
+  r = await join(joinForm(), { token: u.token });
+  assert.deepEqual(r.json, { joined: true, couple_id: ROOM_A });
+  assert.equal(sb.db.spaces.get(SPACE).n, 2);
+  assert.deepEqual(logs, ['join ok', 'join ok', 'join ok']);
 });
 
 test('참여: 가입과 같은 횟수 제한을 나눠 씀 (IP마다 1시간 5번)', async () => {
@@ -640,7 +823,7 @@ test('참여: 가입과 같은 횟수 제한을 나눠 씀 (IP마다 1시간 5�
   assert.equal(sixth.status, 429);
   assert.equal(sixth.headers['retry-after'], '3600');
   assert.match(sixth.json.error, /시도가 너무 많아요/);
-  assert.equal(sb.db.spaces.get(SPACE), 1); // 막힌 요청은 참여까지 가지 않음
+  assert.equal(sb.db.spaces.get(SPACE).n, 1); // 막힌 요청은 참여까지 가지 않음
   assert.equal((await post(form({ code: 'W9999999A' }))).status, 429); // 가입도 막힘
   assert.equal((await join(joinForm(), { token: u.token, ip: '198.51.100.9' })).status, 200); // 다른 IP는 됨
 });
@@ -661,26 +844,97 @@ test('참여: 로그인 토큰이 없거나 안 맞거나 형식이 틀리면 �
   assert.ok(logs.includes('join unauthorized'));
 });
 
-test('참여: 이미 공간이 있어서 거절된 것은 횟수를 세지 않음', async () => {
-  const { join, sb, seedUser } = setup();
+test('참여: 찬 방·방 3개 초과는 코드를 맞힌 것이라 셈, 성공은 세지 않음', async () => {
+  const { join, sb, seedUser, logs } = setup();
   const a = seedUser();
-  sb.db.members.set(a.id, 'FFFF0000');
-  for (let i = 0; i < 7; i++) assert.equal((await join(joinForm({ code: '99999999' }), { token: a.token })).status, 409);
-  const b = seedUser('99999999-2222-4333-8444-555555555555', `other@${DOMAIN}`);
-  for (let i = 0; i < 5; i++) assert.equal((await join(joinForm({ code: '99999999' }), { token: b.token })).status, 400);
-  assert.equal((await join(joinForm(), { token: b.token })).status, 429);
+  for (let i = 0; i < 7; i++) assert.equal((await join(joinForm(), { token: a.token })).status, 200); // 같은 방 다시: 안 셈
+  for (let i = 0; i < 3; i++) assert.equal((await join(joinForm({ code: 'FFFF0000' }), { token: a.token })).status, 400);
+  sb.db.addMember(a.id, 'A0000001');
+  sb.db.addMember(a.id, 'A0000002');
+  sb.db.addRoom('A0000003', 1);
+  for (let i = 0; i < 2; i++) assert.equal((await join(joinForm({ code: 'A0000003' }), { token: a.token })).status, 409);
+  const r = await join(joinForm({ code: '99999999' }), { token: a.token });
+  assert.equal(r.status, 429);
+  assert.equal(sb.db.spaces.get('A0000003').n, 1);
+  assert.deepEqual(logs.slice(7), ['join full', 'join full', 'join full', 'join too_many_rooms', 'join too_many_rooms', 'join limited:ip']);
 });
 
-test('참여: 응답이 끊겼어도 실제로 들어갔으면 성공, 못 들어갔으면 502', async () => {
+test('참여: DB가 닉네임을 거절하면(invalid_display_name) 이름 문구, 횟수는 안 셈', async () => {
+  const { join, seedUser, logs } = setup({
+    over: { 'POST /rest/v1/rpc/join_couple_for': () => ({ status: 400, body: { code: 'P0001', message: 'invalid_display_name' } }) },
+  });
+  const u = seedUser();
+  for (let i = 0; i < 7; i++) {
+    const r = await join(joinForm(), { token: u.token });
+    assert.equal(r.status, 400);
+    assert.equal(r.json.error, s.MSG.displayName);
+  }
+  assert.equal(logs[0], 'join bad_name');
+});
+
+test('참여: 응답이 끊겼어도 실제로 그 방에 들어갔으면 성공(방 id), 못 들어갔으면 502', async () => {
   const ok = setup({ over: { 'POST /rest/v1/rpc/join_couple_for': (c, db, base) => { base(c); throw new Error('timeout'); } } });
   const u = ok.seedUser();
-  assert.equal((await ok.join(joinForm(), { token: u.token })).status, 200);
+  const got = await ok.join(joinForm(), { token: u.token });
+  assert.equal(got.status, 200);
+  assert.deepEqual(got.json, { joined: true, couple_id: ROOM_A });
   const bad = setup({ over: { 'POST /rest/v1/rpc/join_couple_for': () => ({ status: 500, body: {} }) } });
   const v = bad.seedUser();
   const r = await bad.join(joinForm(), { token: v.token });
   assert.equal(r.status, 502);
   assert.equal(r.json.error, s.MSG.joinFailed);
   assert.deepEqual(bad.logs, ['join fail:join']);
+});
+
+test('참여: 응답이 끊겼고 다른 방에만 들어가 있으면 성공으로 치지 않음 (502, 셈)', async () => {
+  const { join, sb, seedUser, logs } = setup({ over: { 'POST /rest/v1/rpc/join_couple_for': () => { throw new Error('timeout'); } } });
+  const u = seedUser();
+  sb.db.addMember(u.id, 'A0000001');
+  const r = await join(joinForm(), { token: u.token });
+  assert.equal(r.status, 502);
+  assert.equal(r.json.error, s.MSG.joinFailed);
+  assert.deepEqual(logs, ['join fail:join']);
+  // 이 실패는 셈: 4번 더 하면 6번째는 429
+  for (let i = 0; i < 4; i++) assert.equal((await join(joinForm(), { token: u.token })).status, 502);
+  assert.equal((await join(joinForm(), { token: u.token })).status, 429);
+});
+
+test('참여: 확인 요청이 !inner 없이 다른 방 줄까지 받아도(couples: null) 성공으로 치지 않음', async () => {
+  const { join, sb, seedUser } = setup({
+    over: {
+      'POST /rest/v1/rpc/join_couple_for': () => { throw new Error('timeout'); },
+      'GET /rest/v1/couple_members': (c, db) => {
+        const id = new URL(`${SUPA}${c.path}`).searchParams.get('user_id').replace(/^eq\./, '');
+        return { status: 200, body: [...(db.members.get(id) || [])].map((couple_id) => ({ couple_id, couples: null })) };
+      },
+    },
+  });
+  const u = seedUser();
+  sb.db.addMember(u.id, 'A0000001');
+  assert.equal((await join(joinForm(), { token: u.token })).status, 502);
+});
+
+test('참여: 응답도 끊기고 멤버 확인도 실패하면 502', async () => {
+  const { join, seedUser } = setup({
+    over: {
+      'POST /rest/v1/rpc/join_couple_for': (c, db, base) => { base(c); throw new Error('timeout'); },
+      'GET /rest/v1/couple_members': () => ({ status: 503, body: {} }),
+    },
+  });
+  const u = seedUser();
+  const r = await join(joinForm(), { token: u.token });
+  assert.equal(r.status, 502);
+  assert.equal(r.json.error, s.MSG.joinFailed);
+});
+
+test('참여: 성공 응답에 방 id가 없으면(이상한 응답) 그 코드의 방인지 확인해서 방 id를 줌', async () => {
+  const { join, seedUser } = setup({
+    over: { 'POST /rest/v1/rpc/join_couple_for': (c, db, base) => { base(c); return { status: 200, body: null }; } },
+  });
+  const u = seedUser();
+  const r = await join(joinForm(), { token: u.token });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json, { joined: true, couple_id: ROOM_A });
 });
 
 test('참여: 로그인 확인이 안 되면(Supabase 오류) 502, 횟수는 안 셈', async () => {
@@ -786,7 +1040,9 @@ test('설정이 비면 만들지 않음', () => {
 test('verifySecretKey: 맞는 키, 다른 프로젝트 키, 연결 실패, SQL 미실행, join_couple_for 없음', async () => {
   const good = fakeSupabase();
   assert.deepEqual(await s.verifySecretKey({ supabaseUrl: SUPA, secretKey: SECRET, fetchImpl: good.fetchImpl }), { ok: true });
-  assert.deepEqual(good.paths(), ['GET /auth/v1/admin/users', 'POST /rest/v1/rpc/space_code_open', 'POST /rest/v1/rpc/join_couple_for']);
+  assert.deepEqual(good.paths(), [
+    'GET /auth/v1/admin/users', 'POST /rest/v1/rpc/space_code_open', 'POST /rest/v1/rpc/join_couple_for', 'POST /rest/v1/rpc/groups_schema_version',
+  ]);
   assert.equal(good.db.members.size, 0); // 확인만 하고 아무도 넣지 않음
   const wrong = fakeSupabase();
   const r1 = await s.verifySecretKey({ supabaseUrl: SUPA, secretKey: 'sb_secret_otherotherother', fetchImpl: wrong.fetchImpl });
@@ -805,4 +1061,64 @@ test('verifySecretKey: 맞는 키, 다른 프로젝트 키, 연결 실패, SQL �
   assert.equal(r3.ok, false);
   assert.equal(r3.retry, false);
   assert.match(r3.reason, /join_couple_for/);
+});
+
+test('verifySecretKey: groups.sql을 안 돌렸으면(groups_schema_version 없음) 다시 해 보지 않고 꺼 둠', async () => {
+  const noGroups = fakeSupabase({ over: { 'POST /rest/v1/rpc/groups_schema_version': () => ({ status: 404, body: { code: 'PGRST202' } }) } });
+  const r1 = await s.verifySecretKey({ supabaseUrl: SUPA, secretKey: SECRET, fetchImpl: noGroups.fetchImpl });
+  assert.equal(r1.ok, false);
+  assert.equal(r1.retry, false);
+  assert.match(r1.reason, /groups\.sql/);
+  const denied = fakeSupabase({ over: { 'POST /rest/v1/rpc/groups_schema_version': () => ({ status: 403, body: {} }) } });
+  const r2 = await s.verifySecretKey({ supabaseUrl: SUPA, secretKey: SECRET, fetchImpl: denied.fetchImpl });
+  assert.equal(r2.ok, false);
+  assert.equal(r2.retry, false);
+  const flaky = fakeSupabase({ over: { 'POST /rest/v1/rpc/groups_schema_version': () => ({ status: 503, body: {} }) } });
+  const r3 = await s.verifySecretKey({ supabaseUrl: SUPA, secretKey: SECRET, fetchImpl: flaky.fetchImpl });
+  assert.equal(r3.ok, false);
+  assert.equal(r3.retry, true);
+  const zero = fakeSupabase({ over: { 'POST /rest/v1/rpc/groups_schema_version': () => ({ status: 200, body: 0 }) } });
+  assert.equal((await s.verifySecretKey({ supabaseUrl: SUPA, secretKey: SECRET, fetchImpl: zero.fetchImpl })).ok, false);
+});
+
+// ---------- 문구 ----------
+test('문구: 예전 두 사람·공간 표현이 없음', () => {
+  for (const [k, v] of Object.entries(s.MSG)) assert.ok(!/두 사람|공간/.test(v), `MSG.${k}: ${v}`);
+  assert.equal(s.MSG.joinAlready, undefined);
+  assert.match(s.MSG.joinFull, /5명/);
+  assert.match(s.MSG.tooManyRooms, /3개/);
+});
+
+test('문구: 틀린 코드·찬 방·방 3개 초과 문구가 index.html friendly()와 글자까지 같음', (t) => {
+  const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'index.html'), 'utf8');
+  const start = html.indexOf('function friendly(');
+  assert.ok(start >= 0, 'index.html에 friendly()가 있어야 함');
+  const body = html.slice(start, html.indexOf('\n}\n', start));
+  if (!/room_full/.test(body)) { t.skip('index.html friendly()가 아직 room_full을 모름 (화면 작업 뒤에 다시 확인)'); return; }
+  const said = (code) => {
+    const m = new RegExp(`/${code}/\\.test\\(m\\)\\) return '([^']*)'`).exec(body);
+    return m && m[1];
+  };
+  assert.equal(said('invalid_code'), s.MSG.joinInvalid);
+  assert.equal(said('room_full'), s.MSG.joinFull);
+  assert.equal(said('too_many_rooms'), s.MSG.tooManyRooms);
+});
+
+test('계정 제한 기본값: 같은 IP에서 하루 6개까지 가입되고 7번째는 429', async () => {
+  const sb = fakeSupabase({});
+  const logs = [];
+  const api = s.createSignupApi({
+    supabaseUrl: SUPA, publishableKey: PUB, secretKey: SECRET, idDomain: DOMAIN, allowedOrigin: ORIGIN,
+    fetchImpl: sb.fetchImpl, now: () => 1_000_000_000_000, log: (m) => logs.push(String(m)),
+  });
+  for (let r = 0; r < 2; r++) sb.db.addRoom(`E000000${r}`, 0);
+  for (let i = 0; i < 6; i++) {
+    const res = fakeRes();
+    await api.signup(fakeReq({ body: form({ code: `E000000${Math.floor(i / 4)}`, username: `same${i}` }) }), res);
+    assert.equal(res.status, 200, `가입 ${i}`);
+  }
+  const res = fakeRes();
+  await api.signup(fakeReq({ body: form({ code: 'E0000001', username: 'same6' }) }), res);
+  assert.equal(res.status, 429);
+  assert.ok(logs.includes('signup space limited:account_ip'));
 });

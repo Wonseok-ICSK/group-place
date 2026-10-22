@@ -41,8 +41,6 @@
   --p1:#0E8C86; --p1-soft:#DDF1EF;
   --p2:#C98208; --p2-soft:#FBEFD6;
   --heart:#E5484D; --danger:#C2362F;
-  --gold-ink:#5B3A00;
-  --p1-ink:#0B746F; --p2-ink:#A36600; /* 도장 글씨: 밝은 화면에선 각자 색을 조금 진하게 */
   --r-s:8px; --r-m:14px; --r-l:22px;
   --gutter:16px;
 }
@@ -53,7 +51,6 @@
     --p1:#3CC2B9; --p1-soft:#14363A;
     --p2:#F0B23E; --p2-soft:#3A2D14;
     --heart:#FF6B70; --danger:#FF7A72;
-    --p1-ink:#3CC2B9; --p2-ink:#F0B23E;
   }
 }
 *{box-sizing:border-box}
@@ -121,16 +118,23 @@ textarea.input{resize:vertical;min-height:84px;line-height:1.6}
 
 /* ---------- main ---------- */
 .top{position:sticky;top:0;z-index:5;background:var(--bg);padding-top:env(safe-area-inset-top)}
-.top-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0 10px}
-.title{margin:0;font-size:22px;font-weight:800;letter-spacing:-0.03em}
-.top-actions{display:flex;align-items:center;gap:2px}
-.duo{display:flex;gap:12px;font-size:13px;color:var(--muted);margin-top:2px}
-.duo span{display:inline-flex;align-items:center;gap:5px}
-.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
-.v1 .dot,.dot.v1{background:var(--p1)}
-.v2 .dot,.dot.v2{background:var(--p2)}
-.v1{--c:var(--p1);--c-soft:var(--p1-soft)}
-.v2{--c:var(--p2);--c-soft:var(--p2-soft)}
+/* 360px 폰에서 방 이름(30자)과 멤버 5명이 아이콘 두 개를 밀어내지 않게: 왼쪽 칸이 줄어들고 줄바꿈 */
+.top-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:14px 0 10px}
+.top-head{flex:1;min-width:0;padding-top:2px}
+.title{margin:0;font-size:22px;line-height:1.35;font-weight:800;letter-spacing:-0.03em;overflow-wrap:anywhere}
+.top-actions{flex:none;display:flex;align-items:center;gap:2px}
+.duo{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:13px;color:var(--muted);margin-top:3px} /* 멤버가 5명까지라 줄바꿈 */
+.duo>span{display:inline-flex;align-items:center;gap:5px;min-width:0;max-width:100%}
+.nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} /* 닉네임(20자까지)이 길면 말줄임 */
+.duo .nm{max-width:9em}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none;background:var(--c,var(--line-strong))}
+/* 멤버 색: .mc-<색 id>가 --c를 정함 (40가지, 밝은/어두운 화면 값은 아래 MEMBER_COLORS에서 만듦). 나간 멤버는 .mc-none */
+.mc{--c-soft:var(--sunken)}
+@supports (background:color-mix(in srgb,red 16%,white)){
+  .mc{--c-soft:color-mix(in srgb,var(--c) 16%,var(--surface))}
+  @media (prefers-color-scheme: dark){.mc{--c-soft:color-mix(in srgb,var(--c) 24%,var(--surface))}}
+}
+.mc-none{--c:var(--line-strong)}
 
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
 .tabs button{
@@ -183,7 +187,12 @@ textarea.input{resize:vertical;min-height:84px;line-height:1.6}
   display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 8px;border-radius:999px;
   background:var(--c-soft);font-size:13px;font-weight:650;
 }
-.voice-tag.empty{background:transparent;border:1px dashed var(--line-strong);color:var(--muted);font-weight:500}
+.voice-tag .nm{max-width:7em}
+/* 멤버가 3명 이상인 방: 별 5개 대신 '점 + 닉네임 + ★숫자'로 줄여서 5명이 남겨도 카드가 길어지지 않게 */
+.voice-tag.mini{gap:4px;padding:3px 9px 3px 7px;font-size:12.5px}
+.voice-tag .sc{display:inline-flex;align-items:center;gap:2px;font-weight:800;font-variant-numeric:tabular-nums}
+.voice-tag .sc svg{width:12px;height:12px;display:block}
+.voice-tag .sc path{fill:var(--c)}
 .stars{display:inline-flex;gap:1px;vertical-align:middle}
 .stars svg{display:block}
 .stars path{fill:var(--line-strong)}
@@ -220,6 +229,8 @@ textarea.input{resize:vertical;min-height:84px;line-height:1.6}
 @keyframes rise{from{transform:translateY(24px);opacity:.4}to{transform:none;opacity:1}}
 @keyframes fade{from{opacity:0}}
 @media (prefers-reduced-motion:reduce){.sheet,.sheet-backdrop{animation:none}}
+/* 다크 모드: 시트 바탕이 화면 바탕과 같은 색이라 뒤를 더 어둡게 하고 위쪽 테두리를 그림 */
+@media (prefers-color-scheme: dark){.sheet-backdrop{background:rgba(0,0,0,.62)}.sheet{box-shadow:0 -1px 0 var(--line-strong)}}
 
 .detail-name{font-size:26px;line-height:1.25;font-weight:800;letter-spacing:-0.03em;margin:6px 0 6px}
 .detail-meta{display:flex;align-items:flex-start;gap:8px;color:var(--muted);font-size:14px}
@@ -245,10 +256,11 @@ textarea.input{resize:vertical;min-height:84px;line-height:1.6}
 .input.date{width:auto;padding:6px 10px}
 .vrow{border-left:3px solid var(--c);padding:1px 0 1px 11px;margin-top:10px}
 .vrow-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px}
-.voice-who{display:flex;align-items:center;gap:7px;font-weight:750}
+.voice-who{display:flex;align-items:center;gap:7px;font-weight:750;min-width:0}
 .you{font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--c-soft);color:var(--ink)}
 .voice-body{margin:4px 0 0;white-space:pre-wrap;word-break:break-word}
 .voice-empty{color:var(--muted);font-size:14px;margin:2px 0 0}
+.visit>.voice-empty{margin-top:8px}
 .rate-input{display:flex;margin:6px 0 10px -3px}
 .rs{position:relative;display:block;padding:3px}
 .rs svg{width:32px;height:32px;display:block}
@@ -260,7 +272,9 @@ textarea.input{resize:vertical;min-height:84px;line-height:1.6}
 .rs button:last-of-type{right:0;border-radius:0 8px 8px 0}
 .voice-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px}
 .voice-actions .btns{display:flex;align-items:center;gap:4px}
-.danger-zone{margin-top:32px;padding-top:16px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted)}
+.by{display:inline-flex;align-items:center;gap:6px;min-width:0;overflow-wrap:anywhere}
+.danger-zone{margin-top:32px;padding-top:16px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:12.5px;color:var(--muted)}
+.danger-zone .text-btn{flex:none;white-space:nowrap}
 
 .cat-pick{display:flex;flex-wrap:wrap;gap:6px}
 .chip.add{border-style:dashed}
@@ -297,13 +311,10 @@ textarea.input{resize:vertical;min-height:84px;line-height:1.6}
 
 /* ---------- 명예의 전당: 우승 도장, 준우승 태그, 역대 기록 ---------- */
 .stamp-wrap{position:relative;display:inline-block;flex:none;line-height:0}
-.stamp{--rot:-15deg;display:inline-block;width:var(--sz,52px);height:var(--sz,52px);color:var(--c);transform:rotate(var(--rot))}
-.stamp.v1{color:var(--p1-ink)}
-.stamp.v2{color:var(--p2-ink)}
+.stamp{--rot:-15deg;display:inline-block;width:var(--sz,52px);height:var(--sz,52px);color:var(--c);transform:rotate(var(--rot))} /* 도장 색 = 고른 멤버 색 */
 .stamp svg{display:block;width:100%;height:100%;overflow:visible}
 .stamp text{font-family:inherit}
-.stamp.gold{color:var(--gold-ink)}
-@media (prefers-color-scheme: light){.stamp:not(.gold) svg{mix-blend-mode:multiply}}
+@media (prefers-color-scheme: light){.stamp svg{mix-blend-mode:multiply}}
 .stamp.fresh{animation:stamp-in .6s cubic-bezier(.2,.9,.3,1.15) both}
 @keyframes stamp-in{
   0%{opacity:0;transform:scale(2) rotate(calc(var(--rot) - 16deg))}
@@ -320,30 +331,25 @@ textarea.input{resize:vertical;min-height:84px;line-height:1.6}
 .list{overflow-x:clip} /* '쾅' 하고 커졌다 줄어드는 도장이 화면 옆으로 삐져나가지 않게 */
 /* 준우승 태그는 길면 주소와 같이 줄어들며 말줄임 */
 .tag{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--c-soft);color:var(--ink);white-space:nowrap}
-.tag.gold{background:linear-gradient(135deg,#FFF8D6,#F8DC74 55%,#FFEEAA);color:var(--gold-ink)}
 .meta .cat{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 준우승 태그가 있으면 칸이 모자랄 때 주소부터 줄이고, 그래도 모자라면 카테고리와 태그가 나눠서 말줄임 */
 .meta.has-tag{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,max-content) minmax(0,1fr)}
 .meta.has-tag>*{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .honors{display:flex;flex-wrap:wrap;gap:12px 14px;margin-top:16px}
 .honor{display:flex;flex-direction:column;align-items:center;gap:6px;width:74px;text-align:center;--sz:64px}
-.honor small{font-size:11.5px;font-weight:600;color:var(--muted);line-height:1.3}
+.honor small{font-size:11.5px;font-weight:600;color:var(--muted);line-height:1.3;overflow-wrap:anywhere}
 .honor-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
 .win-stamp{display:flex;justify-content:center;margin:18px 0 6px;--sz:112px}
 .win-msg{margin:6px 0 0;font-weight:700}
-.win-msg b{color:var(--gold-ink)}
-@media (prefers-color-scheme: dark){.win-msg b{color:#F3D36E}}
 .rec-year{font-size:14px;font-weight:750;margin:22px 0 10px}
 .rec-year:first-of-type{margin-top:14px}
 .rec{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);padding:12px 16px 14px}
 .rec+.rec{margin-top:10px}
-.rec.both{border-color:#EBC24A}
 .rec-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .rec-title{font-weight:750;letter-spacing:-0.02em}
-.gold-badge{flex:none;font-size:12px;font-weight:800;padding:2px 9px;border-radius:999px;background:linear-gradient(135deg,#FFF8D6,#F8DC74 45%,#FFEEAA 75%,#EBC24A);color:var(--gold-ink)}
 .rec-row{border-left:3px solid var(--c);padding:1px 0 1px 11px;margin-top:10px}
 .rec-line{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px}
-.rec-row .who{display:flex;align-items:center;gap:7px;font-weight:750;font-size:14px}
+.rec-row .who{display:flex;align-items:center;gap:7px;font-weight:750;font-size:14px;min-width:0}
 .rec-win{display:flex;align-items:center;gap:6px;margin-top:2px;font-weight:750;font-size:16px;line-height:1.35}
 .rec-win svg{width:17px;height:17px;flex:none;color:var(--c)}
 .rec-sub{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -386,6 +392,31 @@ textarea.input.url{min-height:0;resize:none;line-height:1.45}
 .row{display:flex;gap:8px;align-items:flex-end}
 .row .field{flex:1;margin:0}
 
+/* ---------- 방: 방 고르기, 내 정보의 방·멤버 ---------- */
+.room-list{list-style:none;margin:0;padding:0}
+.room-list li+li{margin-top:10px}
+.room-card{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-m);padding:14px 16px}
+.room-card:active{background:var(--sunken)}
+.room-top{display:flex;align-items:center;gap:8px;min-width:0}
+.room-name{font-size:17px;font-weight:750;letter-spacing:-0.02em;line-height:1.35;min-width:0;overflow-wrap:anywhere}
+.room-meta{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-top:6px;font-size:13.5px;color:var(--muted)}
+.room-dots{display:inline-flex;gap:3px}
+.room-actions{display:flex;gap:8px;margin-top:14px}
+.room-actions .btn{flex:1}
+.badge{flex:none;font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--sunken);color:var(--muted)}
+.member-list{list-style:none;margin:0;padding:0}
+.member-list li{display:flex;align-items:center;gap:7px;padding:7px 0;font-weight:650;min-width:0;overflow-wrap:anywhere}
+.member-list li+li{border-top:1px solid var(--line)}
+.member-count{font-weight:600;color:var(--muted);margin-left:5px;font-variant-numeric:tabular-nums}
+.room-title{font-size:17px;font-weight:750;margin:0;overflow-wrap:anywhere}
+/* 내 색 고르기: 지름 32px 동그라미, 한 줄 8개. 다른 멤버가 쓰는 색은 아예 안 보여 줌 */
+.swatches{display:grid;grid-template-columns:repeat(8,32px);justify-content:space-between;gap:10px 0}
+.swatch{width:32px;height:32px;border-radius:50%;border:0;padding:0;background:var(--c);display:grid;place-items:center;color:var(--surface)}
+.swatch svg{width:18px;height:18px;display:none}
+.swatch[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--ink)}
+.swatch[aria-pressed="true"] svg{display:block}
+.swatches[aria-busy="true"] .swatch{opacity:.6;cursor:default}
+
 /* ---------- toast ---------- */
 #toast{
   position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translate(-50%,20px);
@@ -401,7 +432,7 @@ textarea.input.url{min-height:0;resize:none;line-height:1.45}
 <div id="sheet-root"></div>
 <div id="viewer-root"></div>
 <div id="toast" role="status" aria-live="polite"></div>
-<!-- 도장용: 인주가 고르게 안 묻은 느낌(번짐·얼룩), 황금 도장 색 -->
+<!-- 도장용: 인주가 고르게 안 묻은 느낌(번짐·얼룩) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
   <filter id="stamp-ink" x="-6%" y="-6%" width="112%" height="112%">
     <feTurbulence type="fractalNoise" baseFrequency=".45" numOctaves="2" seed="7" result="noise"/>
@@ -410,10 +441,6 @@ textarea.input.url{min-height:0;resize:none;line-height:1.45}
     <feTurbulence type="fractalNoise" baseFrequency=".05" numOctaves="1" seed="3" result="warp"/>
     <feDisplacementMap in="inked" in2="warp" scale="2" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
-  <linearGradient id="stamp-gold" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#FFFBE0"/><stop offset=".3" stop-color="#FBE387"/><stop offset=".55" stop-color="#F2C94C"/>
-    <stop offset=".78" stop-color="#FFEFAE"/><stop offset="1" stop-color="#E8B93A"/>
-  </linearGradient>
 </defs></svg>
 
 <script>
@@ -433,7 +460,7 @@ const SIGNUP_ENABLED = false;
 
 const BUCKET = 'place-photos';
 // 설정 화면 맨 아래에 보이는 버전. 배포할 때마다 README 업데이트 노트와 같이 올림 ('v버전: 배포일 YYMMDD')
-const APP_VERSION = 'v1.7.1: 261021';
+const APP_VERSION = 'v0.1.0: 261022';
 
 /* ---------- 작은 도우미 ---------- */
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -470,11 +497,11 @@ function rateInput(n) {
   }
   return `<div class="rate-input" role="group" aria-label="내 별점">${s}</div>`;
 }
-// 받침에 맞는 조사: josa('지훈', '이', '가') → '지훈이'
+// 받침에 맞는 조사: josa('지훈', '이', '가') → '지훈이'. 끝의 괄호·기호는 건너뜀: '도윤 (주말만 가능)' → '…가능)이'
 const josa = (word, withFinal, withoutFinal) => {
-  const ch = String(word).trim().slice(-1);
+  const ch = String(word).trim().replace(/[^\p{L}\p{N}]+$/u, '').slice(-1);
   const code = ch.charCodeAt(0) - 0xac00;
-  if (code < 0 || code > 11171) return `${word}${withFinal}(${withoutFinal})`;
+  if (!(code >= 0 && code <= 11171)) return `${word}${withFinal}(${withoutFinal})`;
   return word + (code % 28 ? withFinal : withoutFinal);
 };
 const fmtDate = (iso) => {
@@ -503,9 +530,21 @@ function toast(msg, ms = 2200) {
 }
 function friendly(err) {
   const m = (err && (err.message || err.error_description || err.msg)) || String(err || '');
+  // 그룹 기능용 SQL을 아직 안 돌린 DB (새 함수·칸이 없음)
+  if (/couple_members\.color|rename_room|leave_room|set_member_color|begin_room_delete/.test(m) && /does not exist|schema cache|Could not find/i.test(m))
+    return '그룹 기능용 SQL(supabase/groups.sql)을 먼저 실행해 주세요.';
+  // 방 함수 오류 코드 (홈 서버 MSG와 글자까지 같게)
   if (/invalid_code/.test(m)) return '초대 코드를 다시 확인해 주세요.';
-  if (/couple_full/.test(m)) return '이미 두 사람이 모두 참여한 공간이에요.';
-  if (/already_in_couple/.test(m)) return '이미 참여한 공간이 있어요. 새로고침해 주세요.';
+  if (/room_full/.test(m)) return '이 방은 이미 5명이 모두 찼어요.';
+  if (/too_many_rooms/.test(m)) return '방은 3개까지 들어갈 수 있어요. 다른 방에서 나간 뒤 다시 시도해 주세요.';
+  if (/not_owner/.test(m)) return '방 이름은 방장만 바꿀 수 있어요.';
+  if (/not_last_member/.test(m)) return '그사이 다른 멤버가 들어왔어요. 다시 확인해 주세요.';
+  if (/last_member/.test(m)) return '그사이 다른 멤버가 모두 나갔어요. 다시 확인해 주세요.';
+  if (/not_member/.test(m)) return '이 방의 멤버가 아니에요. 새로고침해 주세요.';
+  if (/color_taken/.test(m)) return '그 색은 다른 멤버가 쓰고 있어요. 다른 색을 골라 주세요.';
+  if (/invalid_color/.test(m)) return '없는 색이에요. 새로고침한 뒤 다시 골라 주세요.';
+  if (/invalid_room_name|couples_name_check/.test(m)) return '방 이름을 1~30자로 입력해 주세요.';
+  if (/invalid_display_name|couple_members_display_name_check/.test(m)) return '닉네임을 1~20자로 입력해 주세요.';
   if (/Invalid login credentials/i.test(m)) return LOGIN_ID_DOMAIN ? '아이디 또는 비밀번호가 맞지 않아요.' : '이메일 또는 비밀번호가 맞지 않아요.';
   if (/Email not confirmed/i.test(m)) return '이메일 인증이 끝나지 않은 계정이에요.';
   // 친구용: DB가 join_couple을 막아 뒀는데 가입·참여 서버가 아직 꺼져 있을 때 (secret key 없음, 서버를 막 다시 켬)
@@ -539,8 +578,17 @@ async function busy(btn, fn) {
 const configured = !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_KEY.includes('YOUR_KEY');
 const sb = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 const state = {
-  user: null, couple: null, members: [], places: [],
-  categories: [],       // [{id, name, position}] 두 사람이 함께 쓰는 카테고리
+  user: null,
+  rooms: [],            // [{id, name, invite_code, created_at}] 내가 든 방 전부 (RLS가 내 방만 줌)
+  allMembers: [],       // [{couple_id, user_id, display_name, role, color, created_at}] 내 방들의 멤버 전부
+  roomsLoaded: false,   // 방 목록을 한 번이라도 받았는지 (못 받았으면 시작하기 대신 다시 시도 화면)
+  roomId: null,         // 지금 방 id (null이면 방 고르기 또는 시작하기)
+  couple: null,         // 지금 방 = rooms 중 roomId (기존 코드가 쓰던 이름 그대로)
+  members: [],          // 지금 방 멤버, 들어온 순서 (created_at → user_id)
+  loadedRoom: null,     // places·categories·cupResults가 어느 방 것인지 (roomId와 다르면 불러오는 중)
+  loadError: false,     // 마지막 불러오기가 실패함 (불러오는 중 화면에 '다시 시도')
+  places: [],
+  categories: [],       // [{id, name, position}] 방 멤버가 함께 쓰는 카테고리
   tab: 'want_to_go', category: '전체', query: '',
   sort: 'recent',       // 다녀온 곳 정렬: 'recent' 최근 방문순 | 'added' 최근 추가순 | 'rating' 평균 평점순
   sheet: null,          // {type, id}
@@ -553,12 +601,125 @@ const state = {
   cupResults: [],       // 끝낸 월드컵 기록 (사람·연도·카테고리마다 하나)
 };
 const uid = () => state.user && state.user.id;
+const MAX_MEMBERS = 5, MAX_ROOMS = 3; // 한 방 5명, 한 사람 3방 (DB 함수·트리거와 같은 숫자)
+/* ---------- 멤버 색 (40가지) ----------
+   DB의 member_colors와 같은 id·순서 (supabase/groups.sql). 순서 = 색 고르기 화면 순서.
+   밝은 값은 흰 바탕·배경에서 3:1 이상, 어두운 값은 카드(#1A212B)에서 선명한 줄 7:1, 짙은 줄 4.6:1 이상.
+   teal·amber는 그룹 기능 전의 방장·멤버 색 (그룹 SQL을 돌릴 때 기존 멤버에게 채워 줌) */
+const MEMBER_COLORS = [
+  { id: 'orange', name: '주황', light: '#D76F05', dark: '#F59246' },
+  { id: 'tangerine', name: '귤', light: '#C97801', dark: '#ED9733' },
+  { id: 'amber', name: '호박', light: '#BD7A05', dark: '#F0B23E' },
+  { id: 'mustard', name: '겨자', light: '#A48904', dark: '#C9A80C' },
+  { id: 'olive', name: '올리브', light: '#8F900D', dark: '#B0B025' },
+  { id: 'lime', name: '라임', light: '#73970B', dark: '#92B842' },
+  { id: 'green', name: '초록', light: '#459D2E', dark: '#70BD5E' },
+  { id: 'emerald', name: '에메랄드', light: '#0F9F5C', dark: '#44C17B' },
+  { id: 'jade', name: '비취', light: '#119D7C', dark: '#14C197' },
+  { id: 'teal', name: '청록', light: '#0E8C86', dark: '#3CC2B9' },
+  { id: 'cyan', name: '시안', light: '#0A9AA1', dark: '#19BDC4' },
+  { id: 'sky', name: '하늘', light: '#0698B2', dark: '#1ABBD8' },
+  { id: 'azure', name: '물빛', light: '#0296C5', dark: '#06B8F1' },
+  { id: 'blue', name: '파랑', light: '#0091E4', dark: '#4EB2FE' },
+  { id: 'cobalt', name: '코발트', light: '#4B89F2', dark: '#7AACFD' },
+  { id: 'indigo', name: '남색', light: '#7281F4', dark: '#95A5FE' },
+  { id: 'violet', name: '보라', light: '#9079EF', dark: '#AD9EFD' },
+  { id: 'purple', name: '자주', light: '#A971E3', dark: '#C695FB' },
+  { id: 'orchid', name: '난초', light: '#BE6AD1', dark: '#D98FEB' },
+  { id: 'pink', name: '분홍', light: '#D362B2', dark: '#EF88CE' },
+  { id: 'orange-deep', name: '짙은 주황', light: '#8D561E', dark: '#B17E4E' },
+  { id: 'tangerine-deep', name: '짙은 귤', light: '#875913', dark: '#AB8149' },
+  { id: 'amber-deep', name: '짙은 호박', light: '#7C5F08', dark: '#A08645' },
+  { id: 'mustard-deep', name: '짙은 겨자', light: '#6E640D', dark: '#938A46' },
+  { id: 'olive-deep', name: '짙은 올리브', light: '#5D681C', dark: '#838F4D' },
+  { id: 'lime-deep', name: '짙은 라임', light: '#4A6C2D', dark: '#729258' },
+  { id: 'green-deep', name: '짙은 초록', light: '#346F3E', dark: '#5F9566' },
+  { id: 'emerald-deep', name: '짙은 에메랄드', light: '#13714E', dark: '#4D9775' },
+  { id: 'jade-deep', name: '짙은 비취', light: '#027060', dark: '#3D9785' },
+  { id: 'teal-deep', name: '짙은 청록', light: '#106E6C', dark: '#339794' },
+  { id: 'cyan-deep', name: '짙은 시안', light: '#126D78', dark: '#3495A2' },
+  { id: 'sky-deep', name: '짙은 하늘', light: '#076C86', dark: '#3E93AE' },
+  { id: 'azure-deep', name: '짙은 물빛', light: '#186994', dark: '#4E90B7' },
+  { id: 'blue-deep', name: '짙은 파랑', light: '#36659A', dark: '#608CBE' },
+  { id: 'cobalt-deep', name: '짙은 코발트', light: '#4B619D', dark: '#7188C0' },
+  { id: 'indigo-deep', name: '짙은 남색', light: '#5D5C9C', dark: '#8284C0' },
+  { id: 'violet-deep', name: '짙은 보라', light: '#6D5898', dark: '#9180BB' },
+  { id: 'purple-deep', name: '짙은 자주', light: '#7A5490', dark: '#9E7CB3' },
+  { id: 'orchid-deep', name: '짙은 난초', light: '#855084', dark: '#AA79A8' },
+  { id: 'pink-deep', name: '짙은 분홍', light: '#904D71', dark: '#B57696' },
+];
+const COLOR_BY_ID = new Map(MEMBER_COLORS.map((c) => [c.id, c]));
+// .mc-<id>{--c:밝은 값}, 어두운 화면에선 어두운 값. 색 표를 한 곳(위 목록)에만 두려고 CSS를 여기서 만듦
+(function memberColorStyle() {
+  const el = document.createElement('style');
+  el.textContent = MEMBER_COLORS.map((c) => `.mc-${c.id}{--c:${c.light}}`).join('\n')
+    + `\n@media (prefers-color-scheme: dark){\n${MEMBER_COLORS.map((c) => `.mc-${c.id}{--c:${c.dark}}`).join('\n')}\n}`;
+  document.head.appendChild(el);
+})();
+// 색 id → 클래스. 모르는 색(목록에 없음)이나 나간 멤버는 회색
+const colorCls = (id) => (COLOR_BY_ID.has(id) ? `mc mc-${id}` : 'mc mc-none');
+const memberCls = (m) => colorCls(m && m.color);
+// 지금 방의 멤버 한 사람: 이름(방마다 다른 닉네임), 색 클래스, 나인지, 방장인지. 방에 없는 id는 '나간 멤버'(회색)
 function person(id) {
   const m = state.members.find((x) => x.user_id === id);
-  if (!m) return { name: '알 수 없음', cls: 'v1', me: false };
-  return { name: m.display_name || (m.user_id === uid() ? '나' : '상대'), cls: m.role === 'owner' ? 'v1' : 'v2', me: m.user_id === uid() };
+  if (!m) return { name: id === uid() ? '나' : '나간 멤버', cls: 'mc mc-none', me: id === uid(), owner: false };
+  return { name: m.display_name || (m.user_id === uid() ? '나' : '멤버'), cls: memberCls(m), me: m.user_id === uid(), owner: m.role === 'owner' };
 }
-const ownerFirst = () => [...state.members].sort((a, b) => (a.role === 'owner' ? 0 : 1) - (b.role === 'owner' ? 0 : 1));
+// 방 멤버를 들어온 순서로 (먼저 들어온 사람이 앞)
+const byJoin = (a, b) => String(a.created_at).localeCompare(String(b.created_at)) || String(a.user_id).localeCompare(String(b.user_id));
+const membersOf = (roomId) => state.allMembers.filter((m) => m.couple_id === roomId).sort(byJoin);
+const memberOrder = () => [...state.members];
+const myMember = (roomId = state.roomId) => state.allMembers.find((m) => m.couple_id === roomId && m.user_id === uid());
+const isOwner = () => { const me = myMember(); return !!me && me.role === 'owner'; };
+
+/* ---------- 지금 방 기억하기 ---------- */
+// 마지막에 쓴 방을 이 기기에 기억 (값 'userId:roomId', 다른 계정으로 로그인하면 무시)
+const ROOM_KEY = 'group-place:last-room';
+function lastRoom() {
+  try {
+    const [u, r] = String(localStorage.getItem(ROOM_KEY) || '').split(':');
+    return u && r && u === uid() ? r : null;
+  } catch { return null; }
+}
+function rememberRoom(id) {
+  try {
+    if (id && uid()) localStorage.setItem(ROOM_KEY, `${uid()}:${id}`);
+    else localStorage.removeItem(ROOM_KEY);
+  } catch { /* 못 남기면 다음에 방을 한 번 더 고를 뿐 */ }
+}
+// 주소의 ?room=<방 id> (선택 기능). 한 번 쓰면 주소에서 뺌
+let urlRoom = (() => { try { return new URLSearchParams(location.search).get('room'); } catch { return null; } })();
+// 로그인 폼·가입으로 방금 들어왔으면 방이 2개 이상일 때 마지막 방 대신 방 고르기 화면
+let forcePicker = false;
+// 지금 방 정하기 (위에서부터 처음 맞는 것). null이면 방 고르기(2개 이상) 또는 시작하기(0개)
+function chooseRoom() {
+  const mine = (id) => !!id && state.rooms.some((r) => r.id === id);
+  if (mine(state.roomId)) return state.roomId;
+  if (urlRoom !== null) {
+    const want = urlRoom;
+    urlRoom = null;
+    try { history.replaceState(history.state, '', location.pathname); } catch { /* 주소만 그대로 남음 */ }
+    if (mine(want)) return want;
+  }
+  if (state.rooms.length === 1) return state.rooms[0].id;
+  if (!forcePicker && mine(lastRoom())) return lastRoom();
+  return null;
+}
+// 방마다 다른 화면 상태 비우기 (방을 바꾸거나 지금 방이 없어졌을 때). 열린 시트도 닫음
+function resetRoomView() {
+  Object.assign(state, {
+    places: [], categories: [], cupResults: [], loadedRoom: null,
+    cup: null, cupSetup: null, cupTab: 'new', editVisit: null, draftRating: 0, photoIdx: 0, query: '', category: '전체',
+  });
+  if (state.sheet) closeSheet();
+}
+// state.roomId에 맞춰 couple·members를 채움. 방이 바뀌었으면 이전 방 화면 상태를 비움
+function applyRoom() {
+  state.couple = state.rooms.find((r) => r.id === state.roomId) || null;
+  if (!state.couple) state.roomId = null;
+  state.members = state.couple ? membersOf(state.roomId) : [];
+  if (state.loadedRoom && state.loadedRoom !== state.roomId) resetRoomView();
+}
 const catNames = () => state.categories.map((c) => c.name);
 const field = (form, n) => form.elements.namedItem(n);
 // 아이디 로그인: @가 없으면 아이디로 보고 정해진 주소를 붙임. LOGIN_ID_DOMAIN이 비어 있으면 입력 그대로(이메일)
@@ -573,31 +734,49 @@ const loginId = (email) => {
 };
 
 /* ---------- 데이터 ---------- */
+// 불러오기마다 번호를 매겨서, 늦게 끝난 예전 불러오기가 그사이 바뀐 방(또는 더 새 내용)을 덮어쓰지 않게 함
+let loadGen = 0;
+// 끝까지 반영했으면 true, 그사이 더 새 불러오기나 방 바꾸기가 있었으면 false (그때는 아무것도 안 바꾸거나, 새 불러오기가 다시 그림)
 async function loadAll() {
+  const gen = ++loadGen;
+  try { return await loadRoomData(gen); }
+  catch (err) { if (gen !== loadGen) return false; throw err; } // 예전 불러오기의 오류는 버림
+}
+async function loadRoomData(gen) {
   const [c, m] = await Promise.all([
-    sb.from('couples').select('id, name, invite_code').limit(1),
-    sb.from('couple_members').select('user_id, display_name, role'),
+    sb.from('couples').select('id, name, invite_code, created_at').order('created_at'),
+    sb.from('couple_members').select('couple_id, user_id, display_name, role, color, created_at').order('created_at'),
   ]);
+  if (gen !== loadGen) return false;
   if (c.error) throw c.error;
   if (m.error) throw m.error;
-  state.couple = c.data[0] || null;
-  state.members = m.data || [];
-  if (!state.couple) { state.places = []; state.categories = []; state.cupResults = []; return; }
+  state.rooms = c.data || [];
+  state.allMembers = m.data || [];
+  state.roomsLoaded = true;
+  state.roomId = chooseRoom();
+  if (state.roomId) rememberRoom(state.roomId);
+  applyRoom();
+  if (!state.roomId) return true;
+  const room = state.roomId;
+  // 방 조건(couple_id)이 꼭 있어야 함: 없으면 내가 든 다른 방 데이터까지 섞여 옴
   const [p, k, w] = await Promise.all([
-    sb.from('places').select('*, reviews(*), visits!visits_place_id_fkey(*), place_photos(*)').order('created_at', { ascending: false }),
-    sb.from('categories').select('id, name, position').order('position').order('created_at'),
-    sb.from('cup_results').select('*').order('played_at', { ascending: false }),
+    sb.from('places').select('*, reviews(*), visits!visits_place_id_fkey(*), place_photos(*)').eq('couple_id', room).order('created_at', { ascending: false }),
+    sb.from('categories').select('id, name, position').eq('couple_id', room).order('position').order('created_at'),
+    sb.from('cup_results').select('*').eq('couple_id', room).order('played_at', { ascending: false }),
   ]);
+  if (gen !== loadGen || state.roomId !== room) return false;
   if (p.error) throw p.error;
   if (k.error) throw k.error;
   state.places = (p.data || []).map(withVisits);
   state.categories = k.data || [];
   // 월드컵 기록은 덤: 못 불러와도(표가 아직 없거나 되돌린 뒤) 나머지는 그대로 씀
   state.cupResults = w.error ? [] : w.data || [];
+  state.loadedRoom = room;
   if (state.category !== '전체' && !catNames().includes(state.category)) state.category = '전체';
   await signPhotos();
+  return gen === loadGen;
 }
-// 방문마다 두 사람의 후기를 묶고, 최근 방문이 앞에 오게 정렬
+// 방문마다 멤버들의 후기를 묶고, 최근 방문이 앞에 오게 정렬
 function withVisits(p) {
   const reviews = p.reviews.map((r) => ({ ...r, rating: r.rating == null ? null : Number(r.rating) }));
   const visits = p.visits
@@ -693,9 +872,31 @@ async function setCover(place, photo) {
   if (error) throw error;
 }
 async function refresh({ keepSheet = true } = {}) {
-  await loadAll();
+  let done;
+  try {
+    done = await loadAll();
+    state.loadError = false;
+  } catch (err) {
+    state.loadError = true;
+    if (screen === 'loading') render(); // 불러오는 중 화면이면 '다시 시도'로 바꿈 (목록 화면은 그대로 둠)
+    throw err;
+  }
+  if (done === false) return; // 더 새 불러오기가 그릴 것
   render();
   if (keepSheet && state.sheet && state.sheet.type === 'detail') renderSheet();
+}
+// 다른 방으로 (방 고르기, 내 정보의 방 바꾸기, 방을 만들거나 들어온 뒤). 여러 번 눌러도 마지막 방만 그려짐
+async function switchRoom(id) {
+  forcePicker = false;
+  if (id !== state.roomId || state.loadedRoom !== id) resetRoomView();
+  else if (state.sheet) closeSheet();
+  state.roomId = id;
+  rememberRoom(id);
+  state.couple = state.rooms.find((r) => r.id === id) || null;
+  state.members = state.couple ? membersOf(id) : [];
+  state.loadError = false;
+  render(); // 불러오는 중
+  await refresh({ keepSheet: false });
 }
 
 /* ---------- 화면: 설정 필요 / 로그인 / 시작하기 ---------- */
@@ -721,7 +922,7 @@ function viewLogin() {
     ${SIGNUP_ENABLED ? '<button class="text-btn" data-action="auth-mode" data-mode="signup" style="margin-top:16px;align-self:center">초대 코드로 가입</button>' : ''}
   </main>`;
 }
-// 친구용: 초대 코드로 가입. 가입 코드(W-XXXX-XXXX)면 가입만, 공간 코드(8자리)면 그 공간에 바로 참여
+// 친구용: 초대 코드로 가입. 가입 코드(W-XXXX-XXXX)면 가입만, 방 코드(8자리)면 그 방에 바로 참여
 let authMode = 'login'; // 로그인 전 화면: 'login' | 'signup'
 function viewSignup() {
   return `<main class="wrap gate">
@@ -730,7 +931,7 @@ function viewSignup() {
     <p class="lead">받은 초대 코드로 계정을 만들어요. 메일 인증은 없어요.</p>
     <form class="panel" id="signup-form" novalidate>
       <label class="field"><span>초대 코드</span><input class="input" name="code" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="20" placeholder="W-XXXX-XXXX 또는 8자리 코드" required>
-        <p class="hint">관리자에게 받은 가입 코드(W로 시작)면 가입한 뒤 공간을 만들어요. 친구가 보낸 8자리 공간 초대 코드면 가입하면서 그 공간에 바로 들어가요.</p></label>
+        <p class="hint">관리자에게 받은 가입 코드(W로 시작)면 가입한 뒤 방을 만들어요. 친구가 보낸 8자리 방 초대 코드면 가입하면서 그 방에 바로 들어가요.</p></label>
       <label class="field"><span>아이디</span><input class="input" type="text" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="20" required>
         <p class="hint">영문 소문자·숫자와 . _ - 로 3~20자. 로그인할 때 써요.</p></label>
       <label class="field"><span>앱에서 보일 이름</span><input class="input" name="name" maxlength="20" placeholder="예: 지훈" required></label>
@@ -749,7 +950,7 @@ function signupInput(f) {
   const username = f.username.value.trim().toLowerCase();
   const displayName = field(f, 'name').value.trim();
   const password = f.password.value;
-  if (!SIGNUP_CODE_RE.test(code) && !/^[0-9A-F]{8}$/.test(code)) return { error: '초대 코드를 다시 확인해 주세요. (W로 시작하는 가입 코드나 8자리 공간 코드)' };
+  if (!SIGNUP_CODE_RE.test(code) && !/^[0-9A-F]{8}$/.test(code)) return { error: '초대 코드를 다시 확인해 주세요. (W로 시작하는 가입 코드나 8자리 방 코드)' };
   if (!/^[a-z0-9][a-z0-9._-]{2,19}$/.test(username) || username.includes('..') || username.endsWith('.')) return { error: '아이디는 영문 소문자·숫자와 . _ - 로 3~20자예요. (맨 앞은 영문이나 숫자)' };
   if (!displayName) return { error: '앱에서 보일 이름을 입력해 주세요.' };
   if (password.length < 8 || new TextEncoder().encode(password).length > 72) return { error: '비밀번호는 8~72자로 입력해 주세요.' };
@@ -777,44 +978,94 @@ const signUp = (input) => postApi('/api/signup', input, {
   failed: '가입을 끝내지 못했어요. 잠시 후 다시 시도해 주세요.',
   slow: '응답이 너무 늦어요. 잠시 뒤 로그인해 보거나 다시 시도해 주세요.',
 });
-// 친구용: 공간 코드로 참여도 홈 서버(POST /api/join)를 거침. 코드 맞히기를 가입과 합쳐 접속한 곳마다 1시간 5번으로 막으려고
-// 친구용 DB는 join_couple을 앱에서 직접 못 부르게 막아 둠(supabase/friends-signup.sql). 결과는 sb.rpc처럼 { error }
+// 친구용: 방 코드로 참여도 홈 서버(POST /api/join)를 거침. 코드 맞히기를 가입과 합쳐 접속한 곳마다 1시간 5번으로 막으려고
+// 친구용 DB는 join_couple을 앱에서 직접 못 부르게 막아 둠(supabase/friends-signup.sql). 결과는 sb.rpc처럼 { error, data: 방 id }
 async function joinViaServer(code, name) {
   try {
     const { data } = await sb.auth.getSession();
     const token = data.session && data.session.access_token;
     if (!token) return { error: new Error('로그인이 끝났어요. 다시 로그인해 주세요.') };
-    await postApi('/api/join', { code, displayName: name }, {
+    const j = await postApi('/api/join', { code, displayName: name }, {
       notFound: '이 사이트에서는 코드로 참여할 수 없어요.',
       failed: '참여하지 못했어요. 잠시 후 다시 시도해 주세요.',
       slow: '응답이 너무 늦어요. 새로고침해서 확인하거나 다시 시도해 주세요.',
     }, token);
-    return { error: null };
+    return { error: null, data: typeof j.couple_id === 'string' ? j.couple_id : null };
   } catch (error) { return { error }; }
 }
-let onboardMode = 'create';
-function viewOnboard() {
-  const create = onboardMode === 'create';
-  // 친구용: 초대 코드로 가입할 때 적은 이름을 미리 채움
+/* ---------- 방 만들기·참여 (시작하기 화면과 '새 방' 시트가 같은 폼을 씀) ---------- */
+let onboardMode = 'create'; // 시작하기 화면: 'create' | 'join' (시트는 state.sheet.mode)
+// 닉네임 미리 채우기: 지금 방의 내 닉네임 → 다른 방의 내 닉네임 → 가입 때 적은 이름
+function defaultNick() {
+  const me = myMember() || state.allMembers.find((m) => m.user_id === uid());
+  if (me && me.display_name) return me.display_name;
   const meta = (LOGIN_ID_DOMAIN && state.user && state.user.user_metadata) || {};
-  const name = typeof meta.display_name === 'string' ? meta.display_name : '';
+  return typeof meta.display_name === 'string' ? meta.display_name : '';
+}
+function roomFormHtml(mode, nick) {
+  const create = mode === 'create';
+  return `<div class="switcher" role="group" aria-label="방 만들기 또는 참여">
+      <button type="button" data-action="room-mode" data-mode="create" aria-pressed="${create}">새 방 만들기</button>
+      <button type="button" data-action="room-mode" data-mode="join" aria-pressed="${!create}">코드로 참여</button>
+    </div>
+    <form id="room-form" data-mode="${create ? 'create' : 'join'}" novalidate>
+      ${create
+        ? '<label class="field"><span>방 이름</span><input class="input" name="room" maxlength="30" placeholder="예: 맛집 탐방대" required></label>'
+        : '<label class="field"><span>초대 코드</span><input class="input" name="code" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12" placeholder="8자리 코드" required></label>'}
+      <label class="field"><span>이 방에서 쓸 닉네임</span><input class="input" name="name" maxlength="20" placeholder="예: 지훈" value="${esc(nick)}" required>
+        <p class="hint">방마다 따로 정해요.</p></label>
+      <button class="btn block" type="submit">${create ? '방 만들기' : '참여하기'}</button>
+      <p class="error"></p>
+    </form>`;
+}
+function viewOnboard() {
   return `<main class="wrap gate">
     <div class="mark"><i></i><i></i></div>
-    <h1>둘만의 공간을 연결해요</h1>
-    <p class="lead">한 사람이 공간을 만들고, 다른 사람은 초대 코드로 들어오면 돼요.</p>
-    <div class="panel">
-      <div class="switcher" role="group" aria-label="시작 방법">
-        <button type="button" data-action="onboard-mode" data-mode="create" aria-pressed="${create}">새로 만들기</button>
-        <button type="button" data-action="onboard-mode" data-mode="join" aria-pressed="${!create}">코드로 참여</button>
-      </div>
-      <form id="onboard-form" novalidate>
-        ${create ? '' : `<label class="field"><span>초대 코드</span><input class="input" name="code" autocomplete="off" autocapitalize="characters" maxlength="12" placeholder="8자리 코드" required></label>`}
-        <label class="field"><span>앱에서 보일 내 이름</span><input class="input" name="name" maxlength="20" placeholder="예: 지훈"${name ? ` value="${esc(name)}"` : ''} required></label>
-        <button class="btn block" type="submit">${create ? '공간 만들기' : '참여하기'}</button>
-        <p class="error" id="onboard-error"></p>
-      </form>
-    </div>
+    <h1>방을 만들거나 참여해요</h1>
+    <p class="lead">방을 만들고 초대 코드를 보내면 친구가 들어올 수 있어요. 한 방은 ${MAX_MEMBERS}명까지예요.</p>
+    <div class="panel">${roomFormHtml(onboardMode, defaultNick())}</div>
     <button class="text-btn" data-action="logout" style="margin-top:16px;align-self:center">다른 계정으로 로그인</button>
+  </main>`;
+}
+function roomNewView() {
+  const mode = state.sheet.mode === 'join' ? 'join' : 'create';
+  return `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">${mode === 'join' ? '코드로 참여' : '새 방 만들기'}</h2><span style="width:40px"></span></div>
+  <div class="sheet-body">${roomFormHtml(mode, defaultNick())}</div>`;
+}
+// 방 카드: 방 이름, 멤버 점(최대 5개), 인원, 내 닉네임, 방장·최근 표시
+function roomCard(r, last) {
+  const ms = membersOf(r.id), me = ms.find((m) => m.user_id === uid());
+  return `<li><button class="room-card" data-action="pick-room" data-id="${esc(r.id)}">
+    <span class="room-top"><span class="room-name">${esc(r.name)}</span>${r.id === last ? '<span class="badge">최근</span>' : ''}</span>
+    <span class="room-meta"><span class="room-dots" aria-hidden="true">${ms.slice(0, MAX_MEMBERS).map((m) => `<i class="dot ${memberCls(m)}"></i>`).join('')}</span>
+      <span>${ms.length}/${MAX_MEMBERS}명</span>${me ? `<span>· ${esc(me.display_name)}</span>` : ''}${me && me.role === 'owner' ? '<span class="badge">방장</span>' : ''}</span>
+  </button></li>`;
+}
+// 새 방 만들기·코드로 참여 버튼 (방이 3개면 안내만)
+const roomNewButtons = () => (state.rooms.length < MAX_ROOMS
+  ? `<div class="room-actions"><button class="btn ghost small" data-action="room-new" data-mode="create">새 방 만들기</button><button class="btn ghost small" data-action="room-new" data-mode="join">코드로 참여</button></div>`
+  : `<p class="hint">방은 ${MAX_ROOMS}개까지 들어갈 수 있어요.</p>`);
+function viewRooms() {
+  const last = lastRoom();
+  return `<main class="wrap gate">
+    <div class="mark"><i></i><i></i></div>
+    <h1>어느 방으로 갈까요?</h1>
+    <p class="lead">방은 내 정보에서 언제든 바꿀 수 있어요.</p>
+    <ul class="room-list">${state.rooms.map((r) => roomCard(r, last)).join('')}</ul>
+    ${roomNewButtons()}
+    <button class="text-btn" data-action="logout" style="margin-top:16px;align-self:center">다른 계정으로 로그인</button>
+  </main>`;
+}
+// 방 데이터를 불러오는 중 (실패했으면 다시 시도)
+function viewLoading() {
+  if (!state.loadError) return '<div class="loading">불러오는 중…</div>';
+  return `<main class="wrap gate">
+    <div class="mark"><i></i><i></i></div>
+    <h1>불러오지 못했어요</h1>
+    <p class="lead">인터넷 연결을 확인하고 다시 시도해 주세요.</p>
+    <button class="btn block" data-action="retry-load">다시 시도</button>
+    ${state.rooms.length > 1 ? '<button class="text-btn" data-action="room-picker" style="margin-top:12px;align-self:center">다른 방 고르기</button>' : ''}
+    <button class="text-btn" data-action="logout" style="margin-top:8px;align-self:center">다른 계정으로 로그인</button>
   </main>`;
 }
 
@@ -857,20 +1108,27 @@ function matched() {
       || p.reviews.some((r) => (r.body || '').toLowerCase().includes(q));
   });
 }
+// 목록 카드의 별점 칩: 최근 별점을 남긴 멤버만, 들어온 순서로. 멤버가 2명 이하면 별 5개, 3명 이상이면 '닉네임 ★4.5'로 줄임
 function pairTags(p) {
-  const order = ownerFirst();
-  return order.map((m) => {
-    const who = person(m.user_id);
+  const mini = state.members.length > 2;
+  return memberOrder().map((m) => {
     const n = latestRating(p, m.user_id);
-    if (n) return `<span class="voice-tag ${who.cls}"><i class="dot"></i>${esc(who.name)} ${stars(n, 13)}</span>`;
-    return `<span class="voice-tag empty ${who.cls}"><i class="dot"></i>${esc(who.name)} 후기 전</span>`;
+    if (!n) return '';
+    const who = person(m.user_id);
+    if (mini) {
+      return `<span class="voice-tag mini ${who.cls}" role="img" aria-label="${esc(`${who.name} ${n}점`)}"><i class="dot"></i><span class="nm">${esc(who.name)}</span>`
+        + `<span class="sc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR}"/></svg>${n.toFixed(1)}</span></span>`;
+    }
+    return `<span class="voice-tag ${who.cls}"><i class="dot"></i><span class="nm">${esc(who.name)}</span>${stars(n, 13)}</span>`;
   }).join('');
 }
 function placeCard(p) {
   const by = person(p.created_by);
   const avg = avgRating(p);
+  // 아무도 별점을 안 남겼으면 칩도 평균도 없음
+  const tags = p.status === 'visited' ? pairTags(p) : '';
   const lower = p.status === 'visited'
-    ? `<div class="pair"><div class="pair-tags">${pairTags(p)}</div>${avg ? `<span class="avg" role="img" aria-label="평균 ${avg.toFixed(1)}점"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR}"/></svg>${avg.toFixed(1)}</span>` : ''}</div>`
+    ? (tags || avg ? `<div class="pair"><div class="pair-tags">${tags}</div>${avg ? `<span class="avg" role="img" aria-label="평균 ${avg.toFixed(1)}점"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR}"/></svg>${avg.toFixed(1)}</span>` : ''}</div>` : '')
     : `<div class="added ${by.cls}"><i class="dot"></i>${esc(josa(by.name, '이', '가'))} 담음 <span aria-hidden="true">|</span> ${fmtDate(p.created_at)}</div>`;
   const img = photoUrl(p);
   // 도장은 가장 앞선 것 하나(+나머지 개수), 준우승은 카테고리 옆에 태그 하나(+나머지 개수)
@@ -907,22 +1165,22 @@ function viewMain() {
   const cats = ['전체', ...new Set([...catNames(), ...state.places.map((p) => p.category)])];
   const tabBtn = (key, label, n) => `<button role="tab" data-action="tab" data-tab="${key}" aria-selected="${state.tab === key}">${label}<span class="n">${n}</span></button>`;
   const sortBtn = (key, label) => `<button data-action="sort" data-sort="${key}" aria-pressed="${state.sort === key}">${label}</button>`;
-  const ordered = ownerFirst();
+  const ordered = memberOrder();
   return `<div class="top"><div class="wrap">
       <div class="top-row">
-        <div>
+        <div class="top-head">
           <h1 class="title">${esc(state.couple.name)}</h1>
-          <div class="duo">${ordered.map((m) => { const w = person(m.user_id); return `<span class="${w.cls}"><i class="dot"></i>${esc(w.name)}</span>`; }).join('')}</div>
+          <div class="duo" aria-label="멤버">${ordered.map((m) => { const w = person(m.user_id); return `<span class="${w.cls}" title="${esc(w.name)}"><i class="dot"></i><span class="nm">${esc(w.name)}</span></span>`; }).join('')}</div>
         </div>
         <div class="top-actions">
           <button class="icon-btn" data-action="cup" aria-label="장소 월드컵">${ICON.trophy}</button>
-          <button class="icon-btn" data-action="settings" aria-label="설정">${ICON.gear}</button>
+          <button class="icon-btn" data-action="settings" aria-label="내 정보">${ICON.gear}</button>
         </div>
       </div>
       <div class="tabs" role="tablist">${tabBtn('want_to_go', '가고 싶은 곳', want)}${tabBtn('visited', '다녀온 곳', visited)}${tabBtn('fav', '찜', fav)}</div>
     </div></div>
     <main class="wrap">
-      ${state.couple.invite_code ? `<div class="invite"><div>상대에게 초대 코드를 보내 주세요<br><b>${esc(state.couple.invite_code)}</b></div><button class="btn small" data-action="copy-code">복사</button></div>` : ''}
+      ${state.couple.invite_code && state.members.length === 1 ? `<div class="invite"><div>친구에게 초대 코드를 보내 주세요<br><b>${esc(state.couple.invite_code)}</b></div><button class="btn small" data-action="copy-code">복사</button></div>` : ''}
       <div class="tools">
         <label class="search"><span class="sr">검색</span>${ICON.search}<input class="input" id="q" type="search" placeholder="이름, 주소, 메모, 후기 검색" value="${esc(state.query)}"></label>
         <div class="chips" role="group" aria-label="카테고리">${cats.map((c) => `<button class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${state.category === c}">${esc(c)}</button>`).join('')}</div>
@@ -1113,14 +1371,19 @@ function closeViewer() {
   syncHistory();
   return true;
 }
-// 방문 한 번: 날짜 + 두 사람의 별점·후기. 편집 중이면 날짜와 내 줄이 입력칸으로 바뀜 (v가 없으면 새 방문)
+// 방문 한 번: 날짜 + 후기를 남긴 멤버들의 별점·후기(들어온 순서, 줄마다 그 멤버 색).
+// 편집 중이면 날짜와 내 줄이 입력칸으로 바뀌고, 다른 멤버 줄은 그대로 보임 (v가 없으면 새 방문)
 function visitCard(p, v, editing) {
   const reviews = v ? v.reviews : [];
   const mine = reviews.find((r) => r.author_id === uid());
-  const partnerWrote = reviews.some((r) => r.author_id !== uid());
-  const rows = ownerFirst().filter((m) => v || m.user_id === uid()).map((m) => {
-    const w = person(m.user_id);
-    const who = `<span class="voice-who"><i class="dot"></i>${esc(w.name)}${w.me ? '<span class="you">나</span>' : ''}</span>`;
+  const othersWrote = reviews.some((r) => r.author_id !== uid());
+  // 후기를 쓴 사람만 줄을 만듦 (편집 중이면 내 줄은 항상). 멤버 목록에 없는 글쓴이는 맨 뒤에 '나간 멤버'로
+  const ids = memberOrder().map((m) => m.user_id);
+  const authors = [...ids, ...reviews.map((r) => r.author_id).filter((id, i, a) => !ids.includes(id) && a.indexOf(id) === i)]
+    .filter((id) => (editing && id === uid()) || reviews.some((r) => r.author_id === id));
+  const rows = authors.map((id) => {
+    const w = person(id);
+    const who = `<span class="voice-who"><i class="dot"></i><span class="nm">${esc(w.name)}</span>${w.me ? '<span class="you">나</span>' : ''}</span>`;
     if (w.me && editing) {
       return `<div class="vrow ${w.cls}">
         <div class="vrow-head">${who}</div>
@@ -1128,17 +1391,17 @@ function visitCard(p, v, editing) {
         <textarea class="input" id="my-review" maxlength="3000" placeholder="어땠는지 남겨 보세요">${esc(mine ? mine.body : '')}</textarea>
       </div>`;
     }
-    const r = reviews.find((x) => x.author_id === m.user_id);
+    const r = reviews.find((x) => x.author_id === id);
     return `<div class="vrow ${w.cls}">
-      <div class="vrow-head">${who}${r && r.rating ? stars(r.rating, 16) : ''}</div>
-      ${r ? (r.body ? `<p class="voice-body">${esc(r.body)}</p>` : '') : '<p class="voice-empty">아직 후기가 없어요.</p>'}
+      <div class="vrow-head">${who}${r.rating ? stars(r.rating, 16) : ''}</div>
+      ${r.body ? `<p class="voice-body">${esc(r.body)}</p>` : ''}
     </div>`;
-  }).join('');
+  }).join('') || '<p class="voice-empty">아직 후기가 없어요.</p>';
   const head = editing
     ? `<label><span class="sr">방문 날짜</span><input class="input date" type="date" id="visit-date" value="${v ? v.visited_on : today()}" max="${today()}" required></label>`
     : `<span class="visit-date">${fmtDay(v.visited_on)}</span><button class="text-btn" data-action="edit-visit" data-visit="${v.id}">${mine ? '내 후기 수정' : '내 후기 쓰기'}</button>`;
-  // 상대 후기가 없는 방문만 통째로 지울 수 있고, 있으면 내 후기만 지움
-  const del = v && !partnerWrote ? '<button class="text-btn danger" data-action="delete-visit">방문 삭제</button>'
+  // 다른 멤버 후기가 없는 방문만 통째로 지울 수 있고, 있으면 내 후기만 지움 (DB 정책과 같음)
+  const del = v && !othersWrote ? '<button class="text-btn danger" data-action="delete-visit">방문 삭제</button>'
     : mine ? '<button class="text-btn danger" data-action="delete-review">내 후기 삭제</button>' : '';
   const actions = editing ? `<div class="voice-actions">
       <span>${del}</span>
@@ -1155,7 +1418,7 @@ function detailView(p) {
   // 방문 기록이 하나도 없으면 새 방문 입력칸을 바로 보여줌
   const editId = state.editVisit || (p.visits.length ? null : 'new');
   const { stamps, seconds } = honorsOf(p.id);
-  const honors = (stamps.length ? `<div class="honors">${stamps.map((h) => `<div class="honor">${stampHtml(h)}<small>${h.gold ? '둘 다 1위' : esc(person(h.user_id).name)}</small></div>`).join('')}</div>` : '')
+  const honors = (stamps.length ? `<div class="honors">${stamps.map((h) => `<div class="honor">${stampHtml(h)}<small>${esc(person(h.user_id).name)}</small></div>`).join('')}</div>` : '')
     + (seconds.length ? `<div class="honor-tags">${seconds.map((h) => secondTag(h, 0, true)).join('')}</div>` : '');
   return `<div class="sheet-head">
       <button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button>
@@ -1181,7 +1444,7 @@ function detailView(p) {
       </div>
       <section class="block">
         <h3>함께 쓰는 메모</h3>
-        <textarea class="input" id="shared-note" maxlength="2000" placeholder="둘 다 고칠 수 있는 메모예요">${esc(p.shared_note)}</textarea>
+        <textarea class="input" id="shared-note" maxlength="2000" placeholder="멤버 모두 고칠 수 있는 메모예요">${esc(p.shared_note)}</textarea>
         <div class="block-row"><button class="btn small ghost" data-action="save-note">메모 저장</button></div>
       </section>
       ${showVisits ? `<section class="block">
@@ -1189,7 +1452,7 @@ function detailView(p) {
         ${editId === 'new' ? visitCard(p, null, true) : ''}
         ${p.visits.map((v) => visitCard(p, v, editId === v.id)).join('')}
       </section>` : `<p class="hint" style="margin-top:18px">‘다녀왔어요’로 바꾸면 방문한 날짜와 각자 별점·후기를 남길 수 있어요.</p>`}
-      <div class="danger-zone"><span>${esc(josa(person(p.created_by).name, '이', '가'))} ${fmtDate(p.created_at)}에 담음</span><button class="text-btn danger" data-action="delete-place">장소 삭제</button></div>
+      <div class="danger-zone"><span class="by ${person(p.created_by).cls}"><i class="dot"></i><span>${esc(josa(person(p.created_by).name, '이', '가'))} ${fmtDate(p.created_at)}에 담음</span></span><button class="text-btn danger" data-action="delete-place">장소 삭제</button></div>
     </div>`;
 }
 
@@ -1247,6 +1510,7 @@ function startCup() {
   const playIn = Array.from({ length: extra }, (_, i) => [pool[i], pool[pool.length - 1 - i]]);
   state.cup = {
     title: cupTitle(year, cat), year, cat, n: ids.length, size, extra, direct,
+    roomId: state.roomId, // 시작한 방에 저장 (하는 사이 방을 바꿔도 다른 방에 남지 않게)
     // 저장할 때 쓰려고 기억해 둠: 하는 사이 카테고리 이름이 바뀌거나 장소가 지워져도 그대로 남기게
     catId: cat === '전체' ? null : (state.categories.find((x) => x.name === cat) || {}).id,
     names: Object.fromEntries(list.map((p) => [p.id, p.name])),
@@ -1314,11 +1578,11 @@ function cupView() {
   const head = `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">${esc(c.title)}</h2><span style="width:40px"></span></div>`;
   if (c.champion) {
     const w = cupPlace(c.champion), img = photoUrl(w);
-    // 저장이 끝나면 도장이 '쾅' 찍힘. 상대도 같은 월드컵에서 같은 곳을 골랐으면 황금 도장
-    const h = c.saved === 'ok' && honorsOf(c.champion).stamps.find((x) => x.year === c.year && x.cat === c.cat);
+    // 저장이 끝나면 내 색 도장이 '쾅' 찍힘 (다른 멤버가 같은 곳을 골랐어도 도장은 사람마다 따로)
+    const h = c.saved === 'ok' && honorsOf(c.champion).stamps.find((x) => x.year === c.year && x.cat === c.cat && x.user_id === uid());
     const saved = h
       ? `<div class="win-stamp">${stampHtml(h, 0, true)}</div>
-        <p class="win-msg">${h.gold ? '<b>둘 다 1위!</b> 황금 도장이 찍혔어요.' : `${esc(honorTitle(c.year, c.cat))} 1위 도장을 찍었어요.`}</p>
+        <p class="win-msg">${esc(honorTitle(c.year, c.cat))} 1위 도장을 찍었어요.</p>
         ${c.prev ? `<p class="hint" style="margin-top:4px">지난번 1위 ${esc(c.prev)} 기록은 이번 결과로 바뀌었어요.</p>` : ''}`
       : c.saved === 'ok' // 그새 지워진 장소가 1위면 도장 없이 기록만 남음
         ? '<p class="win-msg">기록에 남겼어요.</p>'
@@ -1351,7 +1615,7 @@ const recYear = (r) => (r.year == null ? 'all' : String(r.year).padStart(4, '0')
 const recCat = (r) => r.category ?? '전체';
 const honorTitle = (year, cat) => `${year === 'all' ? '역대' : year} ${cat === '전체' ? '종합' : cat}`;
 const myResult = (year, cat) => state.cupResults.find((r) => r.user_id === uid() && recYear(r) === year && recCat(r) === cat);
-// 같은 월드컵(연도 + 카테고리)의 두 사람 기록끼리 묶음
+// 같은 월드컵(연도 + 카테고리)의 멤버들 기록끼리 묶음
 function cupGroups() {
   const groups = new Map();
   for (const r of state.cupResults) {
@@ -1361,28 +1625,22 @@ function cupGroups() {
   }
   return [...groups.values()];
 }
-// 황금 먼저, 그다음 최근 연도(역대가 맨 앞), 종합, 최근에 한 순
-const honorOrder = (a, b) => (b.gold - a.gold)
-  || (a.year === b.year ? 0 : a.year === 'all' ? -1 : b.year === 'all' ? 1 : Number(b.year) - Number(a.year))
+// 최근 연도(역대가 맨 앞), 종합, 최근에 한 순
+const honorOrder = (a, b) => (a.year === b.year ? 0 : a.year === 'all' ? -1 : b.year === 'all' ? 1 : Number(b.year) - Number(a.year))
   || ((b.cat === '전체') - (a.cat === '전체'))
   || String(b.at).localeCompare(String(a.at));
-// 장소마다 받은 1위 도장과 준우승 태그. 같은 월드컵에서 두 사람이 같은 곳을 고르면 황금 하나로 합침
+// 장소마다 받은 1위 도장과 준우승 태그. 기록 하나 = 도장(또는 태그) 하나, 그 기록을 남긴 멤버 색.
+// 같은 월드컵에서 여러 멤버가 같은 곳을 골랐으면 도장도 여러 개 (합치지 않음)
 let honorCache = { src: null, map: new Map() };
 function honorsOf(placeId) {
   if (honorCache.src !== state.cupResults) {
     const map = new Map();
     const slot = (id) => { if (!map.has(id)) map.set(id, { stamps: [], seconds: [] }); return map.get(id); };
-    for (const g of cupGroups()) {
+    for (const r of state.cupResults) {
       for (const [field, list] of [['champion_id', 'stamps'], ['runner_up_id', 'seconds']]) {
-        const byPlace = new Map();
-        g.rs.forEach((r) => { if (r[field]) byPlace.set(r[field], [...(byPlace.get(r[field]) || []), r]); });
-        for (const [id, rs] of byPlace) {
-          const base = { year: g.year, cat: g.cat, at: rs.map((r) => r.played_at).sort().pop() };
-          // 도장 키는 기록 id로: 카테고리 이름을 바꿔도 '쾅'이 다시 나오지 않게
-          slot(id)[list].push(rs.length > 1
-            ? { ...base, gold: true, key: `${list}:gold:${rs.map((r) => r.id).sort().join('+')}:${id}` }
-            : { ...base, gold: false, user_id: rs[0].user_id, key: `${list}:${rs[0].id}:${rs[0].played_at}` });
-        }
+        if (!r[field]) continue;
+        // 도장 키는 기록 id로: 카테고리 이름을 바꿔도 '쾅'이 다시 나오지 않게
+        slot(r[field])[list].push({ year: recYear(r), cat: recCat(r), at: r.played_at, user_id: r.user_id, key: `${list}:${r.id}:${r.played_at}` });
       }
     }
     map.forEach((h) => { h.stamps.sort(honorOrder); h.seconds.sort(honorOrder); });
@@ -1391,7 +1649,7 @@ function honorsOf(placeId) {
   return honorCache.map.get(placeId) || { stamps: [], seconds: [] };
 }
 // 처음 보는 도장만 '쾅' 찍히는 효과. 이 기기에서 이미 본 도장은 기억해 둠
-const SEEN_KEY = 'our-places:seen-stamps';
+const SEEN_KEY = 'group-place:seen-stamps';
 const seenStamps = (() => { try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY)) || []); } catch { return new Set(); } })();
 function markStampsSeen() {
   const fresh = [...document.querySelectorAll('.stamp.fresh')].map((el) => el.dataset.stamp).filter((k) => !seenStamps.has(k));
@@ -1409,30 +1667,22 @@ function stampSvg(h) {
   const words = `<text x="50" y="33" font-size="15.5" font-weight="800">${esc(h.year === 'all' ? '역대' : h.year)}</text>
     <text x="50" y="${len <= 2 ? 59.5 : 58.5}" font-size="${size}" font-weight="900"${fit}>${esc(mid)}</text>
     <text x="50" y="80" font-size="17" font-weight="900">1위</text>`;
-  if (h.gold) {
-    return `<svg viewBox="0 0 100 100" aria-hidden="true">
-      <circle cx="50" cy="50" r="47" fill="url(#stamp-gold)" stroke="#D4A12A" stroke-width="2.5"/>
-      <circle cx="50" cy="50" r="40" fill="none" stroke="#C08A12" stroke-width="1.3" stroke-dasharray="1.6 2.4"/>
-      <g fill="#664400" text-anchor="middle">${words}</g>
-      <path fill="#FFF1A8" stroke="#D4A12A" stroke-width=".9" d="M87 2l2.7 7.6L97.5 12l-7.8 2.6L87 22.5l-2.7-7.9L76.5 12l7.8-2.4z"/>
-      <path fill="#FFF1A8" stroke="#D4A12A" stroke-width=".7" d="M9 77l1.7 4.6L15.5 83l-4.8 1.6L9 89.5l-1.7-4.9L2.5 83l4.8-1.4z"/>
-    </svg>`;
-  }
   return `<svg viewBox="0 0 100 100" aria-hidden="true"><g filter="url(#stamp-ink)">
     <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="5"/>
     <circle cx="50" cy="50" r="38.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
     <g fill="currentColor" text-anchor="middle">${words}</g>
   </g></svg>`;
 }
-// 각자 고른 1위는 그 사람 색 도장, 둘 다 고른 1위는 황금 도장
+// 각자 고른 1위는 그 사람 색 도장
 function stampHtml(h, more = 0, fresh = !seenStamps.has(h.key)) {
-  const label = `${h.gold ? '둘 다 고른' : `${person(h.user_id).name}의`} ${honorTitle(h.year, h.cat)} 1위`;
-  return `<span class="stamp-wrap"><span class="stamp ${h.gold ? 'gold' : person(h.user_id).cls}${fresh ? ' fresh' : ''}" data-stamp="${esc(h.key)}" role="img" aria-label="${esc(label)}">${stampSvg(h)}</span>${more ? `<span class="stamp-more" aria-label="도장 ${more}개 더">+${more}</span>` : ''}</span>`;
+  const who = person(h.user_id);
+  const label = `${who.name}의 ${honorTitle(h.year, h.cat)} 1위`;
+  return `<span class="stamp-wrap"><span class="stamp ${who.cls}${fresh ? ' fresh' : ''}" data-stamp="${esc(h.key)}" role="img" aria-label="${esc(label)}">${stampSvg(h)}</span>${more ? `<span class="stamp-more" aria-label="도장 ${more}개 더">+${more}</span>` : ''}</span>`;
 }
 // 준우승 태그: 카드에선 색으로만(누가 골랐는지), 상세에선 이름까지
 const secondTag = (h, more = 0, named = false) => {
-  const who = h.gold ? '둘 다' : person(h.user_id).name;
-  return `<span class="tag ${h.gold ? 'gold' : person(h.user_id).cls}" title="${esc(`${who} 고른 ${honorTitle(h.year, h.cat)} 준우승`)}">#${esc(honorTitle(h.year, h.cat))} 준우승${named ? ` · ${esc(who)}` : ''}${more ? ` +${more}` : ''}</span>`;
+  const who = person(h.user_id);
+  return `<span class="tag ${who.cls}" title="${esc(`${who.name} 고른 ${honorTitle(h.year, h.cat)} 준우승`)}">#${esc(honorTitle(h.year, h.cat))} 준우승${named ? ` · ${esc(who.name)}` : ''}${more ? ` +${more}` : ''}</span>`;
 };
 // 끝난 월드컵을 내 기록으로 저장. 같은 월드컵을 다시 했으면 새 결과로 바꿈
 async function saveCup() {
@@ -1440,11 +1690,11 @@ async function saveCup() {
   c.saved = 'saving';
   const prev = myResult(c.year, c.cat);
   c.prev = prev && prev.champion_id !== c.champion ? prev.champion_name : null;
-  // 하는 사이 상대가 카테고리 이름을 바꿨으면 바뀐 이름으로, 장소를 지웠으면 이름만 남김
+  // 하는 사이 다른 멤버가 카테고리 이름을 바꿨으면 바뀐 이름으로, 장소를 지웠으면 이름만 남김
   const row = () => {
     const keep = (id) => (state.places.some((x) => x.id === id) ? id : null);
     return {
-      couple_id: state.couple.id, user_id: uid(),
+      couple_id: c.roomId, user_id: uid(),
       year: c.year === 'all' ? null : Number(c.year),
       category: c.cat === '전체' ? null : (state.categories.find((x) => x.id === c.catId) || {}).name,
       champion_id: keep(c.champion), champion_name: c.names[c.champion],
@@ -1456,17 +1706,17 @@ async function saveCup() {
     ? Promise.resolve({ error: { message: 'cup_category_gone' } })
     : sb.from('cup_results').upsert(r, { onConflict: 'couple_id,user_id,year,category' }).select().single());
   let res = await upsert(row());
-  // 이 기기가 모르는 사이 상대가 장소·카테고리를 바꿨을 수 있으니 새로 불러와서 한 번 더
-  if (res.error) {
+  // 이 기기가 모르는 사이 다른 멤버가 장소·카테고리를 바꿨을 수 있으니 새로 불러와서 한 번 더 (그사이 방을 바꿨으면 안 함)
+  if (res.error && state.roomId === c.roomId) {
     try { await loadAll(); } catch { /* 처음 오류를 그대로 보여 줌 */ }
     res = await upsert(row());
   }
   if (res.error) {
     c.saved = 'error'; c.saveError = friendly(res.error);
   } else {
-    // 상대가 같은 월드컵을 방금 끝냈을 수도 있으니 기록 전체를 다시 받아서 황금 도장 여부를 정함
-    const all = await sb.from('cup_results').select('*').order('played_at', { ascending: false });
-    state.cupResults = all.error ? [res.data, ...state.cupResults.filter((r) => r.id !== res.data.id)] : all.data;
+    // 다른 멤버가 방금 끝낸 월드컵 기록도 같이 보이게 기록 전체를 다시 받음
+    const all = await sb.from('cup_results').select('*').eq('couple_id', c.roomId).order('played_at', { ascending: false });
+    if (state.roomId === c.roomId) state.cupResults = all.error ? [res.data, ...state.cupResults.filter((r) => r.id !== res.data.id)] : all.data;
     c.saved = 'ok';
     if (c.cat !== '전체' && res.data.category !== c.cat) { c.cat = res.data.category; c.title = cupTitle(c.year, c.cat); } // 바뀐 카테고리 이름으로
   }
@@ -1480,7 +1730,7 @@ async function saveCup() {
 async function deleteCupResult(id) {
   const r = state.cupResults.find((x) => x.id === id);
   if (!r || !confirm(`${cupTitle(recYear(r), recCat(r))} 내 기록을 지울까요? 1위 도장도 같이 사라져요.`)) return;
-  const { error } = await sb.from('cup_results').delete().eq('id', id);
+  const { error } = await sb.from('cup_results').delete().eq('couple_id', state.roomId).eq('id', id);
   if (error) throw error;
   state.cupResults = state.cupResults.filter((x) => x.id !== id);
   renderSheet(); render();
@@ -1493,13 +1743,14 @@ const cupTabs = () => `<div class="seg" style="margin:4px 0 8px" role="group" ar
 const placeLink = (id, name) => (id && state.places.some((x) => x.id === id)
   ? `<button class="link" data-action="open" data-id="${esc(id)}">${esc(name)}</button>`
   : `<span>${esc(name)}</span> <span class="gone">(지운 장소)</span>`);
+// 월드컵 하나(연도 + 카테고리): 기록을 남긴 멤버만 들어온 순서로, 내가 아직 안 했으면 내 줄('나도 하기')도
 function recCard(g) {
-  // 1위 장소를 지웠어도(연결이 끊겨도) 같은 이름이면 둘 다 1위로 봄
-  const pick = (r) => r.champion_id || `이름:${r.champion_name}`;
-  const both = g.rs.length > 1 && g.rs.every((r) => pick(r) === pick(g.rs[0]));
-  const rows = ownerFirst().map((m) => {
-    const w = person(m.user_id), r = g.rs.find((x) => x.user_id === m.user_id);
-    const who = `<span class="who"><i class="dot"></i>${esc(w.name)}${w.me ? '<span class="you">나</span>' : ''}</span>`;
+  const ids = memberOrder().map((m) => m.user_id);
+  const users = [...ids, ...g.rs.map((r) => r.user_id).filter((id, i, a) => !ids.includes(id) && a.indexOf(id) === i)]
+    .filter((id) => id === uid() || g.rs.some((r) => r.user_id === id));
+  const rows = users.map((id) => {
+    const w = person(id), r = g.rs.find((x) => x.user_id === id);
+    const who = `<span class="who"><i class="dot"></i><span class="nm">${esc(w.name)}</span>${w.me ? '<span class="you">나</span>' : ''}</span>`;
     if (!r) {
       return `<div class="rec-row ${w.cls}"><div class="rec-line">${who}${w.me
         ? `<button class="text-btn" data-action="cup-play" data-year="${esc(g.year)}" data-cat="${esc(g.cat)}" style="color:var(--p1)">나도 하기</button>`
@@ -1511,8 +1762,8 @@ function recCard(g) {
       <div class="rec-sub">준우승 ${placeLink(r.runner_up_id, r.runner_up_name)} · 후보 ${r.candidates}곳${w.me ? ` · <button class="text-btn danger" data-action="cup-del" data-id="${esc(r.id)}">기록 삭제</button>` : ''}</div>
     </div>`;
   }).join('');
-  return `<article class="rec${both ? ' both' : ''}">
-    <div class="rec-head"><span class="rec-title">${esc(cupTitle(g.year, g.cat))}</span>${both ? '<span class="gold-badge">둘 다 1위</span>' : ''}</div>
+  return `<article class="rec">
+    <div class="rec-head"><span class="rec-title">${esc(cupTitle(g.year, g.cat))}</span></div>
     ${rows}
   </article>`;
 }
@@ -1528,12 +1779,12 @@ function cupRecordsView() {
   const sections = years.map((y) => `<h3 class="rec-year">${y === 'all' ? '전체 기간' : `${y}년`}</h3>${groups
     .filter((g) => g.year === y).sort((a, b) => catPos(a.cat) - catPos(b.cat)).map(recCard).join('')}`).join('');
   return `${head}<div class="sheet-body">${cupTabs()}
-    <p class="hint" style="margin:0">각자 고른 1위엔 그 사람 색 도장이, 둘 다 같은 곳을 고르면 황금 도장이 찍혀요.</p>
+    <p class="hint" style="margin:0">각자 고른 1위엔 그 사람 색 도장이 찍혀요.</p>
     ${sections}
   </div>`;
 }
 
-/* ---------- 카테고리 (두 사람이 함께 씀) ---------- */
+/* ---------- 카테고리 (방 멤버가 함께 씀) ---------- */
 async function addCategory(btn) {
   const box = btn.closest('.new-cat'), input = box.querySelector('input');
   const name = input.value.trim();
@@ -1541,7 +1792,7 @@ async function addCategory(btn) {
   if (name === '전체') { toast('‘전체’는 카테고리 이름으로 쓸 수 없어요.'); return; }
   if (!catNames().includes(name)) {
     const position = Math.max(0, ...state.categories.map((c) => c.position)) + 1;
-    const { data, error } = await sb.from('categories').insert({ couple_id: state.couple.id, name, position }).select('id, name, position').single();
+    const { data, error } = await sb.from('categories').insert({ couple_id: state.roomId, name, position }).select('id, name, position').single();
     if (error) throw error;
     state.categories.push(data);
     toast(`‘${name}’ 카테고리를 추가했어요.`);
@@ -1568,7 +1819,7 @@ async function renameCategory(input) {
     toast(name ? '‘전체’는 카테고리 이름으로 쓸 수 없어요.' : '카테고리 이름을 입력해 주세요.');
     return;
   }
-  const { error } = await sb.from('categories').update({ name }).eq('id', cat.id);
+  const { error } = await sb.from('categories').update({ name }).eq('couple_id', state.roomId).eq('id', cat.id);
   if (error) { input.value = cat.name; throw error; }
   if (state.category === cat.name) state.category = name;
   if (state.cupSetup && state.cupSetup.cat === cat.name) state.cupSetup.cat = name;
@@ -1583,7 +1834,7 @@ async function moveCategory(id, dir) {
   [list[i], list[j]] = [list[j], list[i]];
   // 순서를 0부터 다시 매기고 바뀐 것만 저장
   const changed = list.map((c, k) => [c, k]).filter(([c, k]) => c.position !== k);
-  const res = await Promise.all(changed.map(([c, k]) => sb.from('categories').update({ position: k }).eq('id', c.id)));
+  const res = await Promise.all(changed.map(([c, k]) => sb.from('categories').update({ position: k }).eq('couple_id', state.roomId).eq('id', c.id)));
   const bad = res.find((r) => r.error);
   if (bad) throw bad.error;
   state.categories = list.map((c, k) => ({ ...c, position: k }));
@@ -1600,7 +1851,7 @@ async function deleteCategory(id) {
   // 그 카테고리 월드컵 기록은 DB에서 같이 지워짐 (도장도 사라짐)
   const cups = cupGroups().filter((g) => g.cat === cat.name).length;
   if (!confirm(`‘${cat.name}’ 카테고리를 삭제할까요?${cups ? ` ${cat.name} 월드컵 기록 ${cups}개와 도장도 같이 지워져요.` : ''}`)) return;
-  const { error } = await sb.from('categories').delete().eq('id', id);
+  const { error } = await sb.from('categories').delete().eq('couple_id', state.roomId).eq('id', id);
   if (error) throw error;
   state.categories = state.categories.filter((c) => c.id !== id);
   state.cupResults = state.cupResults.filter((r) => r.category !== cat.name);
@@ -1609,18 +1860,80 @@ async function deleteCategory(id) {
   toast('카테고리를 삭제했어요.');
 }
 
-/* ---------- 시트: 설정 ---------- */
+/* ---------- 시트: 내 정보 (방·멤버·초대 코드·닉네임·색·방 바꾸기·카테고리·계정, 맨 아래 나가기) ---------- */
+const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+// 내 색: 이 방에서 다른 멤버가 쓰지 않는 색만 (다른 멤버 색은 아예 안 보여 줌). 지금 내 색은 눌린 상태 + 체크
+function colorPickerHtml(me) {
+  if (!me) return '';
+  const taken = new Set(state.members.filter((m) => m.user_id !== uid()).map((m) => m.color));
+  const free = MEMBER_COLORS.filter((c) => !taken.has(c.id));
+  const mine = COLOR_BY_ID.get(me.color);
+  return `<div class="settings-group">
+      <h3>내 색${mine ? `<span class="member-count">${esc(mine.name)}</span>` : ''}</h3>
+      <div class="swatches" id="swatches" role="group" aria-label="내 색 고르기">${free.map((c) => `<button type="button" class="swatch mc mc-${c.id}" data-action="set-color" data-color="${c.id}" aria-label="${esc(c.name)}" aria-pressed="${c.id === me.color}" title="${esc(c.name)}">${CHECK}</button>`).join('')}</div>
+      <p class="hint">후기·별점·도장에 이 색이 쓰여요. 다른 멤버가 쓰는 색은 빠져 있어요.</p>
+    </div>`;
+}
+// 색 바꾸기 (set_member_color). 그사이 다른 멤버가 같은 색을 골랐으면 DB가 막고, 새로 불러와서 다시 보여 줌
+let colorBusy = false;
+async function setMyColor(color) {
+  const me = myMember();
+  if (colorBusy || !me || me.color === color) return;
+  const roomId = state.roomId;
+  colorBusy = true;
+  const grid = $('#swatches');
+  if (grid) grid.setAttribute('aria-busy', 'true');
+  try {
+    const { error } = await sb.rpc('set_member_color', { p_couple: roomId, p_color: color });
+    if (error) toast(friendly(error));
+    try { await refresh(); } catch (x) { if (!error) toast(friendly(x)); }
+    if (state.roomId !== roomId) return; // 그사이 방을 바꿈
+    if (state.sheet && state.sheet.type === 'settings') {
+      renderSheet();
+      const on = $('#sheet-root [data-action=set-color][aria-pressed="true"]');
+      if (on) on.focus({ preventScroll: true });
+    }
+    if (!error) toast('내 색을 바꿨어요.');
+  } finally {
+    colorBusy = false;
+    const g = $('#swatches');
+    if (g) g.removeAttribute('aria-busy');
+  }
+}
 function settingsView() {
-  const me = state.members.find((m) => m.user_id === uid());
+  const me = myMember();
+  const room = state.couple;
   const id = loginId(state.user.email); // 친구용 아이디 계정이면 주소 대신 아이디
-  return `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">설정</h2><span style="width:40px"></span></div>
+  const n = state.members.length, full = n >= MAX_MEMBERS;
+  const others = state.rooms.filter((r) => r.id !== state.roomId);
+  const memberRow = (m) => {
+    const w = person(m.user_id);
+    return `<li class="${w.cls}"><i class="dot"></i><span>${esc(w.name)}</span>${w.owner ? '<span class="badge">방장</span>' : ''}${w.me ? '<span class="you">나</span>' : ''}</li>`;
+  };
+  return `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">내 정보</h2><span style="width:40px"></span></div>
   <div class="sheet-body">
     <p class="hint" style="margin:4px 0 0">${id ? `아이디 ${esc(id)}로` : `${esc(state.user.email)}로`} 로그인했어요.</p>
+    <div class="settings-group">
+      <h3>방</h3>
+      ${isOwner()
+        ? `<form id="room-name-form" novalidate><div class="row"><label class="field"><span class="sr">방 이름</span><input class="input" name="room" maxlength="30" value="${esc(room.name)}" required></label><button class="btn small" type="submit" style="min-height:46px">이름 저장</button></div></form>`
+        : `<p class="room-title">${esc(room.name)}</p><p class="hint">방 이름은 방장만 바꿀 수 있어요.</p>`}
+      <h3 style="margin:18px 0 2px">멤버<span class="member-count">${n}/${MAX_MEMBERS}명</span></h3>
+      <ul class="member-list">${memberOrder().map(memberRow).join('')}</ul>
+    </div>
+    ${room.invite_code ? `<div class="settings-group"><h3>초대 코드</h3><div class="code-box">${esc(room.invite_code)}</div><button class="btn block ghost" data-action="copy-code">코드 복사</button>
+      <p class="hint">${full ? `${MAX_MEMBERS}명이 모두 찼어요. 누가 나가면 다시 들어올 수 있어요.` : `이 코드로 ${MAX_MEMBERS}명까지 들어올 수 있어요.`}</p></div>` : ''}
     <form class="settings-group" id="name-form" novalidate>
-      <h3>내 이름</h3>
-      <div class="row"><label class="field"><span class="sr">내 이름</span><input class="input" name="name" maxlength="20" value="${esc(me ? me.display_name : '')}" required></label><button class="btn small" type="submit" style="min-height:46px">이름 저장</button></div>
+      <h3>이 방에서 쓰는 닉네임</h3>
+      <div class="row"><label class="field"><span class="sr">닉네임</span><input class="input" name="name" maxlength="20" value="${esc(me ? me.display_name : '')}" required></label><button class="btn small" type="submit" style="min-height:46px">닉네임 저장</button></div>
+      <p class="hint">방마다 따로 정해요.</p>
     </form>
-    ${state.couple.invite_code ? `<div class="settings-group"><h3>초대 코드</h3><div class="code-box">${esc(state.couple.invite_code)}</div><button class="btn block ghost" data-action="copy-code">코드 복사</button><p class="hint">상대가 참여하면 코드는 자동으로 사라져요.</p></div>` : ''}
+    ${colorPickerHtml(me)}
+    <div class="settings-group">
+      <h3>방 바꾸기</h3>
+      ${others.length ? `<ul class="room-list">${others.map((r) => roomCard(r, null)).join('')}</ul>` : '<p class="hint" style="margin:0">지금 든 방은 이 방 하나예요.</p>'}
+      ${roomNewButtons()}
+    </div>
     <div class="settings-group">
       <h3>카테고리</h3>
       <ul class="cat-list">${state.categories.map((c, i) => `<li>
@@ -1630,7 +1943,7 @@ function settingsView() {
         <button class="icon-btn" data-action="cat-delete" data-id="${c.id}" aria-label="${esc(c.name)} 삭제">${ICON.trash}</button>
       </li>`).join('')}</ul>
       <div class="new-cat"><input class="input" maxlength="20" placeholder="새 카테고리 이름" aria-label="새 카테고리 이름" enterkeyhint="done"><button class="btn small" data-action="add-cat">추가</button></div>
-      <p class="hint">이름을 바꾸면 그 카테고리의 장소도 같이 바뀌어요. 두 사람 모두에게 똑같이 보여요.</p>
+      <p class="hint">이름을 바꾸면 그 카테고리의 장소도 같이 바뀌어요. 멤버 모두에게 똑같이 보여요.</p>
     </div>
     <form class="settings-group" id="pw-form" novalidate>
       <h3>비밀번호 변경</h3>
@@ -1641,7 +1954,65 @@ function settingsView() {
     </form>
     <div class="settings-group"><button class="btn block ghost" data-action="logout">로그아웃</button></div>
     <p class="app-version">${esc(APP_VERSION)}</p>
+    <div class="danger-zone"><span>${n > 1 ? '내 후기와 월드컵 기록은 지워지고, 담은 장소는 남아요.' : '혼자 남은 방이라 나가면 방이 지워져요.'}</span><button class="text-btn danger" data-action="leave-room">이 방에서 나가기</button></div>
   </div>`;
+}
+
+/* ---------- 나가기 ---------- */
+// 멤버가 남아 있으면 내 후기·월드컵 기록만 지우고 나감(방장이면 가장 먼저 들어온 멤버가 방장).
+// 혼자 남았으면 방이 통째로 지워짐: 사진 파일은 SQL로 못 지우니 Storage에서 먼저 지우고 나감
+async function leaveRoom(btn) {
+  const start = state.roomId;
+  try { await refresh(); } catch { /* 지금 아는 멤버 수로 진행 (DB가 다시 확인함) */ }
+  const room = state.couple;
+  if (!room || room.id !== start) return; // 그사이 방이 바뀜
+  const roomId = room.id, name = room.name;
+  const alone = state.members.length <= 1;
+  if (alone) {
+    if (!confirm(`‘${name}’에서 나가면 방이 없어져요. 장소·사진·후기·월드컵 기록이 모두 지워지고 되돌릴 수 없어요.`)) return;
+    if (!confirm(`정말 ‘${name}’ 방을 지울까요?`)) return;
+  } else if (!confirm(`‘${name}’에서 나갈까요? 내가 남긴 후기와 월드컵 기록은 지워지고, 내가 담은 장소와 사진은 방에 남아요.${isOwner() ? ' 방장은 가장 먼저 들어온 멤버에게 넘어가요.' : ''}`)) return;
+  await busy(btn, async () => {
+    if (alone) {
+      // 이때부터 15분 동안 이 방 코드로는 들어올 수 없음 (사진을 지우는 사이 누가 들어오지 않게)
+      const { data: paths, error } = await sb.rpc('begin_room_delete', { p_couple: roomId });
+      if (error) {
+        toast(friendly(error));
+        if (/not_last_member/.test(error.message || '')) await refresh().catch(() => {});
+        return;
+      }
+      // 이 방 장소 폴더('<장소 id>/…') 안의 파일만 지움 (DB도 그렇게 돌려주지만 한 번 더 확인)
+      const placeIds = new Set(state.places.map((p) => p.id));
+      const list = (paths || []).filter((x) => typeof x === 'string' && x && placeIds.has(x.split('/')[0]));
+      for (let i = 0; i < list.length; i += 100) {
+        if (list.length > 100) toast(`사진을 지우는 중… (${Math.min(i + 100, list.length)}/${list.length})`, 0);
+        const { error: rmError } = await sb.storage.from(BUCKET).remove(list.slice(i, i + 100));
+        if (rmError) { toast('사진을 다 지우지 못했어요. 다시 시도해 주세요.', 5000); return; } // 방은 남음
+      }
+    }
+    const { data, error } = await sb.rpc('leave_room', { p_couple: roomId });
+    if (error) {
+      // 그사이 다른 멤버가 모두 나가 혼자 남음: 방을 지우는 것은 사진을 지우고 한 번 더 확인받은 뒤에만 (DB가 막음)
+      if (/last_member/.test(error.message || '') && !/not_last_member/.test(error.message || '')) {
+        toast('그사이 다른 멤버가 모두 나갔어요. 다시 확인해 주세요.');
+        await refresh().catch(() => {});
+        return;
+      }
+      throw error;
+    }
+    // 그 방은 이제 내 방이 아님: 기억해 둔 방에서 빼고 남은 방으로 (1개면 그 방, 2개 이상이면 방 고르기, 0개면 시작하기)
+    if (lastRoom() === roomId) rememberRoom(null);
+    state.rooms = state.rooms.filter((r) => r.id !== roomId);
+    state.allMembers = state.allMembers.filter((m) => m.couple_id !== roomId);
+    state.roomId = null;
+    resetRoomView();
+    forcePicker = false;
+    state.roomId = chooseRoom(); // 1개 남았으면 바로 그 방(불러오는 중 화면), 0개·2개 이상이면 시작하기·방 고르기
+    applyRoom();
+    render();
+    toast(data && data.room_deleted ? '방을 지웠어요.' : '방에서 나왔어요.');
+    try { await refresh({ keepSheet: false }); } catch (err) { toast(friendly(err)); }
+  });
 }
 
 /* ---------- 렌더링 ---------- */
@@ -1650,32 +2021,40 @@ function render() {
   const app = $('#app');
   if (!configured) { screen = 'config'; app.innerHTML = viewConfig(); return; }
   if (!state.user) { screen = 'login'; app.innerHTML = SIGNUP_ENABLED && authMode === 'signup' ? viewSignup() : viewLogin(); return; }
-  if (!state.couple) { screen = 'onboard'; app.innerHTML = viewOnboard(); return; }
+  // 방 목록을 아직 못 받았거나, 고른 방의 장소를 불러오는 중
+  if (state.roomId ? state.loadedRoom !== state.roomId || !state.couple : !state.roomsLoaded) { screen = 'loading'; app.innerHTML = viewLoading(); return; }
+  if (!state.rooms.length) { screen = 'onboard'; app.innerHTML = viewOnboard(); return; }
+  if (!state.couple) { screen = 'rooms'; app.innerHTML = viewRooms(); return; }
   screen = 'main';
   app.innerHTML = viewMain();
   markStampsSeen();
 }
 let lastFocus = null;
-function openSheet(type, id) {
+function openSheet(type, id, extra = {}) {
   cancelGoogle();
   if (!state.sheet) lastFocus = document.activeElement;
-  state.sheet = { type, id };
+  state.sheet = { type, id, ...extra };
   if (type === 'detail') { state.editVisit = null; state.draftRating = 0; state.photoIdx = 0; }
   renderSheet();
   const first = $('#sheet-root input:not([type=hidden]), #sheet-root textarea');
-  if (first && type !== 'detail') first.focus(); else { const c = $('#sheet-root [data-action=close]'); c && c.focus(); }
+  // 상세·내 정보는 보러 여는 시트라 입력 칸에 커서를 두지 않음 (휴대폰에서 키보드가 바로 올라오지 않게)
+  if (first && type !== 'detail' && type !== 'settings') first.focus(); else { const c = $('#sheet-root [data-action=close]'); c && c.focus(); }
 }
 /* ---------- 뒤로 가기 (안드로이드 뒤로 버튼, 브라우저 뒤로) ----------
    층(시트 → 정보 수정 → 사진 크게 보기)이 열릴 때마다 방문 기록을 하나씩 쌓아서, 뒤로 가기는 맨 위 층만 닫음.
    다 닫힌 상태에서 누르면 앱을 떠남.
    ✕·저장·삭제처럼 앱이 직접 닫을 때는 쌓아 둔 기록도 같이 되돌림 (그때 오는 popstate는 무시).
    기록은 화면을 누른 그 순간에만 쌓음: 누르지 않았는데 쌓으면 크롬이 그 기록을 건너뛰어 앱이 바로 꺼질 수 있음 */
-const layers = [];         // 기록을 쌓아 둔 층: 'sheet' | 'edit' | 'viewer'
+const layers = [];         // 기록을 쌓아 둔 층: 'sheet' | 'edit' | 'sub'(내 정보에서 연 방 만들기·참여) | 'viewer'
 let skipPops = 0;          // 앱이 직접 되돌린 횟수만큼 popstate 무시
 let closingByBack = false; // 뒤로 가기로 닫는 중 (이때는 기록을 건드리지 않음)
 function wantedLayers() {
   const want = [];
-  if (state.sheet) { want.push('sheet'); if (state.sheet.type === 'edit') want.push('edit'); }
+  if (state.sheet) {
+    want.push('sheet');
+    if (state.sheet.type === 'edit') want.push('edit');
+    else if (state.sheet.type === 'room-new' && state.sheet.back === 'settings') want.push('sub');
+  }
   if ($('#viewer-root').innerHTML) want.push('viewer');
   return want;
 }
@@ -1704,12 +2083,13 @@ window.addEventListener('popstate', () => {
       const kind = layers.pop();
       if (kind === 'viewer') closeViewer();
       else if (kind === 'edit') { if (state.sheet && state.sheet.type === 'edit') openSheet('detail', state.sheet.id); }
+      else if (kind === 'sub') { if (state.sheet && state.sheet.type === 'room-new' && state.couple) openSheet('settings'); }
       else closeSheet(); // 하던 월드컵은 지우지 않음 → 트로피를 다시 누르면 이어서
     }
   } finally { closingByBack = false; }
   // 앞으로 가기로 기록만 앞서 나가면 다시 되돌림 (닫힌 화면을 기록만으로 다시 열지는 않음)
   if (depth > layers.length) { skipPops++; history.go(layers.length - depth); return; }
-  // 닫다가 다른 층도 같이 닫혔으면(예: 상대가 지운 장소) 남은 기록도 맞춤. 여기선 누른 게 아니라서 새로 쌓지는 않음
+  // 닫다가 다른 층도 같이 닫혔으면(예: 다른 멤버가 지운 장소) 남은 기록도 맞춤. 여기선 누른 게 아니라서 새로 쌓지는 않음
   syncHistory({ push: false });
 });
 function renderSheet() {
@@ -1723,7 +2103,15 @@ function drawSheet() {
   let inner = '';
   if (s.type === 'add') inner = placeForm(null);
   else if (s.type === 'edit') inner = placeForm(state.places.find((x) => x.id === s.id));
-  else if (s.type === 'settings') inner = settingsView();
+  else if (s.type === 'settings') {
+    if (!state.couple) { closeSheet(); return; } // 방에서 나간 뒤
+    // 색·닉네임을 바꾸고 다시 그려도 보던 자리 그대로
+    const scroll = root.dataset.view === 'settings' && $('.sheet-body', root) ? $('.sheet-body', root).scrollTop : 0;
+    mountSheet(settingsView(), 'settings');
+    if (scroll) $('.sheet-body', root).scrollTop = scroll;
+    return;
+  }
+  else if (s.type === 'room-new') inner = roomNewView();
   else if (s.type === 'cup') inner = state.cup ? cupView() : state.cupTab === 'records' ? cupRecordsView() : cupSetupView();
   else if (s.type === 'detail') {
     const p = state.places.find((x) => x.id === s.id);
@@ -1780,7 +2168,24 @@ document.addEventListener('click', async (e) => {
   const p = placeId && state.places.find((x) => x.id === placeId);
   try {
     switch (a) {
-      case 'onboard-mode': onboardMode = el.dataset.mode; render(); break;
+      case 'room-mode': {
+        // 만들기 ↔ 참여 전환. 적어 둔 닉네임은 그대로
+        const nick = $('#room-form') && field($('#room-form'), 'name').value;
+        if (state.sheet && state.sheet.type === 'room-new') { state.sheet.mode = el.dataset.mode; drawSheet(); }
+        else { onboardMode = el.dataset.mode; render(); }
+        const form = $('#room-form');
+        if (form && nick != null) field(form, 'name').value = nick;
+        break;
+      }
+      case 'room-new':
+        // 내 정보에서 열었으면 ✕·Esc·뒤로 가기로 내 정보로 돌아감
+        openSheet('room-new', null, { mode: el.dataset.mode === 'join' ? 'join' : 'create', back: state.sheet && state.sheet.type === 'settings' ? 'settings' : null });
+        break;
+      case 'pick-room': if (el.dataset.id !== state.roomId || state.loadedRoom !== el.dataset.id) await switchRoom(el.dataset.id); break;
+      case 'room-picker': state.roomId = null; state.loadError = false; applyRoom(); render(); break;
+      case 'retry-load': state.loadError = false; render(); await refresh({ keepSheet: false }); break;
+      case 'leave-room': await leaveRoom(el); break;
+      case 'set-color': await setMyColor(el.dataset.color); break;
       case 'auth-mode': authMode = el.dataset.mode; render(); window.scrollTo(0, 0); break;
       case 'logout': await sb.auth.signOut(); break;
       case 'tab': state.tab = el.dataset.tab; render(); break;
@@ -1792,6 +2197,7 @@ document.addEventListener('click', async (e) => {
       case 'close': {
         const s = state.sheet;
         if (s && s.type === 'edit') { openSheet('detail', s.id); break; }
+        if (s && s.type === 'room-new' && s.back === 'settings' && state.couple) { openSheet('settings'); break; }
         // 월드컵을 하던 중이면 한 번 물어봄. ✕로 닫으면 그만두는 것 (뒤로 가기로 닫으면 이어서 할 수 있게 남겨 둠)
         if (s && s.type === 'cup' && state.cup && !state.cup.champion && state.cup.history.length && !confirm('월드컵을 그만할까요? 지금까지 고른 건 사라져요.')) break;
         if (s && s.type === 'cup') state.cup = null;
@@ -1827,7 +2233,7 @@ document.addEventListener('click', async (e) => {
       case 'cup-records': state.cup = null; state.cupTab = 'records'; renderSheet(); break;
       case 'cup-tab': state.cupTab = el.dataset.tab; renderSheet(); break;
       case 'cup-play': {
-        // 역대 기록에서 '나도 하기': 상대가 한 월드컵과 같은 조건으로
+        // 역대 기록에서 '나도 하기': 다른 멤버가 한 월드컵과 같은 조건으로
         const { year, cat } = el.dataset;
         if (year !== 'all' && !cupYears().includes(year)) { toast(`${year}년 방문 기록이 이제 없어요.`); break; }
         state.cupSetup = { ...state.cupSetup, year, cat: cat === '전체' || catNames().includes(cat) ? cat : '전체' };
@@ -1858,7 +2264,7 @@ document.addEventListener('click', async (e) => {
       }
       case 'toggle-fav': {
         const next = !p.favorite;
-        const { error } = await sb.from('places').update({ favorite: next }).eq('id', p.id);
+        const { error } = await sb.from('places').update({ favorite: next }).eq('couple_id', state.roomId).eq('id', p.id);
         if (error) throw error;
         p.favorite = next; render(); renderSheet();
         toast(next ? '찜했어요.' : '찜을 해제했어요.');
@@ -1867,14 +2273,14 @@ document.addEventListener('click', async (e) => {
       case 'set-status': {
         const next = el.dataset.status;
         if (p.status === next) break;
-        const { error } = await sb.from('places').update({ status: next }).eq('id', p.id);
+        const { error } = await sb.from('places').update({ status: next }).eq('couple_id', state.roomId).eq('id', p.id);
         if (error) throw error;
         p.status = next; render(); renderSheet();
         toast(next === 'visited' ? '다녀온 곳으로 옮겼어요.' : '가고 싶은 곳으로 옮겼어요.');
         break;
       }
       case 'save-note': await busy(el, async () => {
-        const { error } = await sb.from('places').update({ shared_note: $('#shared-note').value.trim() }).eq('id', p.id);
+        const { error } = await sb.from('places').update({ shared_note: $('#shared-note').value.trim() }).eq('couple_id', state.roomId).eq('id', p.id);
         if (error) throw error;
         await refresh(); toast('메모를 저장했어요.');
       }); break;
@@ -1894,7 +2300,7 @@ document.addEventListener('click', async (e) => {
         if (!day) { toast('방문 날짜를 골라 주세요.'); return; }
         const body = $('#my-review').value.trim();
         const rating = state.draftRating || null;
-        // 새 방문인데 그 날짜 방문이 이미 있으면(상대가 먼저 남김) 거기에 내 후기를 붙임
+        // 새 방문인데 그 날짜 방문이 이미 있으면(다른 멤버가 먼저 남김) 거기에 내 후기를 붙임
         let v = p.visits.find((x) => x.id === state.editVisit) || p.visits.find((x) => x.visited_on === day);
         if (!v) {
           const { data, error } = await sb.from('visits').insert({ place_id: p.id, visited_on: day, created_by: uid() }).select().single();
@@ -1928,20 +2334,20 @@ document.addEventListener('click', async (e) => {
       case 'delete-visit': {
         const v = p.visits.find((x) => x.id === state.editVisit);
         if (!v || !confirm(`${fmtDay(v.visited_on)} 방문 기록을 삭제할까요?${v.reviews.length ? ' 내 후기도 함께 지워져요.' : ''}`)) break;
-        // 상대 후기가 그새 달렸으면 DB가 막아서 지워진 행이 없음
+        // 다른 멤버 후기가 그새 달렸으면 DB가 막아서 지워진 행이 없음
         const { data, error } = await sb.from('visits').delete().eq('id', v.id).select('id');
         if (error) throw error;
         state.editVisit = null; state.draftRating = 0;
         await refresh();
-        toast(data.length ? '방문 기록을 삭제했어요.' : '상대 후기가 있는 방문은 지울 수 없어요.');
+        toast(data.length ? '방문 기록을 삭제했어요.' : '다른 멤버의 후기가 있는 방문은 지울 수 없어요.');
         break;
       }
       case 'delete-place': {
-        if (!confirm(`${josa(p.name, '을', '를')} 삭제할까요? 방문 기록과 두 사람의 후기도 함께 지워져요.`)) break;
+        if (!confirm(`${josa(p.name, '을', '를')} 삭제할까요? 방문 기록과 멤버들의 후기도 함께 지워져요.`)) break;
         // 사진 권한은 장소 존재 여부로 확인하므로 장소보다 먼저 지움 (사진 표 줄은 장소와 같이 지워짐)
         if (p.photos.length) await sb.storage.from(BUCKET).remove(p.photos.map((x) => x.path));
         const sheet = state.sheet;
-        const { error } = await sb.from('places').delete().eq('id', p.id);
+        const { error } = await sb.from('places').delete().eq('couple_id', state.roomId).eq('id', p.id);
         if (error) throw error;
         if (state.sheet === sheet) { state.sheet = null; renderSheet(); } // 그사이 다른 화면을 열었으면 그건 두고
         await refresh(); toast('장소를 삭제했어요.');
@@ -2056,6 +2462,8 @@ document.addEventListener('submit', async (e) => {
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) { err.textContent = friendly(error); return; }
       state.user = data.user;
+      state.roomId = null;
+      forcePicker = true; // 방이 2개 이상이면 방 고르기 화면부터
       try { await refresh({ keepSheet: false }); } catch (x) { err.textContent = friendly(x); }
     });
   }
@@ -2071,22 +2479,44 @@ document.addEventListener('submit', async (e) => {
       if (error || !data.user) { authMode = 'login'; render(); $('#login-error').textContent = '가입했어요. 아이디와 비밀번호로 로그인해 주세요.'; return; }
       state.user = data.user;
       authMode = 'login';
+      forcePicker = true;
+      // 방 코드로 가입했으면 그 방으로 바로
+      state.roomId = typeof j.couple_id === 'string' ? j.couple_id : null;
+      if (state.roomId) rememberRoom(state.roomId);
       try { await refresh({ keepSheet: false }); } catch (x) { render(); toast(friendly(x)); return; }
-      toast(j.joined ? '가입했어요. 공간에 들어왔어요.' : '가입했어요. 이제 둘만의 공간을 만들어요.');
+      toast(j.joined ? '가입했어요. 방에 들어왔어요.' : '가입했어요. 이제 방을 만들거나 참여해요.');
     });
   }
-  if (f.id === 'onboard-form') {
-    const err = $('#onboard-error'); err.textContent = '';
+  if (f.id === 'room-form') {
+    // 방 만들기(방 이름 + 닉네임) 또는 코드로 참여(초대 코드 + 닉네임). 시작하기 화면과 '새 방' 시트가 같이 씀
+    const err = f.querySelector('.error'); err.textContent = '';
+    const create = f.dataset.mode === 'create';
+    const roomName = create ? field(f, 'room').value.trim() : '';
+    const code = create ? '' : field(f, 'code').value.toUpperCase().replace(/[\s-]/g, '');
     const name = field(f, 'name').value.trim();
-    if (!name) { err.textContent = '이름을 입력해 주세요.'; return; }
+    if (create && !roomName) { err.textContent = '방 이름을 입력해 주세요.'; return; }
+    if (!create && !code) { err.textContent = '초대 코드를 입력해 주세요.'; return; }
+    if (!name) { err.textContent = '닉네임을 입력해 주세요.'; return; }
     await busy(btn, async () => {
-      const { error } = onboardMode === 'create'
-        ? await sb.rpc('create_couple', { p_display_name: name })
-        : SIGNUP_ENABLED ? await joinViaServer(f.code.value, name) // 친구용: 서버가 횟수를 세고 참여시킴
-          : await sb.rpc('join_couple', { p_invite_code: f.code.value, p_display_name: name });
+      const { data, error } = create
+        ? await sb.rpc('create_couple', { p_display_name: name, p_couple_name: roomName })
+        : SIGNUP_ENABLED ? await joinViaServer(code, name) // 친구용: 서버가 횟수를 세고 참여시킴
+          : await sb.rpc('join_couple', { p_invite_code: code, p_display_name: name });
       if (error) { err.textContent = friendly(error); return; }
-      await refresh({ keepSheet: false });
-      toast(onboardMode === 'create' ? '공간을 만들었어요. 초대 코드를 보내 주세요.' : '공간에 참여했어요.');
+      try { await switchRoom(typeof data === 'string' && data ? data : null); } catch (x) { toast(friendly(x)); return; }
+      toast(create ? '방을 만들었어요. 초대 코드를 보내 주세요.' : '방에 들어왔어요.');
+    });
+  }
+  if (f.id === 'room-name-form') {
+    const roomId = state.roomId, name = field(f, 'room').value.trim();
+    if (!name) { toast('방 이름을 1~30자로 입력해 주세요.'); return; }
+    if (state.couple && name === state.couple.name) return;
+    await busy(btn, async () => {
+      const { error } = await sb.rpc('rename_room', { p_couple: roomId, p_name: name });
+      if (error) { toast(friendly(error)); return; }
+      try { await refresh(); } catch (x) { toast(friendly(x)); return; }
+      if (state.sheet && state.sheet.type === 'settings') renderSheet();
+      toast('방 이름을 바꿨어요.');
     });
   }
   if (f.id === 'place-form') {
@@ -2108,7 +2538,7 @@ document.addEventListener('submit', async (e) => {
     const fields = { name, address: f.address.value.trim() || null, category: f.category.value, naver_url };
     await busy(btn, async () => {
       if (sheet.type === 'edit') {
-        const { error } = await sb.from('places').update(fields).eq('id', sheet.id);
+        const { error } = await sb.from('places').update(fields).eq('couple_id', state.roomId).eq('id', sheet.id);
         if (error) { if (stillOpen()) err.textContent = friendly(error); else toast(friendly(error)); return; }
         await refresh({ keepSheet: !stillOpen() });
         if (stillOpen()) openSheet('detail', sheet.id);
@@ -2116,7 +2546,7 @@ document.addEventListener('submit', async (e) => {
       } else {
         const { data, error } = await sb.from('places').insert({
           ...fields, status: f.status.value, shared_note: f.shared_note.value.trim(),
-          couple_id: state.couple.id, created_by: uid(),
+          couple_id: state.roomId, created_by: uid(),
         }).select('id').single();
         if (error) { if (stillOpen()) err.textContent = friendly(error); else toast(friendly(error)); return; }
         const files = f.photo.files;
@@ -2132,9 +2562,12 @@ document.addEventListener('submit', async (e) => {
     const name = field(f, 'name').value.trim();
     if (!name) return;
     await busy(btn, async () => {
-      const { error } = await sb.from('couple_members').update({ display_name: name }).eq('user_id', uid());
+      // 닉네임은 방마다 따로: 지금 방의 내 줄만 바꿈 (방 조건이 없으면 내가 든 모든 방이 바뀜)
+      const { error } = await sb.from('couple_members').update({ display_name: name }).eq('couple_id', state.roomId).eq('user_id', uid());
       if (error) { toast(friendly(error)); return; }
-      await refresh(); toast('이름을 바꿨어요.');
+      try { await refresh(); } catch (x) { toast(friendly(x)); return; }
+      if (state.sheet && state.sheet.type === 'settings') renderSheet();
+      toast('닉네임을 바꿨어요.');
     });
   }
   if (f.id === 'pw-form') {
@@ -2149,9 +2582,9 @@ document.addEventListener('submit', async (e) => {
   }
 });
 
-// 다른 앱에 갔다 돌아오면 상대가 바꾼 내용을 다시 불러옴
+// 다른 앱에 갔다 돌아오면 다른 멤버가 바꾼 내용을 다시 불러옴
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && state.user && state.couple) refresh().catch(() => {});
+  if (document.visibilityState === 'visible' && state.user && state.roomId) refresh().catch(() => {});
 });
 
 /* ---------- 시작 ---------- */
@@ -2161,7 +2594,12 @@ document.addEventListener('visibilitychange', () => {
   if (!configured) { render(); return; }
   sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
-      Object.assign(state, { user: null, couple: null, members: [], places: [], categories: [], sheet: null, cup: null, cupResults: [], cupTab: 'new' });
+      loadGen++; // 로그아웃 전에 시작한 불러오기는 버림
+      Object.assign(state, {
+        user: null, rooms: [], allMembers: [], roomsLoaded: false, roomId: null, couple: null, members: [], loadedRoom: null, loadError: false,
+        places: [], categories: [], sheet: null, cup: null, cupSetup: null, cupResults: [], cupTab: 'new', query: '', category: '전체',
+      });
+      forcePicker = false;
       onboardMode = 'create';
       authMode = 'login';
       $('#viewer-root').innerHTML = ''; // 사진 크게 보기도 같이 닫음
@@ -2173,7 +2611,7 @@ document.addEventListener('visibilitychange', () => {
   const { data } = await sb.auth.getSession();
   state.user = data.session ? data.session.user : null;
   if (state.user) {
-    try { await loadAll(); } catch (err) { toast(friendly(err)); }
+    try { await loadAll(); } catch (err) { state.loadError = true; toast(friendly(err)); }
   }
   render();
 })();

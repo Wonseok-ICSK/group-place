@@ -1,12 +1,12 @@
 // 친구용 홈 서버: Vercel이 하던 일(정적 파일 + POST /api/place)과 친구용 '초대 코드로 가입'(POST /api/signup),
-// 앱 안에서 공간 코드로 참여(POST /api/join, 친구용 DB는 join_couple을 앱에서 직접 못 부름)를 맡는다.
+// 앱 안에서 방 코드로 참여(POST /api/join, 친구용 DB는 join_couple을 앱에서 직접 못 부름)를 맡는다.
 // 로그인·데이터·사진은 친구용 Supabase 프로젝트가 맡고, 이 서버는 그 주소와 공개 키를 index.html에 넣어 줄 뿐이다.
 // 저장소의 index.html에는 자리표시값이 들어 있고, 보낼 때만 아래 줄들을 설정값으로 바꾼다. 파일 자체는 고치지 않는다.
 //   const SUPABASE_URL / const SUPABASE_KEY / og:url / og:image / const LOGIN_ID_DOMAIN / const SIGNUP_ENABLED
 // 환경 변수(/etc/our-places/env): SUPABASE_URL, SUPABASE_KEY(Publishable key), PUBLIC_ORIGIN, PORT(기본 8090),
 //   LOGIN_ID_DOMAIN(아이디 로그인용 주소, 예: id.example.com. 이미 만든 아이디 계정이 이 주소로 되어 있으니 바꾸지 않는다)
 // 선택(/etc/our-places/secret.env, set-secret.sh가 씀): SUPABASE_SECRET_KEY. 있으면 확인한 뒤에만 가입과 앱 안 코드 참여를 켠다
-//   (없으면 친구용 앱에서는 공간 코드로 참여가 안 된다. 공간 만들기는 된다).
+//   (없으면 친구용 앱에서는 방 코드로 참여가 안 된다. 방 만들기는 된다).
 // 127.0.0.1에서만 받고, 밖에서는 Cloudflare Tunnel 같은 리버스 프록시(PUBLIC_ORIGIN)로만 들어온다.
 'use strict';
 const http = require('node:http');

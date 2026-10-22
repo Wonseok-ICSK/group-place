@@ -9,3 +9,7 @@ Thumbs.db
 .claude/
 .codex/
 .mcp.json
+# SQL 시험(PGlite) 설치물
+dev/sqltest/node_modules/
+# 가짜 데이터 화면 캡처(dev/mock/shoot.py로 다시 만듦)
+dev/screens/
