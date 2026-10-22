@@ -1,7 +1,7 @@
 {
   "name": "group-place-sqltest",
   "private": true,
-  "description": "groups.sql 시험 (PGlite, 운영 DB에 연결하지 않음)",
+  "description": "groups.sql·colors.sql 시험 (PGlite, 운영 DB에 연결하지 않음)",
   "scripts": {
     "test": "node --test --test-concurrency=1"
   },

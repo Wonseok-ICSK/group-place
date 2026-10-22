@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   ROOT, SQL, uid, newDb, addUsers, run, asUser, ANON, SERVICE, expectError,
-  createRoom, codeOf, join, members, count,
+  createRoom, codeOf, join, members, count, snapshot,
 } = require('./helpers.cjs');
 
 const CODE_RE = /^[0-9A-F]{8}$/;
@@ -115,9 +115,10 @@ test('2. member_colors 40개, 설계·화면과 id·순서 같음, 두 번 적�
   const design = designColorIds();
   assert.equal(design.filter(Boolean).length, 40, '설계 문서 §2.6 표에서 40개를 읽어야 함');
   assert.deepEqual(rows.map((r) => r.id), design);
+  // 화면은 v0.1.2부터 colors.sql의 24색을 씀(colors.test.cjs가 비교). 예전 40색 목록일 때만 여기서 비교
   const client = clientColorIds();
-  if (client) assert.deepEqual(client, design, 'index.html MEMBER_COLORS가 SQL과 다름');
-  else t.diagnostic('index.html에 아직 MEMBER_COLORS가 없어서 화면 비교는 건너뜀');
+  if (client && client.length === 40) assert.deepEqual(client, design, 'index.html MEMBER_COLORS가 SQL과 다름');
+  else t.diagnostic('index.html MEMBER_COLORS가 groups.sql의 40색 목록이 아니라서 여기서는 비교하지 않음(colors.test.cjs가 비교)');
 
   await expectError(db.exec(SQL('groups.sql')), /이미 적용된 SQL이에요/);
   await db.exec('rollback').catch(() => {});
@@ -648,29 +649,6 @@ test('14. RLS: 방끼리 모든 표가 막힘, 두 방 멤버는 둘 다, 초대
 });
 
 // ---------- 15. 되돌리기 ----------
-async function snapshot(db) {
-  const q = async (sql) => (await db.query(sql)).rows.map((r) => Object.values(r).join(' | '));
-  return {
-    functions: await q(`select p.oid::regprocedure::text, pg_get_functiondef(p.oid),
-                               coalesce((select string_agg(a::text, ',' order by a::text) from unnest(p.proacl) a), '')
-                        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                        where n.nspname = 'public' order by 1`),
-    constraints: await q(`select conrelid::regclass::text, conname, pg_get_constraintdef(oid) from pg_constraint
-                          where connamespace = 'public'::regnamespace order by 1, 2`),
-    indexes: await q("select tablename, indexname, indexdef from pg_indexes where schemaname = 'public' order by 1, 2"),
-    columns: await q(`select table_name, column_name, data_type, is_nullable, coalesce(column_default, '')
-                      from information_schema.columns where table_schema = 'public' order by 1, ordinal_position`),
-    triggers: await q("select tgrelid::regclass::text, tgname from pg_trigger where not tgisinternal order by 1, 2"),
-    policies: await q("select schemaname, tablename, policyname, cmd, coalesce(qual, ''), coalesce(with_check, '') from pg_policies order by 1, 2, 3"),
-    tableAcl: await q(`select c.relname, coalesce((select string_agg(a::text, ',' order by a::text) from unnest(c.relacl) a), '')
-                       from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' order by 1`),
-    columnAcl: await q(`select c.relname, a.attname, coalesce((select string_agg(x::text, ',' order by x::text) from unnest(a.attacl) x), '')
-                        from pg_attribute a join pg_class c on c.oid = a.attrelid
-                        where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and a.attnum > 0 and not a.attisdropped
-                          and a.attacl is not null order by 1, 2`),
-  };
-}
-
 test('15. 되돌리기: 여러 방 멤버가 있으면 멈춤, 성공하면 적용 전과 같음, 다시 적용 가능', async () => {
   const db = await newDb({ groups: false });
   const before = await snapshot(db);

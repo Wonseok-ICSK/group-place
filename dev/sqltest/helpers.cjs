@@ -1,6 +1,6 @@
 'use strict';
-// groups.sql 시험 도우미: PGlite(메모리 안 Postgres)로 새 DB를 만들고, Supabase 흉내(stubs.sql) 위에
-// schema.sql → friends-keepalive.sql → friends-signup.sql (→ groups.sql)을 실행한다. 운영·시험 Supabase에는 연결하지 않음.
+// groups.sql·colors.sql 시험 도우미: PGlite(메모리 안 Postgres)로 새 DB를 만들고, Supabase 흉내(stubs.sql) 위에
+// schema.sql → friends-keepalive.sql → friends-signup.sql (→ groups.sql → colors.sql)을 실행한다. 운영·시험 Supabase에는 연결하지 않음.
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -14,13 +14,15 @@ const STUBS = fs.readFileSync(path.join(__dirname, 'stubs.sql'), 'utf8');
 // 시험용 사용자 id: n번 → 00000000-0000-4000-8000-00000000000n
 const uid = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
-async function newDb({ groups = true } = {}) {
+// groups: groups.sql까지, colors: 그 위에 colors.sql까지 (colors는 groups가 있어야 함)
+async function newDb({ groups = true, colors = false } = {}) {
   const db = await PGlite.create({ extensions: { pgcrypto } });
   await db.exec(STUBS);
   await db.exec(SQL('schema.sql'));
   await db.exec(SQL('friends-keepalive.sql'));
   await db.exec(SQL('friends-signup.sql'));
   if (groups) await db.exec(SQL('groups.sql'));
+  if (groups && colors) await db.exec(SQL('colors.sql'));
   return db;
 }
 
@@ -82,7 +84,31 @@ async function count(db, sql, params = []) {
   return r.n;
 }
 
+// 적용 전후 비교용: public 스키마의 함수(본문·권한)·제약·인덱스·칸·트리거·정책·표/칸 권한
+async function snapshot(db) {
+  const q = async (sql) => (await db.query(sql)).rows.map((r) => Object.values(r).join(' | '));
+  return {
+    functions: await q(`select p.oid::regprocedure::text, pg_get_functiondef(p.oid),
+                               coalesce((select string_agg(a::text, ',' order by a::text) from unnest(p.proacl) a), '')
+                        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                        where n.nspname = 'public' order by 1`),
+    constraints: await q(`select conrelid::regclass::text, conname, pg_get_constraintdef(oid) from pg_constraint
+                          where connamespace = 'public'::regnamespace order by 1, 2`),
+    indexes: await q("select tablename, indexname, indexdef from pg_indexes where schemaname = 'public' order by 1, 2"),
+    columns: await q(`select table_name, column_name, data_type, is_nullable, coalesce(column_default, '')
+                      from information_schema.columns where table_schema = 'public' order by 1, ordinal_position`),
+    triggers: await q("select tgrelid::regclass::text, tgname from pg_trigger where not tgisinternal order by 1, 2"),
+    policies: await q("select schemaname, tablename, policyname, cmd, coalesce(qual, ''), coalesce(with_check, '') from pg_policies order by 1, 2, 3"),
+    tableAcl: await q(`select c.relname, coalesce((select string_agg(a::text, ',' order by a::text) from unnest(c.relacl) a), '')
+                       from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' order by 1`),
+    columnAcl: await q(`select c.relname, a.attname, coalesce((select string_agg(x::text, ',' order by x::text) from unnest(a.attacl) x), '')
+                        from pg_attribute a join pg_class c on c.oid = a.attrelid
+                        where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and a.attnum > 0 and not a.attisdropped
+                          and a.attacl is not null order by 1, 2`),
+  };
+}
+
 module.exports = {
   ROOT, SQL, uid, newDb, addUsers, run, asUser, ANON, SERVICE, expectError,
-  createRoom, codeOf, join, members, count,
+  createRoom, codeOf, join, members, count, snapshot,
 };

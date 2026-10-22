@@ -727,3 +727,271 @@ Supabase 대시보드 → SQL Editor에서 파일 내용을 통째로 붙여 넣
 `MAX_MEMBERS = 5`, `MAX_ROOMS = 3`, `MEMBER_COLORS`(§2.6), `ROOM_KEY = 'group-place:last-room'`(값 `userId:roomId`),
 `SEEN_KEY = 'group-place:seen-stamps'`, 색 클래스 `mc mc-<id>` / `mc mc-none`, CSS 변수 `--c`·`--c-soft`, 주소 `?room=<uuid>`(선택),
 시트 종류 `settings`(내 정보)·`room-new`(`mode: 'create' | 'join'`), `APP_VERSION = 'v0.1.0: 261022'`.
+
+---
+
+## 10. v0.1.2 멤버 색: 화사한 무지개 24색 + 직접 고른 색 (`supabase/colors.sql`)
+
+작성 2026-10-22. 주인 요청 "색상이 좀 구림 → 더 화사하게, 무지개 색상, custom을 누르면 컬러 코드를 입력". 버전 `APP_VERSION = 'v0.1.2: 261022'`.
+이 절은 DB 쪽 계약이다(화면은 이 값과 함수를 그대로 쓴다). §2.6의 40색 표는 v0.1.0~v0.1.1 기록으로 남긴다(groups.sql은 지금도 그 40색을 넣고,
+colors.sql이 바로 바꾼다).
+
+### 10.1 결정
+
+| 항목 | 결정 |
+|---|---|
+| 팔레트 | 24색, 무지개 순서(빨강 → 주황 → 노랑 → 초록 → 청록 → 파랑 → 남색 → 보라 → 분홍 → 장미). 짙은 줄(-deep)·올리브·겨자 같은 탁한 색은 뺌 |
+| 직접 고른 색 | `'#rrggbb'`(소문자 16진수 6자리)만. 화면은 24색 뒤 마지막 칸 "직접 고르기"에서 `<input type=color>`와 `#RRGGBB` 글자 칸을 같이 보여 줌 |
+| 저장 | **칸 하나**: `couple_members.color` = 팔레트 id **또는** `'#rrggbb'` (아래 10.3) |
+| 같은 색 | 방 안에서 같은 값은 지금처럼 `unique (couple_id, color)` → `color_taken` |
+| 거의 같은 색 | 다른 멤버 색과 OKLab 거리 **0.03 미만**이면 DB가 막음 → `color_too_close`. 화면은 **0.08 미만**이면 "비슷해요" 안내만(저장은 됨) |
+| 기존 멤버 색 | 색상각(OKLCH hue)이 가장 가까운 새 색으로 옮김(방 안에서 겹치면 다음으로 가까운 색). 적용 전 색은 backup 표에 |
+| `groups_schema_version()` | **그대로 1**. 홈 서버는 색을 다루지 않아서 서버가 알아야 할 것이 없음(signup.cjs·시험 변경 없음) |
+| 잠금 | `set_member_color`는 지금처럼 방 잠금(couples 행 `for update`)만이고, **멤버인지 먼저 확인한 뒤** 잠근다(남의 방 행을 잠그지 못하게, 잠근 뒤 한 번 더 확인). colors.sql·colors_rollback.sql은 맨 앞 확인 직후 `couple_members`·`member_colors`를 `access exclusive`로 잠가, 확인·backup·옮기기가 한 시점의 데이터를 본다(실행 1초 안팎 동안 색 바꾸기·참여는 기다림) |
+
+### 10.2 팔레트 24색 (id 순서 = `member_colors.position` = 화면 순서)
+
+`member_colors`에 `light`·`dark` 칸이 생기고 아래 값이 소문자로 들어간다(거의 같은 색 막기에 씀). 표는 지금처럼 앱에서 못 읽고(권한 없음),
+화면은 `index.html`의 `MEMBER_COLORS`를 쓴다. **id·순서·값이 이 표와 같아야 한다**(dev/sqltest `colors.test.cjs`가 이 표·SQL·index.html을 비교.
+화면 쪽 값은 대소문자 상관없음).
+
+| # | id | 이름 | 밝은 | 어두운 |
+|---|---|---|---|---|
+| 1 | red | 빨강 | #F53C41 | #FF726B |
+| 2 | coral | 산호 | #F66336 | #FF8D6C |
+| 3 | orange | 주황 | #F87805 | #FE9B5D |
+| 4 | tangerine | 귤 | #FA960B | #FEAC59 |
+| 5 | amber | 호박 | #F7AE05 | #FEBE4D |
+| 6 | yellow | 노랑 | #F7CD03 | #FFD83D |
+| 7 | chartreuse | 연두 | #CBD20D | #DCE307 |
+| 8 | lime | 라임 | #84C903 | #99E51C |
+| 9 | green | 초록 | #04BB3D | #45DC5F |
+| 10 | emerald | 에메랄드 | #0CB477 | #23D891 |
+| 11 | mint | 민트 | #0CD2A9 | #3CEABF |
+| 12 | teal | 청록 | #02AFA6 | #25D2C7 |
+| 13 | cyan | 시안 | #09C0D3 | #07DDF2 |
+| 14 | sky | 하늘 | #04AEE0 | #41CBFF |
+| 15 | azure | 물빛 | #049AED | #5FB9FE |
+| 16 | blue | 파랑 | #0182F3 | #5EA7FF |
+| 17 | cobalt | 코발트 | #3461EF | #6892FE |
+| 18 | indigo | 남색 | #5E4DEE | #8384FF |
+| 19 | violet | 보라 | #885AF5 | #A890FE |
+| 20 | purple | 자주 | #AC55F4 | #C68BFF |
+| 21 | orchid | 난초 | #CF63E7 | #EA8DFF |
+| 22 | magenta | 자홍 | #DB3CC6 | #FF6AE8 |
+| 23 | pink | 분홍 | #EF64B3 | #FF91CB |
+| 24 | rose | 장미 | #EC4179 | #FF799B |
+
+만든 방법: OKLCH에서 색상각을 25°(빨강)부터 한 바퀴 돌려 6°(장미, 366°)까지 잡고, 밝은 화면은 L 0.54~0.86·채도 0.13~0.24,
+어두운 화면은 L 0.67~0.89로 잡은 뒤 sRGB 색역 안으로 채도만 줄였다. 이 값은 **칠하는 색**(점·별·테두리·도장·색 띠)이다.
+
+- 어두운 값은 카드(#1A212B)에서 5.2:1(indigo) ~ 11.7:1(yellow).
+- 밝은 값은 흰 바탕에서 1.5:1(yellow)·1.65:1(chartreuse)·1.9~2.1:1(amber, mint, lime) ~ 5.6:1(indigo). 노랑 쪽은 화사함을 위해 일부러 밝다.
+  흰 바탕 위 작은 점·별에는 화면이 얇은 테두리(예: `box-shadow: inset 0 0 0 1px rgb(0 0 0 / .12)`)를 더하는 것을 권한다.
+- **글자에는 이 값을 그대로 쓰지 않는다.** 멤버 색을 글자(닉네임·도장 글씨 등)에 쓸 때는 화면이 읽히는 색을 만든다:
+  OKLCH로 바꿔 색상각은 두고, 밝은 화면은 흰 바탕과 #F6F7F4에서 4.5:1이 될 때까지 L을 낮추고, 어두운 화면은 #1A212B에서 4.5:1이 될 때까지
+  L을 높인다(채도는 색역 안으로). 팔레트 색과 직접 고른 색 모두 같은 함수로.
+- 팔레트끼리 가장 가까운 쌍: 밝은 화면 coral/orange 0.054, 어두운 화면 coral/orange 0.041(OKLab 거리). 그래서 막는 기준 0.03에 걸리는
+  팔레트 쌍은 없다(다른 멤버 색 바로 옆 칸도 고를 수 있음).
+- 빨강·장미는 하트·위험 빨강(#E5484D 등)과 비슷하다. 주인이 무지개를 원해서 넣었다(§2.6의 "5°–40° 빼기"는 v0.1.2부터 적용하지 않음).
+
+### 10.3 저장: `couple_members.color` 한 칸 (+ 자동 계산 칸)
+
+```sql
+-- 팔레트 id(소문자) 또는 직접 고른 '#rrggbb'(소문자)
+alter table public.couple_members add constraint couple_members_color_check check (color ~ '^(#[0-9a-f]{6}|[a-z]+)$');
+-- 팔레트 id일 때만 값이 있는 자동 계산 칸 → 없는 팔레트 id를 외래 키로 막음 (직접 고른 색은 null이라 검사 안 함)
+alter table public.couple_members add column palette_color text
+  generated always as (case when color like '#%' then null else color end) stored;
+alter table public.couple_members add constraint couple_members_palette_color_fkey
+  foreign key (palette_color) references public.member_colors (id);
+-- 그대로: couple_members_couple_color_key unique (couple_id, color), color not null, color에 update 권한 없음
+-- 없어짐: couple_members_color_fkey (color → member_colors.id)
+```
+
+`color`(팔레트 id)와 `custom_color`(hex) 두 칸으로 나누는 안도 봤지만 한 칸으로 했다. 이유: ① 화면 조회(`couple_members.select(… color …)`)와
+`set_member_color`의 인자·반환이 그대로 "색 값 하나"라 화면이 `color.startsWith('#')`만 보면 된다, ② 방 안 같은 값 막기가 지금 unique 하나로
+팔레트·hex 모두 된다(두 칸이면 unique 둘 + "둘 중 하나만" 검사가 더 필요), ③ 없는 팔레트 id는 자동 계산 칸의 외래 키가 그대로 막는다.
+`palette_color`는 읽기 전용 자동 계산 칸이다(화면은 안 써도 됨. `select *`로 읽으면 같이 옴).
+
+`member_colors`: `light text not null`, `dark text not null` 추가(`check (… ~ '^#[0-9a-f]{6}$')`), id 검사는 `'^[a-z]+$'`로 바뀜. RLS만 켜고 권한 없음(그대로).
+
+### 10.4 비슷한 색 (OKLab 거리)
+
+- OKLab: Björn Ottosson의 sRGB → OKLab 식(감마 풀기 → LMS 행렬 → 세제곱근 → Lab 행렬). SQL `member_color_lab(hex)`와 화면이 **같은 식·같은 상수**를 쓴다
+  (상수는 colors.sql과 `dev/sqltest/colors.test.cjs`의 `lab()`에 있음, 시험이 SQL과 JS 결과가 1e-9 안에서 같은지 확인).
+- 멤버 색의 칠하는 색 = [밝은 화면, 어두운 화면]: 팔레트는 `[light, dark]`, 직접 고른 색은 `[hex, hex]`(두 화면 모두 그 색).
+- 두 멤버 색의 거리 = `min(ΔE(밝은끼리), ΔE(어두운끼리))` — 어느 한 화면에서라도 거의 같아 보이면 비슷한 색.
+- **DB가 막음: 거리 < 0.03** (`color_too_close`). 0.02 안팎이 겨우 구별되는 정도라, 0.03 미만은 작은 점·별에서는 같은 색으로 보인다.
+  직접 고른 색이 다른 멤버의 팔레트 색 값(밝은 값이든 어두운 값이든)과 똑같아도 여기에 걸린다(거리 0).
+- **화면 권장: 거리 < 0.08이면 안내**("○○님 색과 비슷해요. 그래도 저장할 수 있어요.") — 직접 고르기에서만. 팔레트 칸은 이미 충분히 떨어져 있다.
+- 화면의 색 칸: 지금처럼 다른 멤버가 쓰는 색은 빼고, **다른 멤버 색과 거리 < 0.03인 팔레트 칸도 뺀다**(다른 멤버가 그 근처 색을 직접 고른 경우).
+- 기준을 바꿀 때는 colors.sql의 `0.03`(두 곳: `pick_member_color`, `set_member_color`), 화면, 이 절, 시험의 `NEAR`를 같이 고친다.
+
+### 10.5 함수 (바뀐 것만)
+
+| 함수 | 반환 | 하는 일 | 오류 코드 |
+|---|---|---|---|
+| `set_member_color(p_couple uuid, p_color text)` **(이름·인자 그대로, 본문 교체)** | `text` 저장된 값(팔레트 id 또는 `'#rrggbb'` 소문자) | `lower(btrim(p_color))` → 멤버인지(아니면 잠그기 전에 `not_member`) → 방 잠금 → 멤버인지 다시 → 형식 확인(팔레트 id이거나 `^#[0-9a-f]{6}$`) → 지금 값과 같으면 그대로 반환 → 다른 멤버와 같은 값이면 `color_taken` → 다른 멤버와 거리 < 0.03이면 `color_too_close` → update(`unique_violation`도 `color_taken`) | `not_authenticated`, `not_member`, `invalid_color`, `color_taken`, **`color_too_close`(새로)** |
+| `pick_member_color(p_couple uuid)` 내부 (본문 교체) | `text` 팔레트 id | 새 24색 중 그 방에서 아무도 안 쓰고 다른 멤버 색과 거리 0.03 이상인 색을 `order by random()`. 트리거 `enforce_member_caps`가 그대로 부름(방 만들기·참여) | `no_free_color`(5명·24색이라 안 남) |
+| `member_color_lab(hex)` 내부 (새로) | `double precision[]` [L, a, b] | 10.4 | — |
+| `member_color_delta(hex, hex)` 내부 (새로) | `double precision` | OKLab 거리 | — |
+| `member_color_hue_gap(hex, hex)` 내부 (새로) | `double precision` 0~180 | 색상각 차이(색 옮기기용) | — |
+| `member_color_fills(color)` 내부 (새로) | `text[]` [밝은, 어두운] (모르는 값이면 null) | 10.4 | — |
+| `member_color_distance(color, color)` 내부 (새로) | `double precision` (모르는 값이면 null) | 10.4 | — |
+
+- `invalid_color` 예: `'gold'`, `'orange-deep'`(예전 id), `''`, `null`, `'ff0000'`(# 없음), `'#fff'`(3자리), `'#ff00000'`, `'rgb(…)'`. 대소문자·앞뒤 공백은 받음
+  (`' Green '` → `'green'`, `'#ABCDEF'` → `'#abcdef'`).
+- 권한: `set_member_color`는 authenticated(그대로). 색 계산 함수 5개와 `pick_member_color`는 public·anon·authenticated 모두 실행 불가(내부 전용).
+  모두 `set search_path = ''`. RLS 정책·표/칸 권한은 **바뀌지 않는다**(시험 c6). `couple_members.color`에는 여전히 update 권한 없음.
+- 그 밖의 함수(`create_couple`, `join_couple_for`, `leave_room` …)는 그대로. 새 멤버 색은 트리거 → `pick_member_color`라 자동으로 새 24색.
+
+### 10.6 기존 멤버 색 옮기기 (colors.sql 적용 때 한 번)
+
+방마다 방장 → 들어온 순서(`created_at`, `user_id`)로, 예전 색의 밝은 값(§2.6)과 **색상각이 가장 가까운** 새 색(같으면 OKLab 거리, 그다음 목록 순서).
+그 방에서 앞사람이 이미 받은 색은 건너뛴다. 혼자 있을 때(겹침 없음) 결과:
+
+| 예전 | 새 | 예전 | 새 | 예전 | 새 | 예전 | 새 |
+|---|---|---|---|---|---|---|---|
+| orange | orange | cyan | cyan | orange-deep | tangerine | cyan-deep | cyan |
+| tangerine | tangerine | sky | cyan | tangerine-deep | amber | sky-deep | sky |
+| amber | tangerine | azure | sky | amber-deep | yellow | azure-deep | azure |
+| mustard | yellow | blue | azure | mustard-deep | yellow | blue-deep | blue |
+| olive | chartreuse | cobalt | cobalt | olive-deep | chartreuse | cobalt-deep | cobalt |
+| lime | lime | indigo | indigo | lime-deep | lime | indigo-deep | indigo |
+| green | green | violet | violet | green-deep | green | violet-deep | violet |
+| emerald | emerald | purple | purple | emerald-deep | emerald | purple-deep | purple |
+| jade | mint | orchid | orchid | jade-deep | mint | orchid-deep | magenta |
+| teal | teal | pink | magenta | teal-deep | teal | pink-deep | pink |
+
+예: 예전 방장 teal + 멤버 amber → teal + tangerine. 방장 tangerine + 멤버 amber → tangerine + amber(멤버는 다음으로 가까운 색).
+적용 전 색은 `backup.couple_colors_v011_<YYYYMMDD_HH24MISS>`(`couple_id, user_id, color`)에 남는다.
+
+### 10.7 화면이 지킬 것 (요약)
+
+- `MEMBER_COLORS = [{ id, name, light, dark }, …]` 24개, 10.2 표와 같은 순서·값. `.mc-<id>` 클래스는 지금처럼 목록에서 만든다.
+- 직접 고른 색(`color`가 `#`로 시작): 처음 쓰일 때 클래스 `.mc-hex-<rrggbb>`를 만들어 `mc mc-hex-<rrggbb>`로 그린다(두 화면 모두 같은 값,
+  인라인 style 대신 클래스라서 화면 코드가 팔레트 색과 똑같이 `cls` 하나만 넘기면 됨). 글자색은 10.2의 "읽히는 색"으로(§11.1).
+  모르는 값(예전 40색 id — colors.sql을 아직 안 돌린 경우)은 지금처럼 `mc-none`(회색).
+- 색 바꾸기: `sb.rpc('set_member_color', { p_couple, p_color })`, `p_color`는 팔레트 id 또는 `#RRGGBB`(화면이 보내기 전에 `^#[0-9A-Fa-f]{6}$` 확인).
+- `friendly()`에 추가·교체:
+  `color_too_close` → '다른 멤버 색과 거의 같아요. 조금 다른 색을 골라 주세요.',
+  `invalid_color` → '없는 색이에요. 새로고침한 뒤 다시 고르거나, 색 코드는 #RRGGBB 형식으로 입력해 주세요.' (`color_taken`은 그대로)
+- 적용 순서상 SQL을 먼저 돌리므로 화면이 colors.sql 적용 여부를 따로 확인하지는 않는다(`groups_schema_version`도 1 그대로).
+  다만 화면은 확인한 팔레트 id나 `'#rrggbb'`만 보내므로, 색 바꾸기에 `invalid_color`가 오면(= colors.sql 전 DB, 새 팔레트 칸이든 직접 고른 색이든)
+  '새 색을 쓰려면 supabase/colors.sql을 먼저 실행해야 해요. 새로고침한 뒤 다시 골라 주세요.'로 알려 준다.
+
+### 10.8 적용 방법 (주인이 할 일)
+
+**지금 친구용 프로젝트**(groups.sql까지 실행한 곳):
+
+1. 친구용 Supabase 프로젝트 대시보드 → SQL Editor에 `supabase/colors.sql` 내용을 통째로 붙여 넣고 **한 번만** Run. 다른 SQL 파일은 실행하지 않는다.
+   `begin; … commit;`이라 중간에 실패하면 아무것도 안 바뀐다. 실행하는 1초 안팎 동안 색 바꾸기·참여는 잠깐 기다렸다가 처리된다.
+   맨 앞 확인에서 멈추면 메시지대로: "먼저 supabase/groups.sql을 실행하세요", "이미 적용된 SQL이에요"(이미 됨, 할 일 없음).
+2. 그다음 v0.1.2 `index.html`을 배포(홈 서버 `signup.cjs`·`server.cjs`는 바뀐 것 없음, 서버 시작 확인도 그대로 통과).
+   화면을 먼저 배포하면 SQL을 돌리기 전까지 멤버 색이 회색으로 보이고 색 바꾸기가 `invalid_color`로 실패한다(데이터는 안전).
+
+**새 프로젝트**: `schema.sql` → `friends-keepalive.sql` → `friends-signup.sql` → `groups.sql` → `colors.sql`.
+
+**되돌리기**: ① 홈 서버를 v0.1.1 화면으로 먼저 되돌림 → ② SQL Editor에서 `supabase/colors_rollback.sql` 실행.
+- 지금 색(직접 고른 색 포함)을 `backup.couple_colors_v012_<시각>`에 복사한 뒤, 방마다 방장 → 들어온 순서로 예전 40색 중 가까운 색으로 옮긴다:
+  선명한 20색 중 색상각이 가장 가까운 색(방 안에서 겹치면 다음), 회색에 가까운 직접 고른 색(채도 0.03 미만)은 OKLab 거리로 가장 가까운 색(짙은 색일 수 있음).
+  혼자일 때 팔레트 결과: red·coral·orange → orange, tangerine → tangerine, amber → amber, yellow → mustard, chartreuse → olive, lime → lime,
+  green → green, emerald → emerald, mint → jade, teal → teal, cyan → cyan, sky → azure, azure → blue, blue·cobalt → cobalt, indigo → indigo,
+  violet → violet, purple → purple, orchid → orchid, magenta·pink·rose → pink (겹치면 다음으로 가까운 색).
+- `member_colors`를 예전 40행으로, `set_member_color`·`pick_member_color`를 groups.sql 본문 그대로, `couple_members_color_fkey`를 다시 만들고
+  `palette_color`·`couple_members_color_check`·색 계산 함수 5개를 지운다. 구조·함수·권한은 groups.sql 적용 직후와 같아진다(시험 c7).
+- colors.sql 적용 **전** 색을 정확히 되살리려면 `backup.couple_colors_v011_<시각>` 표를 쓴다(그사이 들어오거나 색을 바꾼 멤버는 주의).
+- groups.sql까지 되돌리려면 이 파일을 **먼저** 실행한다(`groups_rollback.sql`은 colors.sql이 적용돼 있으면 "먼저 supabase/colors_rollback.sql을 실행하세요"로 멈춤).
+- 다시 적용하려면 `colors.sql`을 그대로 실행하면 된다.
+
+### 10.9 시험 (`dev/sqltest/colors.test.cjs`, `npm test`)
+
+| # | 확인할 것 |
+|---|---|
+| c1 | 24행·순서 1~24, 이 절 10.2 표와 id·값 같음, index.html `MEMBER_COLORS`(새 목록일 때)와 같음, 색상각이 무지개 순서로 커짐, 팔레트끼리 거리 0.04 이상, SQL OKLab = JS OKLab, 두 번 적용·groups.sql 다시 적용은 멈춤, `groups_schema_version` 1 |
+| c1b | groups.sql 없이 실행하면 멈춤, colors.sql 전 되돌리기는 멈춤, colors.sql이 있으면 groups_rollback.sql이 멈춤 |
+| c2 | 예전 40색 모두(16방 + 겹치는 방) → JS로 따로 계산한 "가장 가까운 색상각" 결과와 같음, 10.6 표와 같음, 방 안 겹침 없음, `palette_color = color`, backup 표 = 적용 전 |
+| c3 | 팔레트: 대소문자·공백 정리, 같은 값 `color_taken`, 옆 칸은 고를 수 있음, 이상한 값 `invalid_color`, `not_member`·`not_authenticated`, anon 불가 |
+| c4 | 직접 고른 색: 소문자 저장·`palette_color` null, 같은 값 `color_taken`, 거리 < 0.03 `color_too_close`(다른 멤버 팔레트 색의 밝은·어두운 값 포함, 반대 방향도), 0.03~0.08은 저장됨, 검정·흰색·회색 받음, 직접 update 불가, 제약(형식·외래 키·unique) |
+| c5 | 무작위 색 100번: 쓰인 색·거의 같은 색 절대 안 나옴, 10가지 넘게 나옴, 참여·방 만들기도 새 24색 |
+| c6 | RLS 정책·표/칸 권한·트리거 그대로, 새 함수는 색 계산 5개뿐, 앱(authenticated·anon)은 색 표·색 계산 함수 불가, 방끼리 색 안 보임, search_path 고정 |
+| c7 | 되돌리기: groups.sql 적용 뒤와 구조·함수·권한·색 목록이 같음, 색 옮기기 = JS 계산, backup 표 = 되돌리기 전(직접 고른 색 포함), 예전 `set_member_color` 동작, 다시 적용 = 처음 적용과 같음 |
+
+---
+
+## 11. v0.1.2 화면: 색 고르기·계정 설정·방 메뉴 (`index.html`)
+
+작성 2026-10-22. 주인 요청 ① 색이 칙칙함 → 화사한 무지개 + 직접 고르기, ② 비밀번호 변경이 내 정보에 섞여 어수선함 → 따로, ③ 참가자도 방을 바꾸거나
+새로 만들 수 있는 버튼. `APP_VERSION = 'v0.1.2: 261022'`. 이 절이 §4.5·§4.6·§4.7의 해당 부분보다 앞선다(바뀐 것만 적음).
+
+### 11.1 멤버 색 그리기 (§4.7 대체)
+
+| 항목 | 화면 |
+|---|---|
+| 색 값 | `couple_members.color` = 팔레트 id 또는 `'#rrggbb'`. `colorCls(color)` → `mc mc-<id>` / `mc mc-hex-<rrggbb>` / `mc mc-none` |
+| CSS 변수 | `--c` 칠하는 색(점·별·후기 줄 띠·도장 테두리·색 동그라미), `--ct` **글자에 쓰는 읽히는 색**, `--on` 그 색 위 체크 표시(흰색/남색 중 대비 큰 쪽), `--c-soft` 칩 바탕(그대로) |
+| 읽히는 색 `readableInk(hex, dark)` | §10.2 규칙: OKLCH로 바꿔 색상각은 두고 L만 이분 탐색. 밝은 화면은 #FFFFFF·#F6F7F4 둘 다에서 4.5:1이 되는 가장 밝은 L, 어두운 화면은 #1A212B·#12171F에서 4.5:1이 되는 가장 어두운 L. 채도는 그 L에서 sRGB 안으로 줄임. 이미 4.5:1이면 그대로(어두운 화면 팔레트 값은 모두 그대로) |
+| 지금 글자에 쓰는 곳 | 도장 글씨(`.stamp .st-words{fill:var(--ct)}`). 도장 테두리는 `--c`. 닉네임 등 나머지 글자는 지금처럼 `--ink`/`--muted`라 바뀌지 않음 |
+| 흐린 색 테두리 | 점·색 동그라미·색 판에 `inset 0 0 0 1px var(--ring)`(밝은 화면 검정 12%, 어두운 화면 흰색 16%). 흰 바탕의 노랑·연두, 어두운 바탕의 짙은 직접 고른 색이 묻히지 않게 |
+| 비슷한 색 | `colorDistance(a, b)` = DB `member_color_distance`와 같은 식(§10.4). 상수 `COLOR_BLOCK = 0.03`, `COLOR_WARN = 0.08` |
+
+### 11.2 내 색 고르기 (내 정보 시트)
+
+- 팔레트 칸: 24색 무지개 순서, 한 줄 8개. **다른 멤버가 쓰는 색, 다른 멤버 색과 거리 < 0.03인 색은 빼고** 보여 준다. 내 색은 체크 + 테두리.
+- 맨 아래 **"직접 고르기"** 줄(무지개 동그라미 + "색 판이나 색 코드(#RRGGBB)로 골라요"). 지금 직접 고른 색을 쓰면 그 색 동그라미 + 체크 + "지금 쓰는 색 #RRGGBB",
+  제목 옆 이름은 "직접 고른 색 #RRGGBB".
+- 누르면 아래에 칸이 열림: 색 판 `<input type="color">`(동그라미) + 색 코드 칸(`#RRGGBB`, 대문자로 보임) + 저장 버튼 + 안내 한 줄. 처음 값은 지금 내 색(팔레트면 그 밝은 값).
+  색 판을 움직이면 색 코드 칸이, 색 코드를 6자리까지 치면 색 판이 같이 바뀐다(다시 그리지 않아 커서 그대로). 색 코드 칸에서 Enter = 저장.
+- 확인(`customCheck`, 저장 버튼 상태와 안내):
+
+| 경우 | 안내 | 저장 |
+|---|---|---|
+| 16진수가 아닌 글자, 7자리 이상(`#ggg`, `rgb(…)`, `#FF7A001`) | "색 코드는 #RRGGBB처럼 # 뒤에 6자리로 입력해 주세요. (예: #FF7A00)" (빨강) | 막음 |
+| 아직 6자리를 다 안 침(빈 칸, `#`, `#FF7` 등 16진수 0~5자리) | "# 뒤에 6자리 색 코드를 입력해 주세요. (예: #FF7A00)" (회색, 느낌표 없음) | 막음 |
+| 지금 내 색과 같음(팔레트 색이면 그 밝은·어두운 값과 같아도. 처음 열 때 들어 있는 값) | "지금 내 색이에요. 바꾸려면 색 판이나 색 코드로 다른 색을 골라 주세요." | 막음 |
+| 다른 멤버 색과 거리 < 0.03 | "○○님 색과 거의 같아요. 조금 다른 색을 골라 주세요." + 그 멤버 색 점 (빨강) | 막음 (DB도 `color_too_close`) |
+| 거리 0.03 ~ 0.08 | "○○님 색과 비슷해요. 그래도 저장할 수 있어요." + 그 멤버 색 점 (주황 느낌표) | 됨 |
+| 그 밖 | "이 색으로 저장할 수 있어요." | 됨 |
+
+  `#` 없이 쳐도(`ff7a00`), 앞뒤 공백이 붙어 붙여 넣어도 받고(칸 maxlength 9), 보내기 전에 소문자 `'#rrggbb'`로 바꿔 `set_member_color`에 보낸다. 성공하면 칸이 닫히고 토스트 "내 색을 바꿨어요."
+- 기준 0.08을 고른 이유: 팔레트끼리 가장 가까운 쌍이 0.041~0.054라, 0.08 미만이면 작은 점·별에서 "옆 칸 색" 정도로 헷갈릴 수 있다.
+  그래도 고르는 사람 뜻이 있을 수 있어 안내만 하고, 정말 같아 보이는 0.03 미만만 막는다(DB와 같은 기준).
+
+### 11.3 계정 설정 시트 `account` (새로, §4.6의 1·8·9·10 옮김)
+
+- 들어가는 곳: 내 정보 맨 아래 "계정" 묶음의 줄 버튼(사람 아이콘, "계정 설정", "아이디 X · 비밀번호 변경, 로그아웃", ›)과 내 정보 머리 오른쪽 사람 아이콘.
+- 내용: "아이디 X로 로그인했어요. 계정은 모든 방에서 같이 써요." → 비밀번호 변경(`pw-form` 그대로) → 로그아웃(+ "이 기기에서만 로그아웃돼요…") → 버전 `APP_VERSION`.
+- 내 정보에서 열면 `back: 'settings'`: 머리 왼쪽이 ‹(뒤로)이고, ‹·Esc·바깥 누르기·안드로이드 뒤로 가기 모두 내 정보로 돌아간다(방문 기록 층 `'sub'`).
+  열 때 입력칸에 커서를 두지 않는다(키보드가 바로 올라오지 않게). 내 정보에서 계정 설정·방 만들기로 넘어갈 때 보던 자리(`settingsScroll`)를 기억해, 돌아오면 그 자리로.
+- 내 정보에 남는 것(위에서 아래): 방(이름·멤버) → 초대 코드 → 닉네임 → 내 색 → 방 바꾸기 → 카테고리 → 계정(계정 설정 줄) → 맨 아래 나가기.
+
+### 11.4 방 바꾸기 시트 `rooms` (새로, 메인 머리의 방 이름)
+
+- 메인 위쪽 방 이름이 버튼이 되고 끝에 ⌄를 붙였다(마지막 낱말과 같이 줄바꿈). 누르는 범위는 위아래 8px씩 넓혀(배치는 그대로) 짧은 이름도 44px 가까이. 누르면 시트 "방 바꾸기": "내 방 N/3개 · 방을 누르면 그 방으로 바뀌어요." →
+  내 방 전부(지금 방은 진한 테두리 + "지금 방", 누르면 시트만 닫힘 / 다른 방은 누르면 `switchRoom`) → 방이 3개 미만이면 "새 방 만들기"·"코드로 참여",
+  3개면 "방은 3개까지 들어갈 수 있어요. 새 방을 만들거나 참여하려면 다른 방에서 먼저 나가 주세요."
+- 여기서 연 `room-new`는 `back: 'rooms'` → ‹·Esc·뒤로 가기로 방 바꾸기 시트로 돌아온다. 방장·멤버 모두 같다(방 만들기·참여는 원래 누구나 됨).
+- 내 정보의 "방 바꾸기" 묶음은 그대로 두고 "메인 화면 위쪽의 방 이름을 눌러도 바꿀 수 있어요." 안내를 붙였다. 방 선택 화면 안내도
+  "들어간 뒤에도 위쪽 방 이름을 누르면 언제든 바꿀 수 있어요."로.
+- 뒤로 가기 규칙 일반화: `state.sheet.back`(`'settings' | 'rooms'`)이 있으면 층 `'sub'`를 쌓고, ✕(‹)·Esc·popstate는 `openSheet(back)`.
+
+### 11.5 화면 상수·키 (§9.4에 더함)
+
+`COLOR_BLOCK = 0.03`, `COLOR_WARN = 0.08`, 색 클래스 `mc mc-hex-<rrggbb>`, CSS 변수 `--ct`·`--on`·`--ring`, 시트 종류 `account`(계정 설정)·`rooms`(방 바꾸기),
+시트의 `back: 'settings' | 'rooms'`. `MEMBER_COLORS`는 §10.2(24개).
+
+### 11.6 가짜 Supabase·화면 찍기 (`dev/mock/`)
+
+- `supabase-mock.js`: 24색 표(밝은·어두운 값), `set_member_color`가 대소문자·공백 정리 → `invalid_color` / `color_taken` / `color_too_close`(거리 < 0.03),
+  새 멤버 무작위 색도 가까운 색을 뺌. 방 A의 도윤은 직접 고른 갈색 `#8b5e3c`(팔레트에 없는 색이 그려지는지 확인용).
+- `shoot.py` 새 장면: `02c` 머리 방 메뉴(방 3개, 안내), `14c`–`14f` 방 2개 멤버가 머리 메뉴 → 코드로 참여 → 뒤로 가기로 메뉴 → 다른 방으로,
+  `07b`–`07e` 직접 고르기(열기 → 거의 같음 막힘 → 비슷함 안내 → 저장), `09`·`09b` 비밀번호 칸 없는 내 정보 맨 아래와 계정 설정, `17c` 직접 고른 색을 쓰는 메인,
+  `21b`·`21c`·`22c` 어두운 화면의 직접 고르기·계정 설정·머리 방 메뉴.
+
+### 11.7 적용 방법과 되돌리기 (요약, 자세한 것은 §10.8)
+
+1. 친구용 Supabase 프로젝트(groups.sql까지 실행한 곳)의 SQL Editor에서 **`supabase/colors.sql` 하나만, 한 번** 실행. 홈 서버 `signup.cjs`·`server.cjs`는 바뀐 것 없음.
+2. 그다음 v0.1.2 `index.html` 배포. 순서를 바꾸면 SQL 전까지 멤버 색이 회색이고 색 바꾸기가 실패한다(데이터는 안전).
+3. 되돌리기: 화면을 v0.1.1로 먼저 되돌리고 → `supabase/colors_rollback.sql` 실행(지금 색은 `backup.couple_colors_v012_<시각>`에 남고 예전 40색 중 가까운 색으로).
+   계정 설정 시트·방 메뉴는 화면만의 변경이라 화면을 되돌리면 같이 돌아간다.

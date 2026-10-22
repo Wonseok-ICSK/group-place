@@ -1,5 +1,6 @@
 -- groups.sql 되돌리기: 예전 규칙(한 사람 한 방, 한 방 2명, 2명이 차면 초대 코드 폐기)으로 돌아감.
 -- 순서: 홈 서버를 이전 릴리스로 먼저 되돌림(새 화면·서버는 groups.sql이 있어야 동작) → 이 SQL 실행.
+-- colors.sql(v0.1.2 색)을 적용했으면 colors_rollback.sql을 먼저 실행하세요(아니면 맨 앞 확인에서 멈춤).
 -- 두 개 이상의 방에 든 사람이 있으면 멈춤(한 사람 한 방 제약을 다시 걸 수 없음). 한 방만 남기고 나간 뒤 다시 실행하세요.
 -- 지우기 전 멤버 색은 backup 스키마(backup.couple_members_colors_<시각>)에 복사해 둠.
 -- 남는 것: 3~5명이 된 방은 그대로 남음(예전 함수로는 새로 못 들어올 뿐). 방 이름·장소·후기 등 데이터는 그대로.
@@ -16,6 +17,10 @@ declare
 begin
   if to_regclass('public.member_colors') is null then
     raise exception '되돌릴 것이 없어요 (member_colors 표가 없음).';
+  end if;
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'member_colors' and column_name = 'light') then
+    raise exception '먼저 supabase/colors_rollback.sql을 실행하세요 (v0.1.2 색이 적용돼 있음).';
   end if;
   select count(*) into v_n
   from (select user_id from public.couple_members group by user_id having count(*) > 1) x;

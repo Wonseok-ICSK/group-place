@@ -122,19 +122,29 @@ textarea.input{resize:vertical;min-height:84px;line-height:1.6}
 .top-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:14px 0 10px}
 .top-head{flex:1;min-width:0;padding-top:2px}
 .title{margin:0;font-size:22px;line-height:1.35;font-weight:800;letter-spacing:-0.03em;overflow-wrap:anywhere}
+/* 방 이름 = 버튼: 누르면 방 바꾸기·새 방 시트. 끝의 ⌄가 눌러지는 것임을 알려 줌 (마지막 낱말과 같이 줄바꿈) */
+.title-btn{display:inline;border:0;background:none;padding:8px 6px 8px 0;margin:0 -6px 0 0;font:inherit;color:inherit;letter-spacing:inherit;line-height:inherit;text-align:left;border-radius:6px}
+.title-btn:active{opacity:.65}
+.title-btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.title-btn .tail{white-space:nowrap}
+.title-btn svg{display:inline-block;width:20px;height:20px;margin-left:3px;vertical-align:-3px;color:var(--muted)}
 .top-actions{flex:none;display:flex;align-items:center;gap:2px}
 .duo{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:13px;color:var(--muted);margin-top:3px} /* 멤버가 5명까지라 줄바꿈 */
 .duo>span{display:inline-flex;align-items:center;gap:5px;min-width:0;max-width:100%}
 .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} /* 닉네임(20자까지)이 길면 말줄임 */
 .duo .nm{max-width:9em}
-.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none;background:var(--c,var(--line-strong))}
-/* 멤버 색: .mc-<색 id>가 --c를 정함 (40가지, 밝은/어두운 화면 값은 아래 MEMBER_COLORS에서 만듦). 나간 멤버는 .mc-none */
+/* 화사한 색(노랑·연두)은 흰 바탕에서 흐려서 작은 점·동그라미에 얇은 테두리. 어두운 화면에선 짙은 직접 고른 색이 안 묻히게 밝은 테두리 */
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none;background:var(--c,var(--line-strong));box-shadow:inset 0 0 0 1px var(--ring)}
+/* 멤버 색: .mc-<색 id>(팔레트)·.mc-hex-<rrggbb>(직접 고른 색)가 정함. 값은 아래 MEMBER_COLORS·memberColorRule()에서 만듦. 나간 멤버는 .mc-none
+   --c 칠하는 색(점·별·테두리·도장 테두리), --ct 글자에 쓰는 읽히는 색(밝은 화면은 더 진하게, 어두운 화면은 더 밝게), --on 그 색 위의 체크 표시 */
+:root{--ring:rgb(0 0 0 / .12)}
+@media (prefers-color-scheme: dark){:root{--ring:rgb(255 255 255 / .16)}}
 .mc{--c-soft:var(--sunken)}
 @supports (background:color-mix(in srgb,red 16%,white)){
   .mc{--c-soft:color-mix(in srgb,var(--c) 16%,var(--surface))}
   @media (prefers-color-scheme: dark){.mc{--c-soft:color-mix(in srgb,var(--c) 24%,var(--surface))}}
 }
-.mc-none{--c:var(--line-strong)}
+.mc-none{--c:var(--line-strong);--ct:var(--muted);--on:var(--ink)}
 
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
 .tabs button{
@@ -319,6 +329,7 @@ textarea.input{resize:vertical;min-height:84px;line-height:1.6}
 .stamp{--rot:-15deg;display:inline-block;width:var(--sz,52px);height:var(--sz,52px);color:var(--c);transform:rotate(var(--rot))} /* 도장 색 = 고른 멤버 색 */
 .stamp svg{display:block;width:100%;height:100%;overflow:visible}
 .stamp text{font-family:inherit}
+.stamp .st-words{fill:var(--ct,currentColor)} /* 테두리는 화사한 칠하는 색, 글씨는 읽히는 색 */
 @media (prefers-color-scheme: light){.stamp svg{mix-blend-mode:multiply}}
 .stamp.fresh{animation:stamp-in .6s cubic-bezier(.2,.9,.3,1.15) both}
 @keyframes stamp-in{
@@ -414,13 +425,53 @@ textarea.input.url{min-height:0;resize:none;line-height:1.45}
 .member-list li+li{border-top:1px solid var(--line)}
 .member-count{font-weight:600;color:var(--muted);margin-left:5px;font-variant-numeric:tabular-nums}
 .room-title{font-size:17px;font-weight:750;margin:0;overflow-wrap:anywhere}
-/* 내 색 고르기: 지름 32px 동그라미, 한 줄 8개. 다른 멤버가 쓰는 색은 아예 안 보여 줌 */
+/* 내 색 고르기: 지름 32px 동그라미, 한 줄 8개(무지개 순서). 다른 멤버가 쓰는 색·그와 거의 같은 색은 아예 안 보여 줌 */
 .swatches{display:grid;grid-template-columns:repeat(8,32px);justify-content:space-between;gap:10px 0}
-.swatch{width:32px;height:32px;border-radius:50%;border:0;padding:0;background:var(--c);display:grid;place-items:center;color:var(--surface)}
+.swatch{width:32px;height:32px;border-radius:50%;border:0;padding:0;background:var(--c);display:grid;place-items:center;color:var(--on,#fff);box-shadow:inset 0 0 0 1px var(--ring)}
 .swatch svg{width:18px;height:18px;display:none}
-.swatch[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--ink)}
+.swatch[aria-pressed="true"]{box-shadow:inset 0 0 0 1px var(--ring),0 0 0 2px var(--bg),0 0 0 4px var(--ink)}
 .swatch[aria-pressed="true"] svg{display:block}
-.swatches[aria-busy="true"] .swatch{opacity:.6;cursor:default}
+.color-busy .swatch,.color-busy .custom-pick{opacity:.6;cursor:default}
+/* 직접 고르기: 무지개 동그라미(지금 직접 고른 색이면 그 색 + 체크) + 이름. 누르면 아래에 색 판·색 코드 칸이 열림 */
+.custom-pick{display:flex;align-items:center;gap:12px;width:100%;margin-top:14px;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-m);padding:10px 12px;text-align:left}
+.custom-pick .swatch{flex:none;pointer-events:none}
+.custom-pick .rainbow{background:conic-gradient(#F53C41,#F87805,#F7CD03,#84C903,#04BB3D,#0CD2A9,#04AEE0,#0182F3,#5E4DEE,#AC55F4,#DB3CC6,#EC4179,#F53C41)}
+.custom-pick .swatch svg{display:block}
+.custom-pick .rainbow svg{width:16px;height:16px;color:#fff;filter:drop-shadow(0 0 1.5px rgb(0 0 0 / .55))}
+.custom-pick .swatch.on{box-shadow:inset 0 0 0 1px var(--ring),0 0 0 2px var(--surface),0 0 0 4px var(--ink)}
+.custom-pick .txt{flex:1;min-width:0}
+.custom-pick b{display:block;font-weight:750;font-size:15px}
+.custom-pick small{display:block;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.custom-pick .chev{flex:none;width:20px;height:20px;color:var(--muted);transition:transform .15s}
+.custom-pick[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.custom-panel{margin-top:8px;padding:14px;border-radius:var(--r-m);background:var(--surface);border:1px solid var(--line)}
+.custom-row{display:flex;align-items:center;gap:10px}
+.color-well{flex:none;position:relative;width:46px;height:46px;border-radius:50%;box-shadow:inset 0 0 0 1px var(--ring)}
+.color-well input{-webkit-appearance:none;appearance:none;display:block;width:46px;height:46px;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
+.color-well input::-webkit-color-swatch-wrapper{padding:0}
+.color-well input::-webkit-color-swatch{border:0;border-radius:50%;box-shadow:inset 0 0 0 1px var(--ring)}
+.color-well input::-moz-color-swatch{border:0;border-radius:50%}
+.hex-field{flex:1;min-width:0;margin:0}
+.hex-field .input{font-variant-numeric:tabular-nums;letter-spacing:.06em;text-transform:uppercase}
+.hex-field .input::placeholder{text-transform:none;letter-spacing:0}
+.custom-row .btn{flex:none;min-height:46px}
+.custom-note{display:flex;align-items:flex-start;gap:7px;min-height:1.5em;margin:10px 0 0;font-size:13px;line-height:1.5;color:var(--muted)}
+.custom-note .dot{margin-top:5px}
+.custom-note.warn{color:var(--ink)}
+.custom-note.error{color:var(--danger)}
+.custom-note.warn::before,.custom-note.error::before{content:"!";flex:none;display:inline-grid;place-items:center;width:17px;height:17px;margin-top:1px;border-radius:50%;font-size:11.5px;font-weight:900;color:#fff;background:var(--danger)}
+.custom-note.warn::before{background:#C26A00}
+@media (prefers-color-scheme: dark){.custom-note.warn::before{background:#E08A1E}}
+/* 내 정보 → 계정 설정 줄 */
+.nav-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-m);padding:12px 12px 12px 14px}
+.nav-row .ico{flex:none;width:36px;height:36px;border-radius:50%;background:var(--sunken);display:grid;place-items:center;color:var(--ink)}
+.nav-row .ico svg{width:20px;height:20px}
+.nav-row .txt{flex:1;min-width:0}
+.nav-row b{display:block;font-weight:750;font-size:15px}
+.nav-row small{display:block;font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.nav-row .chev{flex:none;width:20px;height:20px;color:var(--muted)}
+.room-card.current{border-color:var(--ink);cursor:default}
+.badge.now{background:var(--ink);color:var(--bg)}
 
 /* ---------- toast ---------- */
 #toast{
@@ -465,7 +516,7 @@ const SIGNUP_ENABLED = false;
 
 const BUCKET = 'place-photos';
 // 설정 화면 맨 아래에 보이는 버전. 배포할 때마다 README 업데이트 노트와 같이 올림 ('v버전: 배포일 YYMMDD')
-const APP_VERSION = 'v0.1.1: 261022';
+const APP_VERSION = 'v0.1.2: 261022';
 
 /* ---------- 작은 도우미 ---------- */
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -480,6 +531,9 @@ const ICON = {
   pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>',
   up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.2" r="3.8"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/></svg>',
   trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 4h9v5.5a4.5 4.5 0 0 1-9 0z"/><path d="M16.5 6H20v1a3.5 3.5 0 0 1-3.8 3.5M7.5 6H4v1a3.5 3.5 0 0 0 3.8 3.5"/><path d="M12 14v3.5M8.5 20.5h7M9.5 17.5h5v3h-5z"/></svg>',
 };
@@ -547,7 +601,8 @@ function friendly(err) {
   if (/last_member/.test(m)) return '그사이 다른 멤버가 모두 나갔어요. 다시 확인해 주세요.';
   if (/not_member/.test(m)) return '이 방의 멤버가 아니에요. 새로고침해 주세요.';
   if (/color_taken/.test(m)) return '그 색은 다른 멤버가 쓰고 있어요. 다른 색을 골라 주세요.';
-  if (/invalid_color/.test(m)) return '없는 색이에요. 새로고침한 뒤 다시 골라 주세요.';
+  if (/color_too_close/.test(m)) return '다른 멤버 색과 거의 같아요. 조금 다른 색을 골라 주세요.';
+  if (/invalid_color/.test(m)) return '없는 색이에요. 새로고침한 뒤 다시 고르거나, 색 코드는 #RRGGBB 형식으로 입력해 주세요.';
   if (/invalid_room_name|couples_name_check/.test(m)) return '방 이름을 1~30자로 입력해 주세요.';
   if (/invalid_display_name|couple_members_display_name_check/.test(m)) return '닉네임을 1~20자로 입력해 주세요.';
   if (/Invalid login credentials/i.test(m)) return LOGIN_ID_DOMAIN ? '아이디 또는 비밀번호가 맞지 않아요.' : '이메일 또는 비밀번호가 맞지 않아요.';
@@ -607,62 +662,132 @@ const state = {
 };
 const uid = () => state.user && state.user.id;
 const MAX_MEMBERS = 5, MAX_ROOMS = 3; // 한 방 5명, 한 사람 3방 (DB 함수·트리거와 같은 숫자)
-/* ---------- 멤버 색 (40가지) ----------
-   DB의 member_colors와 같은 id·순서 (supabase/groups.sql). 순서 = 색 고르기 화면 순서.
-   밝은 값은 흰 바탕·배경에서 3:1 이상, 어두운 값은 카드(#1A212B)에서 선명한 줄 7:1, 짙은 줄 4.6:1 이상.
-   teal·amber는 그룹 기능 전의 방장·멤버 색 (그룹 SQL을 돌릴 때 기존 멤버에게 채워 줌) */
+/* ---------- 멤버 색 (v0.1.2: 화사한 무지개 24색 + 직접 고른 색) ----------
+   DB의 member_colors와 같은 id·순서·값 (supabase/colors.sql, docs/groups-design.md §10.2). 순서 = 색 고르기 화면 순서(빨강 → 장미).
+   이 값은 칠하는 색(점·별·테두리·도장 테두리)이다. 글자에 쓸 때는 readableInk()가 만든 읽히는 색(--ct)을 쓴다.
+   couple_members.color = 팔레트 id 또는 직접 고른 '#rrggbb'(소문자). 모르는 값(예전 40색 id 등)은 회색 */
 const MEMBER_COLORS = [
-  { id: 'orange', name: '주황', light: '#D76F05', dark: '#F59246' },
-  { id: 'tangerine', name: '귤', light: '#C97801', dark: '#ED9733' },
-  { id: 'amber', name: '호박', light: '#BD7A05', dark: '#F0B23E' },
-  { id: 'mustard', name: '겨자', light: '#A48904', dark: '#C9A80C' },
-  { id: 'olive', name: '올리브', light: '#8F900D', dark: '#B0B025' },
-  { id: 'lime', name: '라임', light: '#73970B', dark: '#92B842' },
-  { id: 'green', name: '초록', light: '#459D2E', dark: '#70BD5E' },
-  { id: 'emerald', name: '에메랄드', light: '#0F9F5C', dark: '#44C17B' },
-  { id: 'jade', name: '비취', light: '#119D7C', dark: '#14C197' },
-  { id: 'teal', name: '청록', light: '#0E8C86', dark: '#3CC2B9' },
-  { id: 'cyan', name: '시안', light: '#0A9AA1', dark: '#19BDC4' },
-  { id: 'sky', name: '하늘', light: '#0698B2', dark: '#1ABBD8' },
-  { id: 'azure', name: '물빛', light: '#0296C5', dark: '#06B8F1' },
-  { id: 'blue', name: '파랑', light: '#0091E4', dark: '#4EB2FE' },
-  { id: 'cobalt', name: '코발트', light: '#4B89F2', dark: '#7AACFD' },
-  { id: 'indigo', name: '남색', light: '#7281F4', dark: '#95A5FE' },
-  { id: 'violet', name: '보라', light: '#9079EF', dark: '#AD9EFD' },
-  { id: 'purple', name: '자주', light: '#A971E3', dark: '#C695FB' },
-  { id: 'orchid', name: '난초', light: '#BE6AD1', dark: '#D98FEB' },
-  { id: 'pink', name: '분홍', light: '#D362B2', dark: '#EF88CE' },
-  { id: 'orange-deep', name: '짙은 주황', light: '#8D561E', dark: '#B17E4E' },
-  { id: 'tangerine-deep', name: '짙은 귤', light: '#875913', dark: '#AB8149' },
-  { id: 'amber-deep', name: '짙은 호박', light: '#7C5F08', dark: '#A08645' },
-  { id: 'mustard-deep', name: '짙은 겨자', light: '#6E640D', dark: '#938A46' },
-  { id: 'olive-deep', name: '짙은 올리브', light: '#5D681C', dark: '#838F4D' },
-  { id: 'lime-deep', name: '짙은 라임', light: '#4A6C2D', dark: '#729258' },
-  { id: 'green-deep', name: '짙은 초록', light: '#346F3E', dark: '#5F9566' },
-  { id: 'emerald-deep', name: '짙은 에메랄드', light: '#13714E', dark: '#4D9775' },
-  { id: 'jade-deep', name: '짙은 비취', light: '#027060', dark: '#3D9785' },
-  { id: 'teal-deep', name: '짙은 청록', light: '#106E6C', dark: '#339794' },
-  { id: 'cyan-deep', name: '짙은 시안', light: '#126D78', dark: '#3495A2' },
-  { id: 'sky-deep', name: '짙은 하늘', light: '#076C86', dark: '#3E93AE' },
-  { id: 'azure-deep', name: '짙은 물빛', light: '#186994', dark: '#4E90B7' },
-  { id: 'blue-deep', name: '짙은 파랑', light: '#36659A', dark: '#608CBE' },
-  { id: 'cobalt-deep', name: '짙은 코발트', light: '#4B619D', dark: '#7188C0' },
-  { id: 'indigo-deep', name: '짙은 남색', light: '#5D5C9C', dark: '#8284C0' },
-  { id: 'violet-deep', name: '짙은 보라', light: '#6D5898', dark: '#9180BB' },
-  { id: 'purple-deep', name: '짙은 자주', light: '#7A5490', dark: '#9E7CB3' },
-  { id: 'orchid-deep', name: '짙은 난초', light: '#855084', dark: '#AA79A8' },
-  { id: 'pink-deep', name: '짙은 분홍', light: '#904D71', dark: '#B57696' },
+  { id: 'red', name: '빨강', light: '#F53C41', dark: '#FF726B' },
+  { id: 'coral', name: '산호', light: '#F66336', dark: '#FF8D6C' },
+  { id: 'orange', name: '주황', light: '#F87805', dark: '#FE9B5D' },
+  { id: 'tangerine', name: '귤', light: '#FA960B', dark: '#FEAC59' },
+  { id: 'amber', name: '호박', light: '#F7AE05', dark: '#FEBE4D' },
+  { id: 'yellow', name: '노랑', light: '#F7CD03', dark: '#FFD83D' },
+  { id: 'chartreuse', name: '연두', light: '#CBD20D', dark: '#DCE307' },
+  { id: 'lime', name: '라임', light: '#84C903', dark: '#99E51C' },
+  { id: 'green', name: '초록', light: '#04BB3D', dark: '#45DC5F' },
+  { id: 'emerald', name: '에메랄드', light: '#0CB477', dark: '#23D891' },
+  { id: 'mint', name: '민트', light: '#0CD2A9', dark: '#3CEABF' },
+  { id: 'teal', name: '청록', light: '#02AFA6', dark: '#25D2C7' },
+  { id: 'cyan', name: '시안', light: '#09C0D3', dark: '#07DDF2' },
+  { id: 'sky', name: '하늘', light: '#04AEE0', dark: '#41CBFF' },
+  { id: 'azure', name: '물빛', light: '#049AED', dark: '#5FB9FE' },
+  { id: 'blue', name: '파랑', light: '#0182F3', dark: '#5EA7FF' },
+  { id: 'cobalt', name: '코발트', light: '#3461EF', dark: '#6892FE' },
+  { id: 'indigo', name: '남색', light: '#5E4DEE', dark: '#8384FF' },
+  { id: 'violet', name: '보라', light: '#885AF5', dark: '#A890FE' },
+  { id: 'purple', name: '자주', light: '#AC55F4', dark: '#C68BFF' },
+  { id: 'orchid', name: '난초', light: '#CF63E7', dark: '#EA8DFF' },
+  { id: 'magenta', name: '자홍', light: '#DB3CC6', dark: '#FF6AE8' },
+  { id: 'pink', name: '분홍', light: '#EF64B3', dark: '#FF91CB' },
+  { id: 'rose', name: '장미', light: '#EC4179', dark: '#FF799B' },
 ];
 const COLOR_BY_ID = new Map(MEMBER_COLORS.map((c) => [c.id, c]));
-// .mc-<id>{--c:밝은 값}, 어두운 화면에선 어두운 값. 색 표를 한 곳(위 목록)에만 두려고 CSS를 여기서 만듦
-(function memberColorStyle() {
-  const el = document.createElement('style');
-  el.textContent = MEMBER_COLORS.map((c) => `.mc-${c.id}{--c:${c.light}}`).join('\n')
-    + `\n@media (prefers-color-scheme: dark){\n${MEMBER_COLORS.map((c) => `.mc-${c.id}{--c:${c.dark}}`).join('\n')}\n}`;
-  document.head.appendChild(el);
-})();
-// 색 id → 클래스. 모르는 색(목록에 없음)이나 나간 멤버는 회색
-const colorCls = (id) => (COLOR_BY_ID.has(id) ? `mc mc-${id}` : 'mc mc-none');
+const HEX_RE = /^#[0-9a-f]{6}$/;
+// 비슷한 색 기준 (OKLab 거리, §10.4): 0.03 미만은 DB가 막음(color_too_close), 0.08 미만은 직접 고르기에서 '비슷해요' 안내만
+const COLOR_BLOCK = 0.03, COLOR_WARN = 0.08;
+const isHexColor = (c) => HEX_RE.test(String(c || ''));
+// '#ABCDEF', 'abcdef', ' #abcdef ' → '#abcdef' (6자리 16진수가 아니면 null)
+const normHex = (s) => { const v = String(s || '').trim().toLowerCase(); const h = v.startsWith('#') ? v : `#${v}`; return HEX_RE.test(h) ? h : null; };
+
+/* OKLab (Björn Ottosson의 식). supabase/colors.sql의 member_color_lab과 같은 상수 */
+const hexRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const fromLinear = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+function oklab(hex) {
+  const [r, g, b] = hexRgb(hex).map(toLinear);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+}
+// OKLab → 선형 sRGB (색역 밖이면 0~1을 벗어남)
+function oklabLinear(L, a, b) {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s];
+}
+const labDelta = (x, y) => { const p = oklab(x), q = oklab(y); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
+// 멤버 색 → 칠하는 색 [밝은 화면, 어두운 화면]. 직접 고른 색은 두 화면 모두 그 색. 모르는 값이면 null
+function colorFills(color) {
+  const c = String(color || '').toLowerCase();
+  if (HEX_RE.test(c)) return [c, c];
+  const p = COLOR_BY_ID.get(c);
+  return p ? [p.light.toLowerCase(), p.dark.toLowerCase()] : null;
+}
+// 두 멤버 색의 거리 = 밝은 화면끼리·어두운 화면끼리 잰 OKLab 거리 중 작은 쪽 (DB member_color_distance와 같음). 모르면 null
+function colorDistance(x, y) {
+  const f = colorFills(x), g = colorFills(y);
+  return f && g ? Math.min(labDelta(f[0], g[0]), labDelta(f[1], g[1])) : null;
+}
+const colorName = (color) => (isHexColor(color) ? '직접 고른 색' : COLOR_BY_ID.has(color) ? COLOR_BY_ID.get(color).name : '');
+
+/* 글자에 쓰는 읽히는 색: 색상각은 두고 밝기(OKLCH L)만 바꿔 바탕과 4.5:1이 되게 (§10.2).
+   밝은 화면은 흰 바탕·배경(#F6F7F4)에서 더 진하게, 어두운 화면은 카드(#1A212B)·배경(#12171F)에서 더 밝게. 채도는 색역 안으로 줄임 */
+const luminance = (rgb) => { const [r, g, b] = rgb.map(toLinear); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+const contrastRatio = (y1, y2) => (Math.max(y1, y2) + 0.05) / (Math.min(y1, y2) + 0.05);
+const INK_BG = { light: ['#ffffff', '#f6f7f4'], dark: ['#1a212b', '#12171f'] };
+const rgbHex = (rgb) => `#${rgb.map((c) => Math.round(Math.min(1, Math.max(0, c)) * 255).toString(16).padStart(2, '0')).join('')}`;
+// 밝기 L·채도 C·색상각 h(라디안)인 색을 sRGB 안에 들어올 때까지 채도만 줄여서 hex로
+function oklchHex(L, C, h) {
+  const inGamut = (c) => oklabLinear(L, c * Math.cos(h), c * Math.sin(h)).every((v) => v >= -1e-4 && v <= 1 + 1e-4);
+  let lo = 0, hi = C;
+  if (!inGamut(hi)) { for (let i = 0; i < 18; i++) { const mid = (lo + hi) / 2; if (inGamut(mid)) lo = mid; else hi = mid; } hi = lo; }
+  return rgbHex(oklabLinear(L, hi * Math.cos(h), hi * Math.sin(h)).map(fromLinear));
+}
+function readableInk(hex, dark) {
+  const bgs = (dark ? INK_BG.dark : INK_BG.light).map((b) => luminance(hexRgb(b)));
+  const ok = (x) => bgs.every((y) => contrastRatio(luminance(hexRgb(x)), y) >= 4.5);
+  if (ok(hex)) return hex;
+  const [L0, a, b] = oklab(hex);
+  const C = Math.hypot(a, b), h = Math.atan2(b, a);
+  // 밝은 화면: 0~L0 중 4.5:1이 되는 가장 밝은 L / 어두운 화면: L0~1 중 4.5:1이 되는 가장 어두운 L
+  let lo = dark ? L0 : 0, hi = dark ? 1 : L0;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (ok(oklchHex(mid, C, h)) === dark) hi = mid; else lo = mid;
+  }
+  let L = dark ? hi : lo, out = oklchHex(L, C, h);
+  for (let i = 0; i < 40 && !ok(out); i++) { L += dark ? 0.004 : -0.004; out = oklchHex(L, C, h); } // 반올림으로 살짝 모자라면 한 걸음 더
+  return out;
+}
+// 그 색 위에 올리는 체크 표시: 흰색과 남색 중 대비가 큰 쪽
+const onInk = (hex) => { const y = luminance(hexRgb(hex)); return contrastRatio(y, 1) >= contrastRatio(y, luminance(hexRgb('#1e2a3a'))) ? '#ffffff' : '#1e2a3a'; };
+
+// 색마다 CSS 규칙 하나: .mc-<id>(팔레트) / .mc-hex-<rrggbb>(직접 고른 색, 처음 쓰일 때 만듦)
+const colorStyle = document.createElement('style');
+document.head.appendChild(colorStyle);
+const colorRules = new Set();
+function memberColorRule(cls, light, dark) {
+  if (colorRules.has(cls)) return;
+  colorRules.add(cls);
+  const rule = (hex, isDark) => `.${cls}{--c:${hex};--ct:${readableInk(hex, isDark)};--on:${onInk(hex)}}`;
+  colorStyle.textContent += `${rule(light, false)}\n@media (prefers-color-scheme: dark){${rule(dark, true)}}\n`;
+}
+MEMBER_COLORS.forEach((c) => memberColorRule(`mc-${c.id}`, c.light.toLowerCase(), c.dark.toLowerCase()));
+// 멤버 색 값 → 클래스. 팔레트는 mc-<id>, 직접 고른 색은 mc-hex-<rrggbb>, 모르는 색(목록에 없음)이나 나간 멤버는 회색
+function colorCls(color) {
+  const c = String(color || '').toLowerCase();
+  if (COLOR_BY_ID.has(c)) return `mc mc-${c}`;
+  if (!HEX_RE.test(c)) return 'mc mc-none';
+  memberColorRule(`mc-hex-${c.slice(1)}`, c, c);
+  return `mc mc-hex-${c.slice(1)}`;
+}
 const memberCls = (m) => colorCls(m && m.color);
 // 지금 방의 멤버 한 사람: 이름(방마다 다른 닉네임), 색 클래스, 나인지, 방장인지. 방에 없는 id는 '나간 멤버'(회색)
 function person(id) {
@@ -1032,16 +1157,29 @@ function viewOnboard() {
     <button class="text-btn" data-action="logout" style="margin-top:16px;align-self:center">다른 계정으로 로그인</button>
   </main>`;
 }
+// 시트 맨 위 왼쪽: 다른 시트에서 넘어왔으면(back) ‹ 뒤로, 아니면 ✕ 닫기
+const sheetClose = () => (state.sheet && state.sheet.back
+  ? `<button class="icon-btn" data-action="close" aria-label="뒤로">${ICON.back}</button>`
+  : `<button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button>`);
 function roomNewView() {
   const mode = state.sheet.mode === 'join' ? 'join' : 'create';
-  return `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">${mode === 'join' ? '코드로 참여' : '새 방 만들기'}</h2><span style="width:40px"></span></div>
+  return `<div class="sheet-head">${sheetClose()}<h2 id="sheet-title">${mode === 'join' ? '코드로 참여' : '새 방 만들기'}</h2><span style="width:40px"></span></div>
   <div class="sheet-body">${roomFormHtml(mode, defaultNick())}</div>`;
 }
-// 방 카드: 방 이름, 멤버 점(최대 5개), 인원, 내 닉네임, 방장·최근 표시
-function roomCard(r, last) {
+// 방 바꾸기 시트 (메인의 방 이름을 누르면): 내 방 전부(지금 방 표시) + 새 방 만들기·코드로 참여 (3개면 안내만)
+function roomsView() {
+  return `<div class="sheet-head">${sheetClose()}<h2 id="sheet-title">방 바꾸기</h2><span style="width:40px"></span></div>
+  <div class="sheet-body">
+    <p class="hint" style="margin:4px 0 12px">내 방 ${state.rooms.length}/${MAX_ROOMS}개 · 방을 누르면 그 방으로 바뀌어요.</p>
+    <ul class="room-list">${state.rooms.map((r) => roomCard(r, null, r.id === state.roomId)).join('')}</ul>
+    ${roomNewButtons()}
+  </div>`;
+}
+// 방 카드: 방 이름, 멤버 점(최대 5개), 인원, 내 닉네임, 방장·최근 표시. current면 지금 방(누르면 시트만 닫힘)
+function roomCard(r, last, current = false) {
   const ms = membersOf(r.id), me = ms.find((m) => m.user_id === uid());
-  return `<li><button class="room-card" data-action="pick-room" data-id="${esc(r.id)}">
-    <span class="room-top"><span class="room-name">${esc(r.name)}</span>${r.id === last ? '<span class="badge">최근</span>' : ''}</span>
+  return `<li><button class="room-card${current ? ' current' : ''}" ${current ? 'data-action="close" aria-current="true"' : `data-action="pick-room" data-id="${esc(r.id)}"`}>
+    <span class="room-top"><span class="room-name">${esc(r.name)}</span>${current ? '<span class="badge now">지금 방</span>' : r.id === last ? '<span class="badge">최근</span>' : ''}</span>
     <span class="room-meta"><span class="room-dots" aria-hidden="true">${ms.slice(0, MAX_MEMBERS).map((m) => `<i class="dot ${memberCls(m)}"></i>`).join('')}</span>
       <span>${ms.length}/${MAX_MEMBERS}명</span>${me ? `<span>· ${esc(me.display_name)}</span>` : ''}${me && me.role === 'owner' ? '<span class="badge">방장</span>' : ''}</span>
   </button></li>`;
@@ -1049,13 +1187,13 @@ function roomCard(r, last) {
 // 새 방 만들기·코드로 참여 버튼 (방이 3개면 안내만)
 const roomNewButtons = () => (state.rooms.length < MAX_ROOMS
   ? `<div class="room-actions"><button class="btn ghost small" data-action="room-new" data-mode="create">새 방 만들기</button><button class="btn ghost small" data-action="room-new" data-mode="join">코드로 참여</button></div>`
-  : `<p class="hint">방은 ${MAX_ROOMS}개까지 들어갈 수 있어요.</p>`);
+  : `<p class="hint">방은 ${MAX_ROOMS}개까지 들어갈 수 있어요. 새 방을 만들거나 참여하려면 다른 방에서 먼저 나가 주세요.</p>`);
 function viewRooms() {
   const last = lastRoom();
   return `<main class="wrap gate">
     <div class="mark"><i></i><i></i></div>
     <h1>어느 방으로 갈까요?</h1>
-    <p class="lead">방은 내 정보에서 언제든 바꿀 수 있어요.</p>
+    <p class="lead">들어간 뒤에도 위쪽 방 이름을 누르면 언제든 바꿀 수 있어요.</p>
     <ul class="room-list">${state.rooms.map((r) => roomCard(r, last)).join('')}</ul>
     ${roomNewButtons()}
     <button class="text-btn" data-action="logout" style="margin-top:16px;align-self:center">다른 계정으로 로그인</button>
@@ -1163,6 +1301,13 @@ function listHtml() {
     : '<strong>찜한 곳이 없어요</strong>장소를 열고 하트를 누르면 여기에 모여요.';
   return list.length ? `<ul class="list">${list.map(placeCard).join('')}</ul>` : `<div class="empty-state">${emptyMsg}</div>`;
 }
+// 메인 위쪽 방 이름: 누르면 방 바꾸기·새 방 시트. 마지막 낱말과 ⌄는 같은 줄에 (낱말이 아주 길면 그냥 줄바꿈)
+function roomTitleBtn(name) {
+  const i = name.lastIndexOf(' ');
+  const head = i >= 0 ? name.slice(0, i + 1) : '', tail = i >= 0 ? name.slice(i + 1) : name;
+  const end = [...tail].length <= 10 ? `<span class="tail">${esc(tail)}${ICON.down}</span>` : `${esc(tail)}${ICON.down}`;
+  return `<button class="title-btn" data-action="rooms" aria-haspopup="dialog" aria-label="${esc(`${name}, 방 바꾸기와 새 방`)}">${esc(head)}${end}</button>`;
+}
 function viewMain() {
   const want = state.places.filter((p) => p.status === 'want_to_go').length;
   const visited = state.places.filter((p) => p.status === 'visited').length;
@@ -1174,7 +1319,7 @@ function viewMain() {
   return `<div class="top"><div class="wrap">
       <div class="top-row">
         <div class="top-head">
-          <h1 class="title">${esc(state.couple.name)}</h1>
+          <h1 class="title">${roomTitleBtn(state.couple.name)}</h1>
           <div class="duo" aria-label="멤버">${ordered.map((m) => { const w = person(m.user_id); return `<span class="${w.cls}" title="${esc(w.name)}"><i class="dot"></i><span class="nm">${esc(w.name)}</span></span>`; }).join('')}</div>
         </div>
         <div class="top-actions">
@@ -1684,7 +1829,7 @@ function stampSvg(h) {
   return `<svg viewBox="0 0 100 100" aria-hidden="true"><g filter="url(#stamp-ink)">
     <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="5"/>
     <circle cx="50" cy="50" r="38.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
-    <g fill="currentColor" text-anchor="middle">${words}</g>
+    <g class="st-words" fill="currentColor" text-anchor="middle">${words}</g>
   </g></svg>`;
 }
 // 각자 고른 1위는 그 사람 색 도장
@@ -1874,44 +2019,108 @@ async function deleteCategory(id) {
   toast('카테고리를 삭제했어요.');
 }
 
-/* ---------- 시트: 내 정보 (방·멤버·초대 코드·닉네임·색·방 바꾸기·카테고리·계정, 맨 아래 나가기) ---------- */
+/* ---------- 시트: 내 정보 (방·멤버·초대 코드·닉네임·색·방 바꾸기·카테고리, 계정 설정으로 가는 줄, 맨 아래 나가기) ---------- */
 const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
-// 내 색: 이 방에서 다른 멤버가 쓰지 않는 색만 (다른 멤버 색은 아예 안 보여 줌). 지금 내 색은 눌린 상태 + 체크
+const PLUS_SMALL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>';
+// 직접 고르기 칸: null이면 닫힘, 문자열이면 열려 있고 그 값(색 코드 칸에 적힌 그대로)
+let customDraft = null;
+const otherMembers = () => state.members.filter((m) => m.user_id !== uid());
+// 직접 고를 색 확인: 형식(아직 덜 친 값은 'pending', 틀린 글자·자릿수 초과만 'error') → 지금 내 색 → 다른 멤버 색과 거리 (< 0.03 막힘, < 0.08 안내만)
+function customCheck(raw) {
+  const hex = normHex(raw);
+  if (!hex && /^#?[0-9a-f]{0,5}$/i.test(String(raw || '').trim())) return { hex: null, level: 'pending', msg: '# 뒤에 6자리 색 코드를 입력해 주세요. (예: #FF7A00)' };
+  if (!hex) return { hex: null, level: 'error', msg: '색 코드는 #RRGGBB처럼 # 뒤에 6자리로 입력해 주세요. (예: #FF7A00)' };
+  const me = myMember();
+  // 처음 열면 지금 팔레트 색(밝은 값)이 들어 있음: 그대로 저장하면 팔레트 색이 직접 고른 색으로 바뀌어 어두운 화면 값을 잃으니 '지금 내 색'으로 봄
+  const mine = me && !isHexColor(me.color) ? colorFills(me.color) : null;
+  if (me && (me.color === hex || (mine && mine.includes(hex)))) return { hex, level: 'same', msg: '지금 내 색이에요. 바꾸려면 색 판이나 색 코드로 다른 색을 골라 주세요.' };
+  let near = null, d = Infinity;
+  for (const m of otherMembers()) { const x = colorDistance(m.color, hex); if (x != null && x < d) { d = x; near = m; } }
+  const who = near && esc(near.display_name || '멤버');
+  if (near && d < COLOR_BLOCK) return { hex, level: 'error', near, msg: `${who}님 색과 거의 같아요. 조금 다른 색을 골라 주세요.` };
+  if (near && d < COLOR_WARN) return { hex, level: 'warn', near, msg: `${who}님 색과 비슷해요. 그래도 저장할 수 있어요.` };
+  return { hex, level: 'ok', msg: '이 색으로 저장할 수 있어요.' };
+}
+const customNoteHtml = (c) => `${c.near ? `<i class="dot ${memberCls(c.near)}" aria-hidden="true"></i>` : ''}<span>${c.msg}</span>`;
+// 색 코드 칸·색 판이 바뀔 때: 안내 문구와 저장 버튼만 고침 (다시 그리지 않아서 입력 중인 커서가 그대로)
+function syncCustom(raw, from) {
+  customDraft = raw;
+  const c = customCheck(raw);
+  const note = $('#custom-note'), save = $('#custom-save'), well = $('#custom-color'), hexIn = $('#custom-hex');
+  if (note) { note.className = `custom-note ${c.level}`; note.innerHTML = customNoteHtml(c); }
+  if (save) save.disabled = !c.hex || c.level === 'error' || c.level === 'same';
+  if (c.hex && from !== 'well' && well) well.value = c.hex;
+  if (from === 'well' && hexIn) hexIn.value = raw.toUpperCase();
+}
+function customPanelHtml(me) {
+  const c = customCheck(customDraft);
+  const start = c.hex || (colorFills(me.color) || ['#888888'])[0];
+  return `<div class="custom-panel" id="custom-panel">
+      <div class="custom-row">
+        <span class="color-well"><input type="color" id="custom-color" value="${esc(start)}" aria-label="색 판에서 고르기"></span>
+        <label class="field hex-field"><span class="sr">색 코드</span><input class="input" id="custom-hex" value="${esc(String(customDraft).toUpperCase())}" maxlength="9" placeholder="#RRGGBB" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="done"></label>
+        <button type="button" class="btn small" id="custom-save" data-action="save-custom-color"${!c.hex || c.level === 'error' || c.level === 'same' ? ' disabled' : ''}>저장</button>
+      </div>
+      <p class="custom-note ${c.level}" id="custom-note" aria-live="polite">${customNoteHtml(c)}</p>
+    </div>`;
+}
+// 내 색: 팔레트 24색 중 이 방에서 다른 멤버가 쓰지 않고 그 색과 거의 같지도 않은 색만 (다른 멤버 색은 아예 안 보여 줌).
+// 지금 내 색은 눌린 상태 + 체크. 맨 끝 '직접 고르기'는 색 판(<input type=color>)과 #RRGGBB 칸
 function colorPickerHtml(me) {
   if (!me) return '';
-  const taken = new Set(state.members.filter((m) => m.user_id !== uid()).map((m) => m.color));
-  const free = MEMBER_COLORS.filter((c) => !taken.has(c.id));
-  const mine = COLOR_BY_ID.get(me.color);
-  return `<div class="settings-group">
-      <h3>내 색${mine ? `<span class="member-count">${esc(mine.name)}</span>` : ''}</h3>
+  const others = otherMembers();
+  const free = MEMBER_COLORS.filter((c) => !others.some((m) => m.color === c.id || (colorDistance(m.color, c.id) ?? 1) < COLOR_BLOCK));
+  const custom = isHexColor(me.color), open = customDraft !== null;
+  const name = colorName(me.color);
+  return `<div class="settings-group" id="color-group">
+      <h3>내 색${name ? `<span class="member-count">${esc(name)}${custom ? ` ${esc(me.color.toUpperCase())}` : ''}</span>` : ''}</h3>
       <div class="swatches" id="swatches" role="group" aria-label="내 색 고르기">${free.map((c) => `<button type="button" class="swatch mc mc-${c.id}" data-action="set-color" data-color="${c.id}" aria-label="${esc(c.name)}" aria-pressed="${c.id === me.color}" title="${esc(c.name)}">${CHECK}</button>`).join('')}</div>
+      <button type="button" class="custom-pick" data-action="custom-color" aria-expanded="${open}" aria-controls="custom-panel">
+        <span class="swatch ${custom ? `${colorCls(me.color)} on` : 'rainbow'}">${custom ? CHECK : PLUS_SMALL}</span>
+        <span class="txt"><b>직접 고르기</b><small>${custom ? `지금 쓰는 색 ${esc(me.color.toUpperCase())}` : '색 판이나 색 코드(#RRGGBB)로 골라요'}</small></span>
+        <span class="chev" aria-hidden="true">${ICON.down}</span>
+      </button>
+      ${open ? customPanelHtml(me) : ''}
       <p class="hint">후기·별점·도장에 이 색이 쓰여요. 다른 멤버가 쓰는 색은 빠져 있어요.</p>
     </div>`;
 }
-// 색 바꾸기 (set_member_color). 그사이 다른 멤버가 같은 색을 골랐으면 DB가 막고, 새로 불러와서 다시 보여 줌
+// 직접 고르기 칸 열기·닫기. 처음 열 때 값: 지금 직접 고른 색, 아니면 지금 팔레트 색(밝은 값)에서 시작
+function toggleCustom() {
+  const me = myMember();
+  if (!me) return;
+  customDraft = customDraft !== null ? null : (isHexColor(me.color) ? me.color : (colorFills(me.color) || ['#888888'])[0]).toUpperCase();
+  renderSheet();
+  if (customDraft !== null) {
+    const panel = $('#custom-panel');
+    if (panel) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+// 색 바꾸기 (set_member_color, 팔레트 id 또는 '#rrggbb'). 그사이 다른 멤버가 같은·거의 같은 색을 골랐으면 DB가 막고, 새로 불러와서 다시 보여 줌
 let colorBusy = false;
 async function setMyColor(color) {
   const me = myMember();
   if (colorBusy || !me || me.color === color) return;
   const roomId = state.roomId;
   colorBusy = true;
-  const grid = $('#swatches');
-  if (grid) grid.setAttribute('aria-busy', 'true');
+  const group = $('#color-group');
+  if (group) group.classList.add('color-busy');
   try {
     const { error } = await sb.rpc('set_member_color', { p_couple: roomId, p_color: color });
-    if (error) toast(friendly(error));
+    // 화면은 확인한 팔레트 id나 '#rrggbb'만 보냄. 그런데 invalid_color = 새 색을 받는 SQL(colors.sql)이 아직 안 돌아감
+    if (error) toast(/invalid_color/.test(error.message || '') ? '새 색을 쓰려면 supabase/colors.sql을 먼저 실행해야 해요. 새로고침한 뒤 다시 골라 주세요.' : friendly(error));
+    else customDraft = null;
     try { await refresh(); } catch (x) { if (!error) toast(friendly(x)); }
     if (state.roomId !== roomId) return; // 그사이 방을 바꿈
     if (state.sheet && state.sheet.type === 'settings') {
       renderSheet();
-      const on = $('#sheet-root [data-action=set-color][aria-pressed="true"]');
+      const on = $('#sheet-root [data-action=set-color][aria-pressed="true"]') || (isHexColor(color) && !error && $('#sheet-root [data-action=custom-color]'));
       if (on) on.focus({ preventScroll: true });
     }
     if (!error) toast('내 색을 바꿨어요.');
   } finally {
     colorBusy = false;
-    const g = $('#swatches');
-    if (g) g.removeAttribute('aria-busy');
+    const g = $('#color-group');
+    if (g) g.classList.remove('color-busy');
   }
 }
 function settingsView() {
@@ -1924,10 +2133,9 @@ function settingsView() {
     const w = person(m.user_id);
     return `<li class="${w.cls}"><i class="dot"></i><span>${esc(w.name)}</span>${w.owner ? '<span class="badge">방장</span>' : ''}${w.me ? '<span class="you">나</span>' : ''}</li>`;
   };
-  return `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">내 정보</h2><span style="width:40px"></span></div>
+  return `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">내 정보</h2><button class="icon-btn" data-action="account" aria-label="계정 설정">${ICON.user}</button></div>
   <div class="sheet-body">
-    <p class="hint" style="margin:4px 0 0">${id ? `아이디 ${esc(id)}로` : `${esc(state.user.email)}로`} 로그인했어요.</p>
-    <div class="settings-group">
+    <div class="settings-group" style="margin-top:8px">
       <h3>방</h3>
       ${isOwner()
         ? `<form id="room-name-form" novalidate><div class="row"><label class="field"><span class="sr">방 이름</span><input class="input" name="room" maxlength="30" value="${esc(room.name)}" required></label><button class="btn small" type="submit" style="min-height:46px">이름 저장</button></div></form>`
@@ -1947,6 +2155,7 @@ function settingsView() {
       <h3>방 바꾸기</h3>
       ${others.length ? `<ul class="room-list">${others.map((r) => roomCard(r, null)).join('')}</ul>` : '<p class="hint" style="margin:0">지금 든 방은 이 방 하나예요.</p>'}
       ${roomNewButtons()}
+      <p class="hint">메인 화면 위쪽의 방 이름을 눌러도 바꿀 수 있어요.</p>
     </div>
     <div class="settings-group">
       <h3>카테고리</h3>
@@ -1959,6 +2168,19 @@ function settingsView() {
       <div class="new-cat"><input class="input" maxlength="20" placeholder="새 카테고리 이름" aria-label="새 카테고리 이름" enterkeyhint="done"><button class="btn small" data-action="add-cat">추가</button></div>
       <p class="hint">이름을 바꾸면 그 카테고리의 장소도 같이 바뀌어요. 멤버 모두에게 똑같이 보여요.</p>
     </div>
+    <div class="settings-group">
+      <h3>계정</h3>
+      <button class="nav-row" data-action="account"><span class="ico">${ICON.user}</span><span class="txt"><b>계정 설정</b><small>${id ? `아이디 ${esc(id)}` : esc(state.user.email)} · 비밀번호 변경, 로그아웃</small></span><span class="chev" aria-hidden="true">${ICON.right}</span></button>
+    </div>
+    <div class="danger-zone"><span>${n > 1 ? '내 후기와 월드컵 기록은 지워지고, 담은 장소는 남아요.' : '혼자 남은 방이라 나가면 방이 지워져요.'}</span><button class="text-btn danger" data-action="leave-room">이 방에서 나가기</button></div>
+  </div>`;
+}
+/* ---------- 시트: 계정 설정 (내 정보에서 넘어옴. 로그인 정보·비밀번호 변경·로그아웃·버전) ---------- */
+function accountView() {
+  const id = loginId(state.user.email);
+  return `<div class="sheet-head">${sheetClose()}<h2 id="sheet-title">계정 설정</h2><span style="width:40px"></span></div>
+  <div class="sheet-body">
+    <p class="hint" style="margin:4px 0 0">${id ? `아이디 <b>${esc(id)}</b>로` : `<b>${esc(state.user.email)}</b>로`} 로그인했어요. 계정은 모든 방에서 같이 써요.</p>
     <form class="settings-group" id="pw-form" novalidate>
       <h3>비밀번호 변경</h3>
       <label class="field"><span>새 비밀번호</span><input class="input" type="password" name="pw" autocomplete="new-password" minlength="8" required></label>
@@ -1966,9 +2188,11 @@ function settingsView() {
       <button class="btn block ghost" type="submit">비밀번호 변경</button>
       <p class="error" id="pw-error"></p>
     </form>
-    <div class="settings-group"><button class="btn block ghost" data-action="logout">로그아웃</button></div>
+    <div class="settings-group" style="margin-top:28px">
+      <button class="btn block ghost" data-action="logout">로그아웃</button>
+      <p class="hint">이 기기에서만 로그아웃돼요. 다시 들어올 때는 ${id ? '아이디와' : '이메일과'} 비밀번호가 필요해요.</p>
+    </div>
     <p class="app-version">${esc(APP_VERSION)}</p>
-    <div class="danger-zone"><span>${n > 1 ? '내 후기와 월드컵 기록은 지워지고, 담은 장소는 남아요.' : '혼자 남은 방이라 나가면 방이 지워져요.'}</span><button class="text-btn danger" data-action="leave-room">이 방에서 나가기</button></div>
   </div>`;
 }
 
@@ -2050,17 +2274,18 @@ function openSheet(type, id, extra = {}) {
   state.sheet = { type, id, ...extra };
   if (type === 'detail') { state.editVisit = null; state.draftRating = 0; state.photoIdx = 0; }
   if (type === 'add' || type === 'edit') warmGoogle().catch(() => {});
+  if (type === 'settings') customDraft = null; // 직접 고르기 칸은 닫힌 채로 시작
   renderSheet();
   const first = $('#sheet-root input:not([type=hidden]), #sheet-root textarea');
-  // 상세·내 정보는 보러 여는 시트라 입력 칸에 커서를 두지 않음 (휴대폰에서 키보드가 바로 올라오지 않게)
-  if (first && type !== 'detail' && type !== 'settings') first.focus(); else { const c = $('#sheet-root [data-action=close]'); c && c.focus(); }
+  // 상세·내 정보·계정 설정·방 바꾸기는 보러 여는 시트라 입력 칸에 커서를 두지 않음 (휴대폰에서 키보드가 바로 올라오지 않게)
+  if (first && !['detail', 'settings', 'account', 'rooms'].includes(type)) first.focus(); else { const c = $('#sheet-root [data-action=close]'); c && c.focus(); }
 }
 /* ---------- 뒤로 가기 (안드로이드 뒤로 버튼, 브라우저 뒤로) ----------
    층(시트 → 정보 수정 → 사진 크게 보기)이 열릴 때마다 방문 기록을 하나씩 쌓아서, 뒤로 가기는 맨 위 층만 닫음.
    다 닫힌 상태에서 누르면 앱을 떠남.
    ✕·저장·삭제처럼 앱이 직접 닫을 때는 쌓아 둔 기록도 같이 되돌림 (그때 오는 popstate는 무시).
    기록은 화면을 누른 그 순간에만 쌓음: 누르지 않았는데 쌓으면 크롬이 그 기록을 건너뛰어 앱이 바로 꺼질 수 있음 */
-const layers = [];         // 기록을 쌓아 둔 층: 'sheet' | 'edit' | 'sub'(내 정보에서 연 방 만들기·참여) | 'viewer'
+const layers = [];         // 기록을 쌓아 둔 층: 'sheet' | 'edit' | 'sub'(다른 시트에서 넘어온 시트: 내 정보 → 계정 설정·방 만들기, 방 바꾸기 → 방 만들기) | 'viewer'
 let skipPops = 0;          // 앱이 직접 되돌린 횟수만큼 popstate 무시
 let closingByBack = false; // 뒤로 가기로 닫는 중 (이때는 기록을 건드리지 않음)
 function wantedLayers() {
@@ -2068,7 +2293,7 @@ function wantedLayers() {
   if (state.sheet) {
     want.push('sheet');
     if (state.sheet.type === 'edit') want.push('edit');
-    else if (state.sheet.type === 'room-new' && state.sheet.back === 'settings') want.push('sub');
+    else if (state.sheet.back) want.push('sub');
   }
   if ($('#viewer-root').innerHTML) want.push('viewer');
   return want;
@@ -2098,7 +2323,7 @@ window.addEventListener('popstate', () => {
       const kind = layers.pop();
       if (kind === 'viewer') closeViewer();
       else if (kind === 'edit') { if (state.sheet && state.sheet.type === 'edit') openSheet('detail', state.sheet.id); }
-      else if (kind === 'sub') { if (state.sheet && state.sheet.type === 'room-new' && state.couple) openSheet('settings'); }
+      else if (kind === 'sub') { if (state.sheet && state.sheet.back && state.couple) openSheet(state.sheet.back); }
       else closeSheet(); // 하던 월드컵은 지우지 않음 → 트로피를 다시 누르면 이어서
     }
   } finally { closingByBack = false; }
@@ -2111,6 +2336,12 @@ function renderSheet() {
   drawSheet();
   syncHistory();
 }
+// 내 정보에서 계정 설정·방 만들기로 넘어갈 때 보던 자리 (돌아오면 되살림). 다른 시트에서 넘어가면 0
+let settingsScroll = 0;
+function keepSettingsScroll() {
+  const body = $('#sheet-root .sheet-body');
+  settingsScroll = state.sheet && state.sheet.type === 'settings' && body ? body.scrollTop : 0;
+}
 function drawSheet() {
   const root = $('#sheet-root');
   const s = state.sheet;
@@ -2121,12 +2352,19 @@ function drawSheet() {
   else if (s.type === 'settings') {
     if (!state.couple) { closeSheet(); return; } // 방에서 나간 뒤
     // 색·닉네임을 바꾸고 다시 그려도 보던 자리 그대로
-    const scroll = root.dataset.view === 'settings' && $('.sheet-body', root) ? $('.sheet-body', root).scrollTop : 0;
+    // 계정 설정·방 만들기(내 정보에서 연 것)에서 ‹·Esc·뒤로 가기로 돌아오면 떠날 때 자리로
+    const scroll = root.dataset.view === 'settings' && $('.sheet-body', root) ? $('.sheet-body', root).scrollTop
+      : ['account', 'room-new'].includes(root.dataset.view) ? settingsScroll : 0;
     mountSheet(settingsView(), 'settings');
     if (scroll) $('.sheet-body', root).scrollTop = scroll;
     return;
   }
   else if (s.type === 'room-new') inner = roomNewView();
+  else if (s.type === 'account') inner = accountView();
+  else if (s.type === 'rooms') {
+    if (!state.couple) { closeSheet(); return; }
+    inner = roomsView();
+  }
   else if (s.type === 'cup') inner = state.cup ? cupView() : state.cupTab === 'records' ? cupRecordsView() : cupSetupView();
   else if (s.type === 'detail') {
     const p = state.places.find((x) => x.id === s.id);
@@ -2193,9 +2431,19 @@ document.addEventListener('click', async (e) => {
         break;
       }
       case 'room-new':
-        // 내 정보에서 열었으면 ✕·Esc·뒤로 가기로 내 정보로 돌아감
-        openSheet('room-new', null, { mode: el.dataset.mode === 'join' ? 'join' : 'create', back: state.sheet && state.sheet.type === 'settings' ? 'settings' : null });
+        // 내 정보·방 바꾸기 시트에서 열었으면 ‹·Esc·뒤로 가기로 그 시트로 돌아감
+        keepSettingsScroll();
+        openSheet('room-new', null, { mode: el.dataset.mode === 'join' ? 'join' : 'create', back: state.sheet && ['settings', 'rooms'].includes(state.sheet.type) ? state.sheet.type : null });
         break;
+      case 'rooms': openSheet('rooms'); break;
+      case 'account': keepSettingsScroll(); openSheet('account', null, { back: state.sheet && state.sheet.type === 'settings' ? 'settings' : null }); break;
+      case 'custom-color': if (!colorBusy) toggleCustom(); break;
+      case 'save-custom-color': {
+        const c = customCheck($('#custom-hex') ? $('#custom-hex').value : customDraft);
+        if (!c.hex || c.level === 'error' || c.level === 'same') { syncCustom($('#custom-hex') ? $('#custom-hex').value : customDraft); break; }
+        await setMyColor(c.hex);
+        break;
+      }
       case 'pick-room': if (el.dataset.id !== state.roomId || state.loadedRoom !== el.dataset.id) await switchRoom(el.dataset.id); break;
       case 'room-picker': state.roomId = null; state.loadError = false; applyRoom(); render(); break;
       case 'retry-load': state.loadError = false; render(); await refresh({ keepSheet: false }); break;
@@ -2213,7 +2461,7 @@ document.addEventListener('click', async (e) => {
       case 'close': {
         const s = state.sheet;
         if (s && s.type === 'edit') { openSheet('detail', s.id); break; }
-        if (s && s.type === 'room-new' && s.back === 'settings' && state.couple) { openSheet('settings'); break; }
+        if (s && s.back && state.couple) { openSheet(s.back); break; } // 넘어온 시트(계정 설정·방 만들기)는 원래 시트로
         // 월드컵을 하던 중이면 한 번 물어봄. ✕로 닫으면 그만두는 것 (뒤로 가기로 닫으면 이어서 할 수 있게 남겨 둠)
         if (s && s.type === 'cup' && state.cup && !state.cup.champion && state.cup.history.length && !confirm('월드컵을 그만할까요? 지금까지 고른 건 사라져요.')) break;
         if (s && s.type === 'cup') state.cup = null;
@@ -2406,6 +2654,9 @@ document.addEventListener('scroll', (e) => {
 
 document.addEventListener('input', (e) => {
   if (e.target.id === 'q') { state.query = e.target.value; $('#list-area').innerHTML = listHtml(); markStampsSeen(); }
+  // 직접 고르기: 색 판을 움직이면 색 코드 칸도, 색 코드를 치면 (6자리가 되는 순간) 색 판도 같이
+  if (e.target.id === 'custom-color') syncCustom(e.target.value, 'well');
+  if (e.target.id === 'custom-hex') syncCustom(e.target.value, 'hex');
   // 휴대폰 키보드의 클립보드 버튼은 paste 이벤트 없이 글자를 넣으므로 여기서도 정리
   if (e.target.name === 'naver_url') {
     const form = e.target.form, v = e.target.value;
@@ -2466,6 +2717,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.isComposing && e.target instanceof Element) {
     const box = e.target.closest('.new-cat');
     if (box) { e.preventDefault(); box.querySelector('[data-action=add-cat]').click(); }
+    else if (e.target.id === 'custom-hex') { e.preventDefault(); const b = $('#custom-save'); if (b && !b.disabled) b.click(); else syncCustom(e.target.value, 'hex'); }
     else if (e.target.dataset.catId) { e.preventDefault(); e.target.blur(); }
   }
 });

@@ -41,10 +41,29 @@
   const denied = (t) => pgErr('42501', `permission denied for table ${t}`);
   const hash = (s) => { let h = 2166136261; for (const ch of String(s)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
 
-  /* ---------- 색 40가지 (supabase/groups.sql의 member_colors와 같은 id) ---------- */
-  const COLORS = ['orange', 'tangerine', 'amber', 'mustard', 'olive', 'lime', 'green', 'emerald', 'jade', 'teal',
-    'cyan', 'sky', 'azure', 'blue', 'cobalt', 'indigo', 'violet', 'purple', 'orchid', 'pink'];
-  const MEMBER_COLORS = [...COLORS, ...COLORS.map((c) => `${c}-deep`)];
+  /* ---------- 색: 무지개 24색 + 직접 고른 '#rrggbb' (supabase/colors.sql의 member_colors와 같은 id·값, §10) ---------- */
+  const PALETTE = {
+    red: ['#f53c41', '#ff726b'], coral: ['#f66336', '#ff8d6c'], orange: ['#f87805', '#fe9b5d'], tangerine: ['#fa960b', '#feac59'],
+    amber: ['#f7ae05', '#febe4d'], yellow: ['#f7cd03', '#ffd83d'], chartreuse: ['#cbd20d', '#dce307'], lime: ['#84c903', '#99e51c'],
+    green: ['#04bb3d', '#45dc5f'], emerald: ['#0cb477', '#23d891'], mint: ['#0cd2a9', '#3ceabf'], teal: ['#02afa6', '#25d2c7'],
+    cyan: ['#09c0d3', '#07ddf2'], sky: ['#04aee0', '#41cbff'], azure: ['#049aed', '#5fb9fe'], blue: ['#0182f3', '#5ea7ff'],
+    cobalt: ['#3461ef', '#6892fe'], indigo: ['#5e4dee', '#8384ff'], violet: ['#885af5', '#a890fe'], purple: ['#ac55f4', '#c68bff'],
+    orchid: ['#cf63e7', '#ea8dff'], magenta: ['#db3cc6', '#ff6ae8'], pink: ['#ef64b3', '#ff91cb'], rose: ['#ec4179', '#ff799b'],
+  };
+  const MEMBER_COLORS = Object.keys(PALETTE);
+  const HEX = /^#[0-9a-f]{6}$/;
+  const NEAR = 0.03; // set_member_color·pick_member_color가 막는 거리 (OKLab, 어느 한 화면에서라도)
+  // OKLab (Björn Ottosson의 식, colors.sql member_color_lab과 같음)
+  function lab(hex) {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+  }
+  const labDelta = (x, y) => { const p = lab(x), q = lab(y); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
+  const fills = (c) => (HEX.test(c) ? [c, c] : (Object.hasOwn(PALETTE, c) ? PALETTE[c] : null)); // [밝은, 어두운]
+  const colorDistance = (x, y) => { const f = fills(x), g = fills(y); return f && g ? Math.min(labDelta(f[0], g[0]), labDelta(f[1], g[1])) : null; };
 
   /* ---------- 지어낸 사람·방 ---------- */
   const U = {
@@ -112,7 +131,7 @@
     member('A', 'junho', 'owner', 'amber', '준호', '2026-03-02 10:00');
     member('A', 'mina', 'member', 'teal', '미나', '2026-03-02 11:00');
     member('A', 'seoyeon', 'member', 'violet', '서연', '2026-03-05 09:30');
-    member('A', 'doyun', 'member', 'green-deep', '도윤 (주말만 가능)', '2026-03-10 20:00');
+    member('A', 'doyun', 'member', '#8b5e3c', '도윤 (주말만 가능)', '2026-03-10 20:00'); // 직접 고른 색 (팔레트에 없는 갈색)
     member('A', 'harin', 'member', 'pink', '디저트 담당 하린', '2026-04-01 13:00');
     place('kal', 'A', {
       name: '골목 끝 칼국수', category: '맛집', status: 'visited', fav: true, by: 'junho', created: '2026-03-03 12:10', photos: 3,
@@ -472,9 +491,11 @@
   const roomCount = (who) => db.couple_members.filter((m) => m.user_id === who).length;
   const membersOf = (roomId) => db.couple_members.filter((m) => m.couple_id === roomId);
   const textLen = (s) => [...String(s ?? '').trim()].length;
+  // 새 멤버의 무작위 색: 24색 중 그 방에서 아무도 안 쓰고, 다른 멤버 색과 거의 같지 않은 색 (colors.sql pick_member_color)
   function freeColor(roomId) {
-    const used = new Set(membersOf(roomId).map((m) => m.color));
-    const free = MEMBER_COLORS.filter((c) => !used.has(c));
+    const ms = membersOf(roomId);
+    const free = MEMBER_COLORS.filter((c) => !ms.some((m) => m.color === c || (colorDistance(m.color, c) ?? 1) < NEAR));
+    if (!free.length) throw raise('no_free_color');
     return free[Math.floor(Math.random() * free.length)];
   }
   const newCode = () => {
@@ -524,13 +545,17 @@
       db.couples.find((r) => r.id === p_couple).name = String(p_name).trim();
       return String(p_name).trim();
     },
+    // 팔레트 id 또는 '#rrggbb' (대소문자·앞뒤 공백 정리). 같은 값 color_taken, 거리 < 0.03 color_too_close (colors.sql §10.5)
     set_member_color({ p_couple, p_color }) {
       const me = lockMember(p_couple);
-      if (!MEMBER_COLORS.includes(p_color)) throw raise('invalid_color');
-      if (me.color === p_color) return p_color;
-      if (membersOf(p_couple).some((m) => m.color === p_color)) throw raise('color_taken');
-      me.color = p_color;
-      return p_color;
+      const c = String(p_color ?? '').trim().toLowerCase();
+      if (!Object.hasOwn(PALETTE, c) && !HEX.test(c)) throw raise('invalid_color');
+      if (me.color === c) return c;
+      const others = membersOf(p_couple).filter((m) => m.user_id !== uid());
+      if (others.some((m) => m.color === c)) throw raise('color_taken');
+      if (others.some((m) => (colorDistance(m.color, c) ?? 1) < NEAR)) throw raise('color_too_close');
+      me.color = c;
+      return c;
     },
     begin_room_delete({ p_couple }) {
       lockMember(p_couple);
