@@ -145,8 +145,13 @@ textarea.input{resize:vertical;min-height:84px;line-height:1.6}
 .tabs .n{font-weight:600;font-size:13px;margin-left:3px;font-variant-numeric:tabular-nums}
 .tools{padding:12px 0 6px}
 .search{position:relative}
-.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--muted)}
-.search .input{padding-left:38px;border-radius:999px;background:var(--surface)}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--muted);pointer-events:none}
+.search .input{padding-left:38px;padding-right:44px;border-radius:999px;background:var(--surface)}
+.search .input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;display:none}
+/* 검색어 지우기 ✕: 글자가 있을 때만 */
+.search-clear{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:38px;height:38px;border:0;border-radius:50%;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.search .search-clear svg{position:static;transform:none;width:16px;height:16px}
+.search .input:placeholder-shown ~ .search-clear{display:none}
 .chips{display:flex;gap:6px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:none;margin:0 calc(var(--gutter) * -1);padding-left:var(--gutter);padding-right:var(--gutter)}
 .chips::-webkit-scrollbar{display:none}
 .chip{
@@ -460,7 +465,7 @@ const SIGNUP_ENABLED = false;
 
 const BUCKET = 'place-photos';
 // 설정 화면 맨 아래에 보이는 버전. 배포할 때마다 README 업데이트 노트와 같이 올림 ('v버전: 배포일 YYMMDD')
-const APP_VERSION = 'v0.1.0: 261022';
+const APP_VERSION = 'v0.1.1: 261022';
 
 /* ---------- 작은 도우미 ---------- */
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -1182,7 +1187,7 @@ function viewMain() {
     <main class="wrap">
       ${state.couple.invite_code && state.members.length === 1 ? `<div class="invite"><div>친구에게 초대 코드를 보내 주세요<br><b>${esc(state.couple.invite_code)}</b></div><button class="btn small" data-action="copy-code">복사</button></div>` : ''}
       <div class="tools">
-        <label class="search"><span class="sr">검색</span>${ICON.search}<input class="input" id="q" type="search" placeholder="이름, 주소, 메모, 후기 검색" value="${esc(state.query)}"></label>
+        <div class="search"><label class="sr" for="q">검색</label>${ICON.search}<input class="input" id="q" type="search" placeholder="이름, 주소, 메모, 후기 검색" value="${esc(state.query)}"><button type="button" class="search-clear" data-action="clear-search" aria-label="검색어 지우기">${ICON.close}</button></div>
         <div class="chips" role="group" aria-label="카테고리">${cats.map((c) => `<button class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${state.category === c}">${esc(c)}</button>`).join('')}</div>
         ${state.tab === 'visited' ? `<div class="sort" role="group" aria-label="정렬">${sortBtn('recent', '최근 방문순')}${sortBtn('added', '최근 추가순')}${sortBtn('rating', '평점순')}</div>` : ''}
       </div>
@@ -1276,6 +1281,15 @@ async function googlePlace(url, signal) {
   if (!r.ok) throw new Error(`place ${r.status}`);
   const j = await r.json();
   return { name: String(j.name || '').trim(), address: String(j.address || '').trim() };
+}
+// 지도 서버 함수를 미리 불러 둠 (로그인 확인용 공개 키와 구글 연결을 링크 붙여넣기 전에 준비). 15초에 한 번까지
+let warmedAt = 0;
+async function warmGoogle() {
+  if (!/^https?:$/.test(location.protocol) || Date.now() - warmedAt < 15000) return;
+  warmedAt = Date.now();
+  const { data } = await sb.auth.getSession();
+  const token = data.session && data.session.access_token;
+  if (token) fetch('/api/place', { method: 'POST', body: '{"warm":true}', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` } }).catch(() => {});
 }
 const GOOGLE_WAIT = '구글 지도에서 이름·주소를 가져오는 중…';
 const googleKey = (v) => safeUrl(cleanUrl(String(v || '').trim()));
@@ -2035,6 +2049,7 @@ function openSheet(type, id, extra = {}) {
   if (!state.sheet) lastFocus = document.activeElement;
   state.sheet = { type, id, ...extra };
   if (type === 'detail') { state.editVisit = null; state.draftRating = 0; state.photoIdx = 0; }
+  if (type === 'add' || type === 'edit') warmGoogle().catch(() => {});
   renderSheet();
   const first = $('#sheet-root input:not([type=hidden]), #sheet-root textarea');
   // 상세·내 정보는 보러 여는 시트라 입력 칸에 커서를 두지 않음 (휴대폰에서 키보드가 바로 올라오지 않게)
@@ -2191,6 +2206,7 @@ document.addEventListener('click', async (e) => {
       case 'tab': state.tab = el.dataset.tab; render(); break;
       case 'cat': state.category = el.dataset.cat; render(); break;
       case 'sort': state.sort = el.dataset.sort; render(); break;
+      case 'clear-search': $('#q').value = ''; state.query = ''; $('#list-area').innerHTML = listHtml(); markStampsSeen(); break;
       case 'open': openSheet('detail', el.dataset.id); break;
       case 'add': openSheet('add'); break;
       case 'settings': openSheet('settings'); break;
@@ -2395,13 +2411,17 @@ document.addEventListener('input', (e) => {
     const form = e.target.form, v = e.target.value;
     if (googleJob && googleJob.form === form && googleKey(v) !== googleJob.url) cancelGoogle(); // 묻는 중에 링크를 바꿈
     if (isShareText(v)) applyShare(form, v);
-    // 링크만 붙여넣은 구글 지도 링크: 손으로 치는 중에 묻지 않게 잠깐 기다렸다가
+    // 링크만 넣은 구글 지도 링크: 붙여넣기(키보드의 클립보드 버튼 포함)는 바로, 손으로 치는 중이면 잠깐 기다렸다가
     else if (isGoogleMaps(v.trim())) {
       clearTimeout(googleTimer);
-      googleTimer = setTimeout(() => fillFromGoogle(form), 400);
+      if (e.inputType === 'insertFromPaste' || e.inputType === 'insertReplacementText' || (e.data && e.data.length > 8)) fillFromGoogle(form);
+      else googleTimer = setTimeout(() => fillFromGoogle(form), 400);
     }
   }
 });
+
+// 검색어 지우기 ✕를 눌러도 검색창에 있던 커서(키보드)는 그대로 (없었으면 키보드를 새로 띄우지도 않음)
+document.addEventListener('mousedown', (e) => { if (e.target.closest('.search-clear')) e.preventDefault(); });
 
 document.addEventListener('paste', (e) => {
   const form = e.target.form;
@@ -2585,6 +2605,7 @@ document.addEventListener('submit', async (e) => {
 // 다른 앱에 갔다 돌아오면 다른 멤버가 바꾼 내용을 다시 불러옴
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && state.user && state.roomId) refresh().catch(() => {});
+  if (document.visibilityState === 'visible' && $('#place-form')) warmGoogle(); // 구글 지도에서 링크를 복사해 돌아온 참
 });
 
 /* ---------- 시작 ---------- */

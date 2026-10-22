@@ -12,7 +12,7 @@
   <img alt="PWA" src="https://img.shields.io/badge/PWA-홈_화면_앱-1f6f5c">
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Auth·Postgres·Storage-3ecf8e">
   <img alt="Node" src="https://img.shields.io/badge/Node-20+-339933">
-  <img alt="Version" src="https://img.shields.io/badge/version-v0.1.0-1f6f5c">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.1.1-1f6f5c">
   <img alt="Status" src="https://img.shields.io/badge/status-MVP_시험_중-d9822b">
 </p>
 
