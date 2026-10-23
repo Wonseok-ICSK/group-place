@@ -142,7 +142,15 @@ language sql volatile security definer set search_path='' as $$
  with due as (select id from public.trash_jobs where purge_after<=now() and next_attempt<=now()
   and (lease_until is null or lease_until<now()) order by purge_after for update skip locked limit 1)
  update public.trash_jobs j set lease=gen_random_uuid(),lease_until=now()+interval '30 minutes',attempts=attempts+1
- from due where j.id=due.id returning j.id,j.lease,j.paths
+ from due where j.id=due.id returning j.id,j.lease,
+ -- 삭제 직전에 시작해 snapshot 뒤에 끝난 업로드도 3일 뒤에는 함께 찾는다.
+ array(select distinct p from (
+   select unnest(j.paths) as p
+   union all select o.name from storage.objects o
+    where o.bucket_id='place-photos' and exists(
+      select 1 from jsonb_array_elements(coalesce(j.payload->'places','[]')) s
+      where split_part(o.name,'/',1)=s->>'id')
+ ) all_paths where p is not null)
 $$;
 create function public.maintenance_finish(p_id uuid,p_lease uuid,p_error text) returns boolean
 language plpgsql security definer set search_path='' as $$

@@ -66,6 +66,7 @@ if [[ ! -d "$target" ]]; then
   tmp=''
 fi
 
+install -m 700 -o root -g root "$target/deploy/home/set-db.sh" /usr/local/sbin/group-place-set-db
 install -d -o root -g ourplaces -m 750 "$env_dir"
 if [[ -n "${SUPABASE_URL:-}" || -n "${SUPABASE_KEY:-}" ]]; then
   [[ "${SUPABASE_URL:-}" =~ $url_re ]] || die 'SUPABASE_URL은 https://<프로젝트 ID 20자>.supabase.co 형식이어야 해요'

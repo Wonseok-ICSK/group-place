@@ -22,7 +22,10 @@ test('V031: 장소·연결 데이터는 원자적으로 휴지통으로, 사진 
   await assert.rejects(run(db,ANON,'select public.maintenance_claim()'),/permission denied/);
   assert.equal((await run(db,SERVICE,'select * from public.maintenance_claim()')).length,0);
   await db.query("update public.trash_jobs set purge_after=now()-interval '1 second'");
+  const latePath=`${place}/${'c'.repeat(32)}.jpg`;
+  await db.query("insert into storage.objects(bucket_id,name) values('place-photos',$1)",[latePath]);
   const [claim]=await run(db,SERVICE,'select * from public.maintenance_claim()');assert.equal(claim.id,j.id);
+  assert.ok(claim.paths.includes(latePath),'삭제와 겹쳐 늦게 끝난 업로드도 만료 시 정리');
   assert.equal((await run(db,SERVICE,'select * from public.maintenance_claim()')).length,0,'lease 중복 작업 방지');
   assert.equal((await run(db,SERVICE,'select public.maintenance_finish($1,$2,null) as ok',[j.id,'00000000-0000-4000-8000-000000000000']))[0].ok,false);
   await run(db,SERVICE,"select public.maintenance_finish($1,$2,'STORAGE_DELETE_FAILED')",[j.id,claim.lease]);
