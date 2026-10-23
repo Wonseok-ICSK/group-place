@@ -92,7 +92,7 @@
 
 <a href="promo/promo-30s.mp4"><img src="promo/storyboard.jpg" alt="30초 홍보 영상 스토리보드 (누르면 영상)" width="100%"></a>
 
-30초 세로 영상: [promo/promo-30s.mp4](promo/promo-30s.mp4). 실제 앱 화면을 예시 데이터로 조작해 녹화했습니다(그룹 기능 이전 화면).
+30초 세로 영상(v0.2.0): [promo/promo-30s.mp4](promo/promo-30s.mp4). 실제 앱 화면을 예시 데이터로 녹화했습니다(친구 방, 별점·후기, 맛집 월드컵, 공개 방, 내 방에 담기). 사진: 비짓강남 · 서울시 · 미쉐린 가이드 · Visit Seoul.
 
 ## 구성
 
