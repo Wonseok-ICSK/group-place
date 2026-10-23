@@ -4,11 +4,14 @@ set -euo pipefail
 [[ "$(id -u)" == 0 && -t 0 ]] || { echo 'SSH 터미널에서 sudo bash set-db.sh로 실행하세요.' >&2; exit 2; }
 ref="$(sed -n 's@^SUPABASE_URL=https://\([a-z0-9]*\)\.supabase\.co$@\1@p' /etc/our-places/env)"
 [[ "$ref" =~ ^[a-z0-9]{20}$ ]] || exit 2
-read -r -p 'Supabase session pooler host [aws-0-ap-northeast-2.pooler.supabase.com]: ' db_host
+db_host="${1:-}"
+if [[ -z "$db_host" ]]; then
+  IFS= read -r -p 'DB 서버 주소 (비밀번호 아님, 모르면 Enter) [aws-0-ap-northeast-2.pooler.supabase.com]: ' db_host
+fi
 export PGHOST="${db_host:-aws-0-ap-northeast-2.pooler.supabase.com}"
-[[ "$PGHOST" =~ ^[a-z0-9.-]+\.supabase\.(com|co)$ ]] || exit 2
+[[ "$PGHOST" =~ ^[a-z0-9.-]+\.supabase\.(com|co)$ ]] || { echo '서버 주소 형식이 아니에요. 기본 주소를 쓸 때는 Enter만 누르세요.' >&2; exit 2; }
 export PGPORT=5432 PGDATABASE=postgres PGUSER="postgres.$ref" PGSSLMODE=require PGCONNECT_TIMEOUT=10
-read -r -s -p '현재 Supabase DB 비밀번호: ' PGPASSWORD
+IFS= read -r -s -p '현재 Supabase DB 비밀번호 (입력해도 보이지 않음): ' PGPASSWORD
 echo
 export PGPASSWORD
 if [[ "$(psql -At -v ON_ERROR_STOP=1 -c 'select public.stability_schema_version()' 2>/dev/null)" != 1 ]]; then
