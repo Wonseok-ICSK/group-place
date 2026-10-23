@@ -23,7 +23,7 @@ domain_re='^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$'
 url_re='^https://[a-z0-9]{20}\.supabase\.co$'
 key_re='^sb_publishable_[A-Za-z0-9_-]{10,200}$'
 blocked_ref_sha256=(b7ed2b80671cdca9a6b48622040a2143d853dd32baff32ba6abd46ab15719cf4)  # 연결하면 안 되는 Supabase 프로젝트(별도의 비공개 배포). ID 대신 SHA-256만 둔다
-units=(our-places.service our-places-keepalive.service our-places-keepalive.timer)
+units=(our-places.service our-places-keepalive.service our-places-keepalive.timer our-places-purge.service our-places-purge.timer our-places-backup.service our-places-backup.timer)
 
 # 동시에 두 번 돌지 않게
 exec 9>/run/lock/our-places-install.lock
@@ -39,9 +39,9 @@ trap cleanup EXIT
 # Node 20 이상(Ubuntu 패키지, 유닛은 /usr/bin/node를 쓴다), curl
 export DEBIAN_FRONTEND=noninteractive
 node_major() { [[ -x /usr/bin/node ]] && /usr/bin/node -p 'process.versions.node.split(".")[0]' || echo 0; }
-if (( $(node_major) < 20 )) || ! command -v curl >/dev/null; then
+if (( $(node_major) < 20 )) || ! command -v curl >/dev/null || ! command -v pg_dump >/dev/null; then
   apt-get update -q
-  apt-get install -y -q nodejs curl
+  apt-get install -y -q nodejs curl postgresql-client
 fi
 (( $(node_major) >= 20 )) || die '/usr/bin/node 20 이상이 필요해요'
 
@@ -50,12 +50,14 @@ id ourplaces >/dev/null 2>&1 || useradd --system --gid ourplaces --home-dir /non
   --shell /usr/sbin/nologin ourplaces
 
 install -d -o root -g root -m 755 "$base" "$base/releases"
+install -d -o root -g root -m 700 /var/backups/group-place
+install -d -o root -g ourplaces -m 750 /var/lib/our-places-jobs
 rm -rf -- "$base"/releases/.new.*  # 예전 실패가 남긴 임시 폴더
 target="$base/releases/$rel"
 if [[ ! -d "$target" ]]; then
   tmp="$(mktemp -d "$base/releases/.new.XXXXXX")"
   tar -xzf "$tarball" -C "$tmp" --no-same-owner --no-same-permissions
-  for f in index.html api/place.js deploy/home/server.cjs deploy/home/signup.cjs deploy/home/public.cjs deploy/home/pages.cjs; do
+  for f in index.html api/place.js deploy/home/server.cjs deploy/home/signup.cjs deploy/home/public.cjs deploy/home/pages.cjs deploy/home/maintenance.cjs; do
     [[ -f "$tmp/$f" ]] || die "릴리스에 $f 이 없어요 (index.html, api/place.js, deploy/home/server.cjs·signup.cjs·public.cjs·pages.cjs가 모두 있어야 해요)"
   done
   chown -R root:root "$tmp"
@@ -173,6 +175,11 @@ if ! wait_healthy; then
   exit 1
 fi
 trap - ERR
+
+# 휴지통과 백업은 같은 파일 잠금을 사용한다. 백업 중 사진을 영구 삭제하지 않는다.
+if [[ -f "$env_dir/secret.env" ]]; then
+  systemctl enable --now our-places-purge.timer our-places-backup.timer
+fi
 
 systemctl restart our-places-keepalive.timer  # enable만으로는 다음 부팅까지 타이머가 돌지 않는다
 if ! systemctl start our-places-keepalive.service; then

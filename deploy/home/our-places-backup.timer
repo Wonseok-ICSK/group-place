@@ -1,0 +1,9 @@
+[Unit]
+Description=group-place backup at 08:30 and 18:30 KST
+[Timer]
+OnCalendar=*-*-* 08:30:00 Asia/Seoul
+OnCalendar=*-*-* 18:30:00 Asia/Seoul
+Persistent=true
+AccuracySec=1min
+[Install]
+WantedBy=timers.target

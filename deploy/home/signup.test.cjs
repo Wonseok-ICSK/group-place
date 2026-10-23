@@ -107,6 +107,7 @@ function fakeSupabase({ over = {} } = {}) {
     'POST /rest/v1/rpc/groups_schema_version': (c) => (isAdmin(c.headers) ? { status: 200, body: 1 } : deny),
     'POST /rest/v1/rpc/public_rooms_version': (c) => (isAdmin(c.headers) ? { status: 200, body: 1 } : deny),
     'POST /rest/v1/rpc/stability_schema_version': (c) => (isAdmin(c.headers) ? { status: 200, body: 1 } : deny),
+    'POST /rest/v1/rpc/maintenance_version': (c) => (isAdmin(c.headers) ? { status: 200, body: 1 } : deny),
     // public.sql §2.6: 공개 방이고 열려 있을 때만 방 이름
     'POST /rest/v1/rpc/space_code_info': (c) => {
       if (!isAdmin(c.headers)) return deny;
@@ -1090,6 +1091,7 @@ test('verifySecretKey: 맞는 키, 다른 프로젝트 키, 연결 실패, SQL �
     'GET /auth/v1/admin/users', 'POST /rest/v1/rpc/space_code_open', 'POST /rest/v1/rpc/join_couple_for', 'POST /rest/v1/rpc/groups_schema_version',
     'POST /rest/v1/rpc/public_rooms_version',
     'POST /rest/v1/rpc/stability_schema_version',
+    'POST /rest/v1/rpc/maintenance_version',
   ]);
   assert.equal(good.db.members.size, 0); // 확인만 하고 아무도 넣지 않음
   const wrong = fakeSupabase();

@@ -1,0 +1,8 @@
+[Unit]
+Description=group-place trash cleanup every ten minutes
+[Timer]
+OnCalendar=*-*-* *:0/10:00 Asia/Seoul
+Persistent=true
+AccuracySec=1min
+[Install]
+WantedBy=timers.target

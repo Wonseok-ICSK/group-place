@@ -1,0 +1,20 @@
+[Unit]
+Description=group-place: permanently purge expired three-day trash
+After=network-online.target
+[Service]
+Type=oneshot
+User=root
+Group=ourplaces
+EnvironmentFile=/etc/our-places/env
+EnvironmentFile=/etc/our-places/secret.env
+ExecStart=/usr/bin/flock -w 600 /run/lock/our-places-data.lock /usr/bin/node /srv/our-places/current/deploy/home/maintenance.cjs purge
+StateDirectory=our-places-jobs
+StateDirectoryMode=0750
+UMask=0027
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/run/lock
+[Install]
+WantedBy=multi-user.target

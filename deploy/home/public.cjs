@@ -590,6 +590,11 @@ function createPublicApi({
     if (exp <= Math.floor(now() / 1000)) { log('public img expired'); return send(res, 404, { error: PMSG.photoGone }); }
     const ga = imgAllLim('all');
     if (!ga.ok) { log('public img limited:global'); return send(res, 429, { error: PMSG.tooMany }, { 'retry-after': String(ga.retryAfter) }); }
+    // 휴지통으로 옮긴 파일은 캐시가 있어도 새 공개 요청으로 다시 내보내지 않는다.
+    let active;
+    try { active = await rpc('maintenance_photo_active', { p_path: p }); }
+    catch { return send(res, 502, { error: PMSG.down }); }
+    if (active !== true) return send(res, 404, { error: PMSG.photoGone });
     const img = await loadImage(p);
     if (img.status !== 200) {
       const gone = img.status === 404;

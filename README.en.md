@@ -14,7 +14,7 @@
   <img alt="PWA" src="https://img.shields.io/badge/PWA-installable-1f6f5c">
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Auth·Postgres·Storage-3ecf8e">
   <img alt="Node" src="https://img.shields.io/badge/Node-20+-339933">
-  <img alt="Version" src="https://img.shields.io/badge/version-v0.2.3-1f6f5c">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.3.1-1f6f5c">
   <img alt="Status" src="https://img.shields.io/badge/status-MVP_testing-d9822b">
 </p>
 
@@ -26,6 +26,13 @@
 </p>
 
 > The UI is in Korean. Screenshots use sample data; the photos are generated examples and contain no real user information.
+
+## v0.3.1
+
+Deleted records disappear from active views immediately and remain in private trash for 72 hours before server cleanup.
+Database and photo backups run on the home server at 08:30 and 18:30 Asia/Seoul. This version also ports map sharing,
+local drafts, duplicate and cross-tab search hints, and visit-entry improvements from the original app v2.0.0.
+Run **`maintenance.sql` after `stability.sql`, before deploying** ([upgrade, backup and rollback](docs/release-v0.3.1.md), Korean).
 
 ## v0.2.3 stability update
 

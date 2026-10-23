@@ -48,8 +48,8 @@ test('C1. PUBLIC_ROOMS_ENABLED 한 줄, PUBLIC_ACK_VERSION = public_ack_version(
   assert.ok(PUBLIC_SQL.includes("check (public_key ~ '^[a-km-np-z2-9]{10}$')"));
 });
 
-test('C2. APP_VERSION은 v0.2.3-261023-<소문자 16진수 5자>', () => {
-  assert.match(constValue('APP_VERSION'), /^'v0\.2\.3-261023-[0-9a-f]{5}'$/);
+test('C2. APP_VERSION은 v0.3.1-261023-<소문자 16진수 5자>', () => {
+  assert.match(constValue('APP_VERSION'), /^'v0\.3\.1-261023-[0-9a-f]{5}'$/);
 });
 
 test('C3. 읽기 전용 구간·VISIT_ACTIONS에 초대 코드·코드 복사·코드 다시 만들기·찜 단추가 없음, VISIT_ACTIONS는 설계 §4.2 목록', () => {
@@ -86,9 +86,9 @@ test('C5. 사진 경로는 무작위 이름(Date.now 없음) + /t/ 썸네일, �
   assert.ok(!add.includes('Date.now()'), 'addPhotos에 Date.now() 경로가 없음 (업로드 시각이 드러남)');
   assert.ok(add.includes('`${place.id}/t/${id}.jpg`'), '썸네일 경로');
   assert.ok(add.includes('photoId()'));
-  assert.match(fnSource('deletePhoto'), /photo\.thumb_path/);
+  assert.match(fnSource('deletePhoto'), /trash_item/);
   const del = HTML.slice(HTML.indexOf("case 'delete-place'"), HTML.indexOf("case 'remove-photo'"));
-  assert.match(del, /x\.thumb_path/);
+  assert.match(del, /trash_item/);
 });
 
 test('서버와 같은 규칙: 못 쓰는 글자(BAD_TEXT_RE)·닉네임 비교(nickKey)·지도 주소(publicMapUrl = public.cjs mapUrl)', () => {

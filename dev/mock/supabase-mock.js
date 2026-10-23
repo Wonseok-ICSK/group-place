@@ -649,7 +649,7 @@
   }
   const RPC = {
     groups_schema_version: () => 1,
-    save_visit_review({ p_place, p_day, p_visit, p_rating, p_body }) {
+    save_visit_review({ p_place, p_day, p_visit, p_rating, p_body, p_base }) {
       const place = db.places.find((p) => p.id === p_place);
       if (!uid()) throw raise('not_authenticated');
       if (!place || !isMember(place.couple_id)) throw raise('not_member');
@@ -659,14 +659,41 @@
       let visit = p_visit ? db.visits.find((v) => v.id === p_visit && v.place_id === p_place)
         : db.visits.find((v) => v.place_id === p_place && v.visited_on === p_day);
       if (p_visit && !visit) throw raise('visit_gone');
+      if (p_visit && p_base && p_base.day) {
+        if (p_day === p_base.day) p_day = visit.visited_on;
+        else if (visit.visited_on !== p_base.day) throw raise('visit_changed');
+      }
+      const old = visit && db.reviews.find((r) => r.visit_id === visit.id && r.author_id === uid());
+      if (!(p_visit == null && p_rating == null && !body) && p_base && ((old?.body || '') !== (p_base.body || '') || (old?.rating || 0) !== (p_base.rating || 0))) throw raise('review_changed');
       if (visit && db.visits.some((v) => v !== visit && v.place_id === p_place && v.visited_on === p_day)) throw unique('visits_place_day_key');
       if (!visit) { visit = { ...DEFAULTS.visits(), place_id: p_place, visited_on: p_day, created_by: uid() }; db.visits.push(visit); }
       visit.visited_on = p_day;
       const mine = db.reviews.find((r) => r.visit_id === visit.id && r.author_id === uid());
+      if (p_visit == null && p_rating == null && !body) return visit.id;
       if (p_rating == null && !body) db.reviews = db.reviews.filter((r) => r !== mine);
       else if (mine) Object.assign(mine, { rating: p_rating, body, updated_at: nowIso() });
       else db.reviews.push({ ...DEFAULTS.reviews(), place_id: p_place, visit_id: visit.id, author_id: uid(), rating: p_rating, body });
       return visit.id;
+    },
+    trash_item({ p_kind, p_id }) {
+      const table = {place:'places',photo:'place_photos',visit:'visits',review:'reviews',category:'categories',cup:'cup_results'}[p_kind];
+      if (!table) throw raise('invalid_trash_kind');
+      if (!uid()) throw raise('not_authenticated');
+      const row = db[table].find(r => r.id === p_id);
+      if (!row) return false;
+      if (!isMember(roomOf(table, row))) throw raise('not_member');
+      if (p_kind === 'review' && row.author_id !== uid() || p_kind === 'cup' && row.user_id !== uid()) throw raise('not_author');
+      if (p_kind === 'visit' && db.reviews.some(r => r.visit_id === p_id && r.author_id !== uid())) throw raise('other_reviews');
+      if (p_kind === 'category' && db.places.some(p => p.couple_id === row.couple_id && p.category === row.name)) throw raise('category_in_use');
+      // 이 mock은 사용자에게 보이는 활성 목록만 흉내 낸다. 물리 정리는 SQL·worker 시험에서 검증.
+      cascadeDelete(table, row); db[table] = db[table].filter(r => r !== row); return true;
+    },
+    trash_uploads() { return true; },
+    save_shared_note({ p_place, p_body, p_base }) {
+      const p = db.places.find(p => p.id === p_place);
+      if (!p || !isMember(p.couple_id) || p.shared_note !== p_base) throw raise('note_changed');
+      if ([...p_body].length > 2000) throw raise('invalid_note');
+      p.shared_note = p_body; return true;
     },
     create_couple({ p_display_name, p_couple_name }) {
       if (!uid()) throw raise('not_authenticated');

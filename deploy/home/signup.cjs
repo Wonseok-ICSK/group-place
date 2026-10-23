@@ -269,6 +269,11 @@ async function verifySecretKey({ supabaseUrl, secretKey, fetchImpl = fetch }) {
   if (r.status === 404) return { ok: false, retry: false, reason: '현재 버전용 supabase/stability.sql을 먼저 실행해 주세요' };
   if (r.status === 401 || r.status === 403) return { ok: false, retry: false, reason: 'secret key로 안정화 버전을 확인할 수 없어요 (권한)' };
   if (!(r.ok && typeof r.json === 'number' && r.json >= 1)) return { ok: false, retry: true, reason: `안정화 버전 응답 ${r.status}` };
+  try {
+    r = await call(fetchImpl, `${supabaseUrl}/rest/v1/rpc/maintenance_version`, { method: 'POST', headers, body: {} });
+  } catch { return down; }
+  if (r.status === 404) return { ok: false, retry: false, reason: '현재 버전용 supabase/maintenance.sql을 먼저 실행해 주세요' };
+  if (!(r.ok && r.json === 1)) return { ok: false, retry: r.status >= 500, reason: '휴지통 규칙 버전을 확인하지 못했어요' };
   return { ok: true };
 }
 

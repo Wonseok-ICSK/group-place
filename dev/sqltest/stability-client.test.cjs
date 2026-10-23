@@ -23,7 +23,7 @@ function formContext({ duplicate = false, accept = true } = {}) {
     isGoogleMaps: () => true, isShareText: () => false, fillEmpty: () => [], fillFromGoogle() {}, googleJob: null,
     toast: (s) => { messages.push(s); toastEl.textContent = s; }, uid: () => 'u', friendly: (e) => e.message,
     placeKey: (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase(),
-    confirm: (s) => { confirmations.push(s); return accept; }, refresh: async () => {}, openSheet() {},
+    confirm: (s) => { confirmations.push(s); return accept; }, refresh: async () => {}, openSheet() {}, dropAddForm() {},
     setTimeout, clearTimeout, AbortController,
     sb: { from: () => ({ insert: (r) => { inserted.push(r); return { select: () => ({ single: async () => ({ data: { id: 'p' }, error: null }) }) }; } }) },
   };
@@ -84,6 +84,8 @@ test('V023 화면: 후기 저장 중 다른 상세를 열어도 새로 작성 �
   const ctx = { document: { addEventListener: (n, f) => { click = f; } }, state, ro: () => false,
     curPlaces: () => [{ id: 'place-A', visits: [] }], busy: async (b, f) => f(), toast() {}, friendly: (e) => e.message,
     $: (s) => ({ value: s === '#visit-date' ? '2026-10-23' : '작성한 후기' }), refresh: async () => {},
+    editIdOf: () => 'new', draftKey: () => 'draft-A', readDraft: () => null,
+    serverReview: () => ({ day: '', rating: 0, body: '' }), reviewMovedOn: () => false, dropDraft() {},
     sb: { rpc: async (name, body) => { sent.push({ name, body }); await saved; return { error: null }; } } };
   vm.createContext(ctx);
   vm.runInContext(HTML.slice(HTML.indexOf("document.addEventListener('click',"), HTML.indexOf('// 사진을 옆으로 밀 때 번호')), ctx);

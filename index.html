@@ -563,6 +563,24 @@ button.vis-card{width:100%;text-align:left;font:inherit;color:inherit}
 }
 #toast.show{opacity:1;transform:translate(-50%,0)}
 .loading{min-height:100dvh;display:grid;place-items:center;color:var(--muted)}
+/* 검색 결과가 다른 탭에 있을 때 */
+.other-tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:14px}
+.other-tabs.more{justify-content:flex-start;align-items:center;margin:8px 0 0;font-size:13px;color:var(--muted)}
+.other-tabs.more>span{margin-right:2px}
+
+
+/* '다녀왔어요'를 누른 직후 새 방문 칸 위 안내 */
+.visit-guide{margin:4px 0 8px;padding:8px 12px;border-radius:var(--r-s);background:var(--p1-soft);color:var(--ink);font-size:13px;line-height:1.45;word-break:keep-all}
+
+/* 장소 추가: 이미 담은 곳 알림 (막지는 않음) */
+.dup-hint{display:flex;align-items:center;gap:8px;margin:-6px 0 14px;padding:8px 6px 8px 12px;border-radius:var(--r-s);background:var(--p2-soft);font-size:13px;line-height:1.45;word-break:keep-all}
+.dup-hint:empty{display:none}
+.dup-hint>span{min-width:0;overflow-wrap:anywhere} /* 띄어쓰기 없는 긴 이름도 줄바꿈 ([열기]가 밖으로 밀리지 않게) */
+.dup-hint .text-btn{flex:none;margin-left:auto;padding:4px 8px;color:var(--p2-ink);white-space:nowrap;font-size:13px}
+/* 상세: 이 폰에 남겨 둔 쓰던 후기·메모를 다시 채웠다는 한 줄 (알림은 입력칸을 가려서 안 씀) */
+.draft-line{display:flex;align-items:center;flex-wrap:wrap;gap:0 6px;margin:6px 0 0;font-size:12.5px;line-height:1.45;color:var(--muted);word-break:keep-all}
+.draft-line .text-btn{padding:2px 4px;font-size:12.5px;color:var(--p1)}
+
 </style>
 </head>
 <body>
@@ -599,7 +617,7 @@ const PUBLIC_ROOMS_ENABLED = false; // 공개 방 둘러보기 (GET /api/public/
 
 const BUCKET = 'place-photos';
 // 계정 설정 맨 아래에 보이는 빌드 번호 'v버전-배포일(YYMMDD)-무작위 5자(16진수)'. 배포할 때마다 새로 만듦
-const APP_VERSION = 'v0.2.3-261023-8b7c2';
+const APP_VERSION = 'v0.3.1-261023-a73d9';
 
 /* 공개 방 (docs/public-rooms-design.md §4) */
 const PUBLIC_ACK_VERSION = 1;            // 동의 문구 버전. DB public_ack_version()과 같아야 함 (시험이 비교)
@@ -691,6 +709,9 @@ function friendly(err) {
   if (/photo_limit/.test(m)) return '사진은 장소마다 10장까지예요. 다른 멤버가 올린 사진을 확인해 주세요.';
   if (/visit_gone/.test(m)) return '그 방문 기록이 바뀌거나 지워졌어요. 새로고침한 뒤 다시 남겨 주세요.';
   if (/save_context_changed/.test(m)) return '방이나 계정이 바뀌어 저장을 중단했어요. 원래 방에서 다시 시도해 주세요.';
+  if (/maintenance_version|trash_item/.test(m) && /does not exist|schema cache|Could not find/i.test(m)) return '현재 버전용 SQL(supabase/maintenance.sql)을 먼저 실행해 주세요.';
+  if (/review_changed|visit_changed|note_changed/.test(m)) return '다른 기기나 멤버가 먼저 고쳤어요. 쓰던 내용은 남아 있어요. 최신 기록을 확인한 뒤 다시 저장해 주세요.';
+  if (/other_reviews/.test(m)) return '다른 멤버 후기가 있는 방문은 지울 수 없어요.';
   // 그룹 기능용 SQL을 아직 안 돌린 DB (새 함수·칸이 없음)
   if (/couple_members\.color|rename_room|leave_room|set_member_color|begin_room_delete/.test(m) && /does not exist|schema cache|Could not find/i.test(m))
     return '그룹 기능용 SQL(supabase/groups.sql)을 먼저 실행해 주세요.';
@@ -754,6 +775,7 @@ async function busy(btn, fn) {
 const configured = !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_KEY.includes('YOUR_KEY');
 const sb = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 const state = {
+  authRetry: false,
   user: null,
   rooms: [],            // [{id, name, invite_code, created_at, visibility, description, public_key, public_hidden_at}] 내가 든 방 전부 (RLS가 내 방만 줌)
   allMembers: [],       // [{couple_id, user_id, display_name, role, color, created_at}] 내 방들의 멤버 전부
@@ -768,6 +790,7 @@ const state = {
   tab: 'want_to_go', category: '전체', query: '',
   sort: 'recent',       // 다녀온 곳 정렬: 'recent' 최근 방문순 | 'added' 최근 추가순 | 'rating' 평균 평점순
   sheet: null,          // {type, id}
+  justVisited: null,
   editVisit: null,      // 내 후기를 쓰는 중인 방문 id ('new' = 새 방문)
   photoIdx: 0,          // 상세 화면에서 보고 있는 사진 번호
   draftRating: 0,
@@ -1118,7 +1141,7 @@ async function addPhotos(place, files, onProgress = () => {}) {
         if (!tu.error) thumb = t;
       } catch { /* 썸네일 없이 */ }
       const res = await sb.from('place_photos').insert({ place_id: place.id, path, thumb_path: thumb, position: ++pos, created_by: uid() });
-      if (res.error) { await sb.storage.from(BUCKET).remove([path, thumb].filter(Boolean)); throw res.error; }
+      if (res.error) { await sb.rpc('trash_uploads', { p_paths: [path, thumb].filter(Boolean) }); throw res.error; }
       done++;
     } catch (err) { if (!error) { error = err; error.photoName = file.name; } }
   }
@@ -1137,9 +1160,8 @@ function photoResultText(r) {
 }
 // 표에서 먼저 지우고 파일을 지움 (파일만 남는 건 괜찮지만, 없는 파일을 가리키면 안 되니까)
 async function deletePhoto(photo) {
-  const { data, error } = await sb.from('place_photos').delete().eq('id', photo.id).select('id');
+  const { error } = await sb.rpc('trash_item', { p_kind: 'photo', p_id: photo.id });
   if (error) throw error;
-  if (data.length) await sb.storage.from(BUCKET).remove([photo.path, photo.thumb_path].filter(Boolean)); // 썸네일도 같이
 }
 // 대표 사진 = 맨 앞. 지금 맨 앞보다 하나 앞 순서로 옮김
 async function setCover(place, photo) {
@@ -1497,11 +1519,11 @@ function filtered() {
   }
   return list;
 }
-function matched() {
+function matched(tab = ui().tab) {
   const u = ui();
   const q = u.query.trim().toLowerCase();
   return curPlaces().filter((p) => {
-    if (u.tab === 'fav' ? !p.favorite : p.status !== u.tab) return false;
+    if (tab === 'fav' ? !p.favorite : p.status !== tab) return false;
     if (u.category !== '전체' && p.category !== u.category) return false;
     if (!q) return true;
     return [p.name, p.address, p.shared_note, p.category].some((v) => (v || '').toLowerCase().includes(q))
@@ -1549,16 +1571,26 @@ function placeCard(p) {
     ${lower}
   </button></li>`;
 }
+const TAB_NAMES = { want_to_go: '가고 싶은 곳', visited: '다녀온 곳', fav: '찜' };
+function otherTabs(list) {
+  if (!ui().query.trim()) return [];
+  const shown = new Set(list.map((p) => p.id));
+  const tabs = ui().tab === 'fav' ? ['want_to_go', 'visited'] : [ui().tab === 'visited' ? 'want_to_go' : 'visited'];
+  return tabs.map((t) => ({ t, n: matched(t).filter((p) => !shown.has(p.id)).length })).filter((x) => x.n);
+}
 function listHtml() {
   const list = filtered();
-  const u = ui();
-  const emptyMsg = u.query || u.category !== '전체'
+  const others = otherTabs(list);
+  const go = others.map(({ t, n }) => `<button class="chip" data-action="tab" data-tab="${t}">${TAB_NAMES[t]} ${n}곳 보기</button>`).join('');
+  const emptyMsg = others.length
+    ? `<strong>이 탭에는 없어요</strong>다른 탭에 검색어와 맞는 곳이 있어요.<div class="other-tabs">${go}</div>`
+    : ui().query || ui().category !== '전체'
     ? '<strong>조건에 맞는 장소가 없어요</strong>검색어나 카테고리를 바꿔 보세요.'
-    : ro() ? (u.tab === 'visited' ? '<strong>아직 다녀온 곳이 없어요</strong>' : '<strong>가고 싶은 곳이 없어요</strong>')
-    : state.tab === 'want_to_go' ? '<strong>가고 싶은 곳을 담아 보세요</strong>오른쪽 아래 버튼으로 첫 장소를 추가해요.'
-    : state.tab === 'visited' ? '<strong>아직 다녀온 곳이 없어요</strong>가고 싶은 곳에서 ‘다녀왔어요’를 누르면 여기로 옮겨져요.'
+    : ui().tab === 'want_to_go' ? '<strong>가고 싶은 곳을 담아 보세요</strong>오른쪽 아래 버튼으로 첫 장소를 추가해요.'
+    : ui().tab === 'visited' ? '<strong>아직 다녀온 곳이 없어요</strong>가고 싶은 곳에서 ‘다녀왔어요’를 누르면 여기로 옮겨져요.'
     : '<strong>찜한 곳이 없어요</strong>장소를 열고 하트를 누르면 여기에 모여요.';
-  return list.length ? `<ul class="list">${list.map(placeCard).join('')}</ul>` : `<div class="empty-state">${emptyMsg}</div>`;
+  if (!list.length) return `<div class="empty-state">${emptyMsg}</div>`;
+  return `${others.length ? `<div class="other-tabs more"><span>다른 탭에도 있어요</span>${go}</div>` : ''}<ul class="list">${list.map(placeCard).join('')}</ul>`;
 }
 // 메인 위쪽 방 이름: 누르면 방 바꾸기·새 방 시트. 마지막 낱말과 ⌄는 같은 줄에 (낱말이 아주 길면 그냥 줄바꿈)
 function roomTitleBtn(name) {
@@ -1632,22 +1664,26 @@ function selectCat(form, name) {
   form.category.value = name;
   form.querySelectorAll('[data-action=pick-cat]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.cat === name));
 }
-function placeForm(p) {
-  const v = p || { name: '', address: '', category: catNames()[0] || '', naver_url: '', status: state.tab === 'visited' ? 'visited' : 'want_to_go', shared_note: '' };
+function placeForm(p, draft) {
+  const blank = { name: '', address: '', category: catNames()[0] || '', naver_url: '', status: state.tab === 'visited' ? 'visited' : 'want_to_go', shared_note: '' };
+  const v = p || (draft ? { ...blank, ...draft, category: catNames().includes(draft.category) ? draft.category : blank.category } : blank);
   const cats = [...new Set([...catNames(), v.category])].filter(Boolean);
-  return `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">${p ? '정보 수정' : '장소 추가'}</h2><span style="width:40px"></span></div>
-  <form class="sheet-body" id="place-form" novalidate>
-    ${p ? '' : pubHint('place', 'margin:0 0 12px')}
-    <label class="field"><span>장소 이름</span><input class="input" name="name" maxlength="80" value="${esc(v.name)}" required></label>
-    <div class="field"><span style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">카테고리</span>
+  const linkField = `<label class="field"><span>지도 링크 (네이버·구글)</span><textarea class="input url" name="naver_url" rows="2" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://naver.me/… 또는 https://maps.app.goo.gl/…">${esc(v.naver_url || '')}</textarea>
+      <p class="hint">공유하기로 복사한 링크나 문구를 붙여넣으면 링크만 골라 넣고, 비어 있는 이름·주소도 채워 줘요. 해외 장소는 구글 지도 링크로.</p></label>`;
+  const nameField = `<label class="field"><span>장소 이름</span><input class="input" name="name" maxlength="80" value="${esc(v.name)}" required></label>
+    ${p ? '' : '<div class="dup-hint" id="dup-hint" role="status"></div>'}`;
+  const catField = `<div class="field"><span style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">카테고리</span>
       <div class="cat-pick" role="radiogroup" aria-label="카테고리">${cats.map((c) => catChip(c, v.category === c)).join('')}<button type="button" class="chip add" data-action="new-cat">+ 새 카테고리</button></div>
       <div class="new-cat hidden"><input class="input" maxlength="20" placeholder="새 카테고리 이름" aria-label="새 카테고리 이름" enterkeyhint="done"><button type="button" class="btn small" data-action="add-cat">추가</button></div>
       <input type="hidden" name="category" value="${esc(v.category)}">
-    </div>
-    <label class="field" style="margin-top:14px"><span>지도 링크 (네이버·구글)</span><textarea class="input url" name="naver_url" rows="2" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://naver.me/… 또는 https://maps.app.goo.gl/…">${esc(v.naver_url || '')}</textarea>
-      <p class="hint">공유하기로 복사한 링크나 문구를 붙여넣으면 링크만 골라 넣고, 비어 있는 이름·주소도 채워 줘요. 해외 장소는 구글 지도 링크로.</p></label>
-    <label class="field"><span>주소</span><input class="input" name="address" maxlength="200" value="${esc(v.address || '')}"></label>
-    ${p ? '' : `<div class="field"><span style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">상태</span>
+    </div>`;
+  const addressField = `<label class="field"><span>주소</span><input class="input" name="address" maxlength="200" value="${esc(v.address || '')}"></label>`;
+  // 장소 추가는 링크부터 (붙여넣으면 이름·주소가 채워지니까), 정보 수정은 이름부터
+  return `<div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="닫기">${ICON.close}</button><h2 id="sheet-title">${p ? '정보 수정' : '장소 추가'}</h2><span style="width:40px"></span></div>
+  <form class="sheet-body" id="place-form" novalidate>
+    ${p ? '' : pubHint('place', 'margin:0 0 12px')}
+    ${p ? `${nameField}${catField}<div style="margin-top:14px">${linkField}</div>${addressField}` : `${linkField}${nameField}${addressField}${catField}`}
+    ${p ? '' : `<div class="field" style="margin-top:14px"><span style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">상태</span>
       <div class="seg" style="margin:0" role="group" aria-label="상태">
         <button type="button" data-action="pick-status" data-status="want_to_go" aria-pressed="${v.status === 'want_to_go'}">가고 싶은 곳</button>
         <button type="button" data-action="pick-status" data-status="visited" aria-pressed="${v.status === 'visited'}">다녀왔어요</button>
@@ -1683,13 +1719,35 @@ function fillEmpty(form, s) {
   const filled = [];
   if (!field(form, 'name').value.trim() && s.name) { field(form, 'name').value = s.name; filled.push('이름'); }
   if (!form.address.value.trim() && s.address) { form.address.value = s.address; filled.push('주소'); }
+  checkDup(form);
   return filled;
 }
+// 이미 담은 곳이면 장소 추가 화면에 알려 줌 (저장은 막지 않음).
+// 이름은 띄어쓰기·문장부호를 빼고 비교하고, 한쪽이 다른 쪽을 품으면(올디스타코 ⊂ 올디스타코 을지로 2호점) 4글자 이상일 때만 같은 곳으로 봄
+const nameKey = (s) => String(s || '').toLowerCase().replace(/[\s.,·'’"()\-_/&]/g, '');
+function sameName(a, b) {
+  a = nameKey(a); b = nameKey(b);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const [short, long] = a.length < b.length ? [a, b] : [b, a];
+  return short.length >= 4 && long.includes(short);
+}
+function checkDup(form) {
+  const box = form && form.querySelector('#dup-hint');
+  if (!box) return;
+  const name = field(form, 'name').value, link = googleKey(form.naver_url.value);
+  const hits = state.places.filter((p) => sameName(p.name, name) || (link && p.naver_url && googleKey(p.naver_url) === link));
+  const p = hits[0];
+  box.innerHTML = p ? `<span>이미 담은 곳이에요 · <b>${esc(p.name)}</b> (${p.status === 'visited' ? '다녀온 곳' : '가고 싶은 곳'}, ${esc(josa(person(p.created_by).name, '이', '가'))} 담음${hits.length > 1 ? ` · 외 ${hits.length - 1}곳` : ''})</span>
+    <button type="button" class="text-btn" data-action="open" data-id="${p.id}">열기</button>` : '';
+}
+
 // 구글 지도 링크면 true (이름·주소는 구글에 물어본 뒤 따로 채움)
 function applyShare(form, text) {
   const s = parseShare(text);
   if (!s.url) return false;
   form.naver_url.value = s.url;
+  checkDup(form);
   if (isGoogleMaps(s.url)) { fillFromGoogle(form, s); return true; }
   fillEmpty(form, s);
   return false;
@@ -1769,6 +1827,78 @@ function fillFromGoogle(form, fallback = {}) {
     } else toast(`구글 지도에서 이름·주소를 가져오지 못했어요. ${what ? `붙여넣은 문구로 ${what} 채웠어요.` : '직접 적어 주세요.'}`, 5000);
   })();
 }
+
+const SHARE_KEY = 'group-place:share';
+let addDraft = null;
+let sharedText = null; // 아직 장소 추가로 안 연 공유
+function takeShare() {
+  let text = '';
+  try {
+    const q = new URLSearchParams(location.search);
+    const keys = ['title', 'text', 'url'];
+    if (keys.some((k) => q.has(k))) {
+      // 같은 내용이 여러 칸에 오면 한 번만 (네이버는 보통 text에 다 넣고, 구글은 url에 링크만 줄 때가 있음)
+      const parts = [];
+      for (const k of keys) {
+        const v = (q.get(k) || '').trim();
+        if (!v || parts.some((x) => x.includes(v))) continue;
+        for (let i = parts.length - 1; i >= 0; i--) if (v.includes(parts[i])) parts.splice(i, 1);
+        parts.push(v);
+      }
+      // 링크도 글도 없으면(제목만) 공유로 보지 않음
+      if ((q.get('text') || '').trim() || (q.get('url') || '').trim()) text = parts.join('\n').slice(0, 4000);
+      // 주소창에서 지움 (새로고침해도 다시 담기지 않게). 뒤로 가기 기록(history.state)은 그대로 둠
+      keys.forEach((k) => q.delete(k));
+      const rest = q.toString();
+      history.replaceState(history.state, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+      try { if (text) sessionStorage.setItem(SHARE_KEY, text); } catch { /* 저장소를 못 쓰면 이번 화면에서만 */ }
+    }
+  } catch { /* 주소를 못 읽으면 공유 없이 */ }
+  if (!text) { try { text = sessionStorage.getItem(SHARE_KEY) || ''; } catch { /* 없음 */ } }
+  return text || null;
+}
+// 목록이 뜬 다음 한 번만: 장소 추가를 열고 공유한 글로 채움
+function openShared() {
+  if (!sharedText || ro() || !state.roomId || state.loadedRoom !== state.roomId) return;
+  const text = sharedText;
+  sharedText = null;
+  try { sessionStorage.removeItem(SHARE_KEY); } catch { /* 없음 */ }
+  // 장소 추가를 쓰다가 지도 앱에서 공유하면 앱이 새로 열림 → 남겨 둔 쓰던 내용 위에 공유한 것을 채움 (빈 칸만, 링크는 공유한 것으로)
+  addDraft = takeAddForm();
+  openSheet('add');
+  const form = $('#place-form');
+  if (!form) return;
+  const merged = !!(state.sheet && state.sheet.draft);
+  if (URL_RE.test(text)) { if (applyShare(form, text)) return; } // 구글 지도는 '가져오는 중'·'채웠어요' 알림을 따로 띄움
+  else fillEmpty(form, parseShare(text)); // 링크 없이 이름·주소 글만 공유한 경우
+  const name = field(form, 'name').value.trim(), link = form.naver_url.value.trim();
+  toast(merged ? '쓰던 장소 추가에 공유한 장소를 채웠어요. 사진을 골랐었다면 다시 골라 주세요.'
+    : name ? '공유한 장소를 채웠어요. 카테고리를 고르고 저장해 주세요.'
+    : link ? '공유한 링크를 넣었어요. 이름을 적고 저장해 주세요.'
+    : '공유한 글에서 장소 정보를 찾지 못했어요. 직접 적어 주세요.', 4000);
+}
+// 장소 추가를 쓰는 중에 다른 앱으로 가면 쓰던 내용을 이 폰에 잠깐(10분) 남김. 공유하기로 돌아오면 앱이 새로 열려서 화면이 사라지기 때문.
+// 저장하거나 닫으면 지움. 고른 사진은 남길 수 없음
+const ADD_KEY_PREFIX = 'group-place:add:';
+function keepAddForm() {
+  const f = $('#place-form');
+  if (!f || !state.sheet || state.sheet.type !== 'add' || !uid()) return;
+  const d = { roomId: state.roomId, at: Date.now(), name: field(f, 'name').value, naver_url: f.naver_url.value, address: f.address.value,
+    category: f.category.value, status: f.status.value, shared_note: f.shared_note.value };
+  try {
+    if (d.name.trim() || d.naver_url.trim() || d.address.trim() || d.shared_note.trim()) localStorage.setItem(ADD_KEY_PREFIX + uid() + ':' + state.roomId, JSON.stringify(d));
+    else localStorage.removeItem(ADD_KEY_PREFIX + uid() + ':' + state.roomId);
+  } catch { /* 저장소를 못 쓰면 그만 */ }
+}
+function takeAddForm() {
+  try {
+    const d = JSON.parse(localStorage.getItem(ADD_KEY_PREFIX + uid() + ':' + state.roomId));
+    localStorage.removeItem(ADD_KEY_PREFIX + uid() + ':' + state.roomId);
+    return d && typeof d.at === 'number' && Date.now() - d.at < 600000 ? d : null;
+  } catch { return null; }
+}
+const dropAddForm = () => { try { localStorage.removeItem(ADD_KEY_PREFIX + uid() + ':' + state.roomId); } catch { /* 저장소를 못 씀 */ } };
+
 
 /* ---------- 시트: 장소 상세 ---------- */
 // 사진 넘겨 보기: 옆으로 밀면 다음 사진, 누르면 크게. 맨 앞이 대표 사진(목록 썸네일)
@@ -1865,8 +1995,9 @@ function visitCard(p, v, editing) {
       <span>${del}</span>
       <span class="btns">${v || p.visits.length ? '<button class="text-btn" data-action="cancel-visit">취소</button>' : ''}<button class="btn small" data-action="save-visit">저장</button></span>
     </div>` : '';
-  return `<article class="visit">
-    <div class="visit-head">${head}</div>
+  const guide = !ro() && editing && !v && state.justVisited === p.id ? '<p class="visit-guide">다녀온 곳으로 옮겼어요. 날짜와 별점을 고르고 <b>저장</b>을 눌러야 방문 기록이 남아요.</p>' : '';
+  return `<article class="visit${editing ? ' editing' : ''}">
+    ${guide}<div class="visit-head">${head}</div>
     ${rows}${actions}
   </article>`;
 }
@@ -1917,6 +2048,98 @@ function detailView(p) {
       <div class="danger-zone"><span class="by ${person(p.created_by).cls}"><i class="dot"></i><span>${esc(josa(person(p.created_by).name, '이', '가'))} ${fmtDate(p.created_at)}에 담음</span></span><button class="text-btn danger" data-action="delete-place">장소 삭제</button></div>`}
     </div>`;
 }
+
+const DRAFT = 'group-place:draft:';
+const DRAFT_MS = 14 * 864e5;
+const draftKey = (kind, placeId, visitId) => `${DRAFT}${uid()}:${state.roomId}:${kind}:${placeId}${kind === 'review' ? `:${visitId}` : ''}`;
+const editIdOf = (p) => state.editVisit || (p.visits.length ? null : 'new'); // 지금 열린 후기 입력칸 (방문 기록이 없으면 새 방문 칸이 저절로 열림)
+const pendingDrafts = new Map(); // 아직 안 남긴 것: key → 값 (null이면 지움)
+const restored = new Map();      // 이번에 다시 채운 입력칸: key → 덧붙일 말 (다시 그려도 한 줄이 남게)
+let draftTimer;
+const okDraft = (d) => !!d && typeof d === 'object' && typeof d.at === 'number' && (typeof d.text === 'string' || (typeof d.body === 'string' && typeof d.day === 'string'));
+function readDraft(key) {
+  if (pendingDrafts.has(key)) return pendingDrafts.get(key);
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(key)); } catch { d = undefined; }
+  if (okDraft(d) && Date.now() - d.at < DRAFT_MS) return d;
+  if (d !== null) { try { localStorage.removeItem(key); } catch { /* 저장소를 못 씀 */ } } // 오래됐거나 깨진 것은 버림
+  return null;
+}
+function draftKeys(prefix) {
+  const keys = new Set([...pendingDrafts.keys()].filter((k) => k.startsWith(prefix)));
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(prefix)) keys.add(k); } } catch { /* 저장소를 못 씀 */ }
+  return [...keys];
+}
+function flushDrafts() {
+  clearTimeout(draftTimer);
+  pendingDrafts.forEach((v, k) => { try { if (v) localStorage.setItem(k, JSON.stringify(v)); else localStorage.removeItem(k); } catch { /* 가득 찼거나 막힘: 못 남길 뿐 */ } });
+  pendingDrafts.clear();
+}
+function putDraft(key, value) {
+  pendingDrafts.set(key, value);
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(flushDrafts, 400);
+}
+function dropDraft(key) {
+  pendingDrafts.delete(key);
+  restored.delete(key);
+  try { localStorage.removeItem(key); } catch { /* 저장소를 못 씀 */ }
+}
+const dropDrafts = (prefix) => draftKeys(prefix).forEach(dropDraft);
+// 서버에 있는 내 후기 (새 방문이면 오늘·빈칸)
+function serverReview(p, id) {
+  const v = p.visits.find((x) => x.id === id);
+  const mine = v && v.reviews.find((r) => r.author_id === uid());
+  return { day: v ? v.visited_on : today(), rating: (mine && mine.rating) || 0, body: (mine && mine.body) || '' };
+}
+const sameReview = (a, b) => a.day === b.day && (Number(a.rating) || 0) === (Number(b.rating) || 0) && a.body.trim() === b.body.trim();
+const detailPlace = () => !ro() && state.sheet && state.sheet.type === 'detail' && state.places.find((x) => x.id === state.sheet.id);
+// 치거나 고를 때마다: 서버와 다르면 남기고, 같아지면 지움
+function keepNoteDraft() {
+  const p = detailPlace(), note = $('#shared-note');
+  if (!p || !note || !uid()) return;
+  const key = draftKey('note', p.id), old = readDraft(key);
+  // base: 쓰기 시작할 때의 서버 메모 (다시 채울 때 상대가 그사이 바꿨는지 보려고)
+  putDraft(key, note.value.trim() === (p.shared_note || '').trim() ? null
+    : { text: note.value, base: old && typeof old.base === 'string' ? old.base : p.shared_note || '', at: Date.now() });
+}
+function keepReviewDraft() {
+  const p = detailPlace(), id = p && editIdOf(p), body = $('#my-review'), day = $('#visit-date');
+  if (!id || !body || !day || !uid()) return;
+  const cur = { day: day.value, rating: state.draftRating || 0, body: body.value };
+  const key = draftKey('review', p.id, id), old = readDraft(key), s = serverReview(p, id);
+  // base: 쓰기 시작할 때의 서버 값 (다시 채울 때 그사이 상대가 날짜를, 내가 다른 폰에서 후기를 바꿨는지 보려고)
+  const base = old && old.base && typeof old.base.body === 'string' ? old.base : s;
+  putDraft(key, sameReview(cur, s) ? null : { ...cur, base, at: Date.now() });
+}
+// 다시 채울 값: 날짜는 내가 바꿨을 때만 쓰던 값으로 (안 바꿨으면 그사이 상대가 고친 날짜를 그대로)
+const draftReview = (d, s) => (d.base && d.day === d.base.day ? { ...d, day: s.day } : d);
+// 쓰기 시작한 뒤 서버의 내 후기가 바뀌었으면(다른 폰에서 고침) 다시 채울 때 알려 줌
+const reviewMovedOn = (d, s) => !!d.base && ((Number(d.base.rating) || 0) !== (Number(s.rating) || 0) || d.base.body.trim() !== s.body.trim());
+// 상세를 열 때 쓰던 후기가 있으면 그 입력칸을 열어 둠 (여러 개면 가장 최근 것, 그사이 지워진 방문은 빼고)
+function draftVisit(placeId) {
+  const p = state.places.find((x) => x.id === placeId);
+  if (!p || !uid()) return null;
+  const prefix = `${DRAFT}${uid()}:${state.roomId}:review:${p.id}:`;
+  let best = null, at = 0;
+  for (const k of draftKeys(prefix)) {
+    const id = k.slice(prefix.length), d = readDraft(k);
+    if (!d || typeof d.body !== 'string' || !(id === 'new' || p.visits.some((v) => v.id === id))) continue;
+    const s = serverReview(p, id);
+    if (sameReview(draftReview(d, s), s)) { dropDraft(k); continue; }
+    if (d.at > at) { best = id; at = d.at; }
+  }
+  return best;
+}
+const draftLine = (kind, extra = '') => `<p class="draft-line"><span>${kind === 'note' ? '쓰던 메모를' : '쓰던 후기를'} 다시 채웠어요${esc(extra)}</span><button type="button" class="text-btn" data-action="drop-draft" data-kind="${kind}">지우기</button></p>`;
+function paintRating(group) {
+  if (!group) return;
+  group.querySelectorAll('.rs').forEach((s, k) => { s.className = `rs ${starCls(state.draftRating, k + 1)}`; });
+  group.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', Number(b.dataset.n) === state.draftRating));
+}
+// 14일 지난 것·깨진 것 정리 (앱을 열 때 한 번)
+const cleanDrafts = () => draftKeys(DRAFT).forEach(readDraft);
+
 
 /* ---------- 시트: 장소 월드컵 ---------- */
 // 방문 기록 날짜 기준: 2025년과 2026년에 모두 갔으면 두 해 월드컵에 다 나옴
@@ -2193,7 +2416,7 @@ async function saveCup() {
 async function deleteCupResult(id) {
   const r = state.cupResults.find((x) => x.id === id);
   if (!r || !confirm(`${cupTitle(recYear(r), recCat(r))} 내 기록을 지울까요? 1위 도장도 같이 사라져요.`)) return;
-  const { error } = await sb.from('cup_results').delete().eq('couple_id', state.roomId).eq('id', id);
+  const { error } = await sb.rpc('trash_item', { p_kind: 'cup', p_id: id });
   if (error) throw error;
   state.cupResults = state.cupResults.filter((x) => x.id !== id);
   renderSheet(); render();
@@ -2314,7 +2537,7 @@ async function deleteCategory(id) {
   // 그 카테고리 월드컵 기록은 DB에서 같이 지워짐 (도장도 사라짐)
   const cups = cupGroups().filter((g) => g.cat === cat.name).length;
   if (!confirm(`‘${cat.name}’ 카테고리를 삭제할까요?${cups ? ` ${cat.name} 월드컵 기록 ${cups}개와 도장도 같이 지워져요.` : ''}`)) return;
-  const { error } = await sb.from('categories').delete().eq('couple_id', state.roomId).eq('id', id);
+  const { error } = await sb.rpc('trash_item', { p_kind: 'category', p_id: id });
   if (error) throw error;
   state.categories = state.categories.filter((c) => c.id !== id);
   state.cupResults = state.cupResults.filter((r) => r.category !== cat.name);
@@ -2555,7 +2778,7 @@ function publicNotice() {
 
 /* ---------- 나가기 ---------- */
 // 멤버가 남아 있으면 내 후기·월드컵 기록만 지우고 나감(방장이면 가장 먼저 들어온 멤버가 방장).
-// 혼자 남았으면 방이 통째로 지워짐: 사진 파일은 SQL로 못 지우니 Storage에서 먼저 지우고 나감
+// 혼자 남았으면 방과 연결 기록을 비공개 휴지통으로 옮기고 서버가 3일 뒤 사진부터 정리
 async function leaveRoom(btn) {
   const start = state.roomId;
   try { await refresh(); } catch { /* 지금 아는 멤버 수로 진행 (DB가 다시 확인함) */ }
@@ -2565,33 +2788,26 @@ async function leaveRoom(btn) {
   const alone = state.members.length <= 1, pub = isPublicRoom(room);
   if (alone) {
     if (!confirm(pub
-      ? `‘${name}’에서 나가면 이 공개 방과 둘러보기 링크가 사라져요. 장소·사진·후기·월드컵 기록이 모두 지워지고 되돌릴 수 없어요.`
-      : `‘${name}’에서 나가면 방이 없어져요. 장소·사진·후기·월드컵 기록이 모두 지워지고 되돌릴 수 없어요.`)) return;
+      ? `‘${name}’에서 나가면 이 공개 방과 둘러보기 링크가 사라져요. 장소·사진·후기·월드컵 기록이 화면에서 사라지고, 서버의 비공개 보관함에서 3일 뒤 영구 삭제돼요.`
+      : `‘${name}’에서 나가면 방이 없어져요. 장소·사진·후기·월드컵 기록이 화면에서 사라지고, 서버의 비공개 보관함에서 3일 뒤 영구 삭제돼요.`)) return;
     if (!confirm(`정말 ‘${name}’ 방을 지울까요?`)) return;
   } else if (!confirm(`‘${name}’에서 나갈까요? 내가 남긴 후기와 월드컵 기록은 지워지고, 내가 담은 장소와 사진은 방에 남아요.${isOwner() ? ' 방장은 가장 먼저 들어온 멤버에게 넘어가요.' : ''}`
     // 공개 방: 남는 장소·사진은 계속 공개되고 '예전 멤버'로 보임 (§4.11)
     + (pub ? ' 공개 방이라 내가 담은 장소와 올린 사진은 남아 계속 공개되고, 공개 화면에는 ‘예전 멤버’로 보여요. 내리고 싶은 사진은 나가기 전에 지워 주세요.' : ''))) return;
   await busy(btn, async () => {
     if (alone) {
-      // 이때부터 15분 동안 이 방 코드로는 들어올 수 없음 (사진을 지우는 사이 누가 들어오지 않게)
-      const { data: paths, error } = await sb.rpc('begin_room_delete', { p_couple: roomId });
+      // 이때부터 15분 동안 이 방 코드로는 들어올 수 없음 (마지막 멤버 삭제 확인과 실행 사이 참여 방지)
+      const { error } = await sb.rpc('begin_room_delete', { p_couple: roomId });
       if (error) {
         toast(friendly(error));
         if (/not_last_member/.test(error.message || '')) await refresh().catch(() => {});
         return;
       }
-      // 이 방 장소 폴더('<장소 id>/…') 안의 파일만 지움 (DB도 그렇게 돌려주지만 한 번 더 확인)
-      const placeIds = new Set(state.places.map((p) => p.id));
-      const list = (paths || []).filter((x) => typeof x === 'string' && x && placeIds.has(x.split('/')[0]));
-      for (let i = 0; i < list.length; i += 100) {
-        if (list.length > 100) toast(`사진을 지우는 중… (${Math.min(i + 100, list.length)}/${list.length})`, 0);
-        const { error: rmError } = await sb.storage.from(BUCKET).remove(list.slice(i, i + 100));
-        if (rmError) { toast('사진을 다 지우지 못했어요. 다시 시도해 주세요.', 5000); return; } // 방은 남음
-      }
+
     }
     const { data, error } = await sb.rpc('leave_room', { p_couple: roomId });
     if (error) {
-      // 그사이 다른 멤버가 모두 나가 혼자 남음: 방을 지우는 것은 사진을 지우고 한 번 더 확인받은 뒤에만 (DB가 막음)
+      // 그사이 다른 멤버가 모두 나가 혼자 남음: 방을 지우는 것은 한 번 더 확인받은 뒤에만 (DB가 막음)
       if (/last_member/.test(error.message || '') && !/not_last_member/.test(error.message || '')) {
         toast('그사이 다른 멤버가 모두 나갔어요. 다시 확인해 주세요.');
         await refresh().catch(() => {});
@@ -3194,6 +3410,7 @@ let screen = 'loading';
 function render() {
   const app = $('#app');
   if (!configured) { screen = 'config'; app.innerHTML = viewConfig(); return; }
+  if (state.authRetry) { screen = 'loading'; app.innerHTML = viewLoading(); return; }
   if (!state.user) { screen = 'login'; app.innerHTML = SIGNUP_ENABLED && authMode === 'signup' ? viewSignup() : viewLogin(); return; }
   // 공개 방 읽기 전용 보기 → 둘러보기 → (내 방 화면들) 순서로 고름
   if (state.visit) { screen = 'visit'; app.innerHTML = viewMain(); return; }
@@ -3205,13 +3422,17 @@ function render() {
   screen = 'main';
   app.innerHTML = viewMain();
   markStampsSeen();
+  if (sharedText && !state.sheet) queueMicrotask(() => { if (sharedText && !state.sheet && !ro() && screen === 'main') openShared(); });
 }
 let lastFocus = null;
 function openSheet(type, id, extra = {}) {
+  keepNoteDraft(); keepReviewDraft();
   cancelGoogle();
   if (!state.sheet) lastFocus = document.activeElement;
   state.sheet = { type, id, ...extra };
-  if (type === 'detail') { state.editVisit = null; state.draftRating = 0; state.photoIdx = 0; }
+  if (type === 'add' && addDraft && Date.now() - addDraft.at < 600000 && addDraft.roomId === state.roomId) state.sheet.draft = addDraft;
+  if (type === 'add') addDraft = null;
+  if (type === 'detail') { state.editVisit = ro() ? null : draftVisit(id); const p = curPlaces().find((x) => x.id === id); state.draftRating = !ro() && p ? serverReview(p, state.editVisit).rating : 0; state.photoIdx = 0; }
   if (type === 'add' || type === 'edit') warmGoogle().catch(() => {});
   if (type === 'settings') customDraft = null; // 직접 고르기 칸은 닫힌 채로 시작
   renderSheet();
@@ -3291,7 +3512,7 @@ function drawSheet() {
   const s = state.sheet;
   if (!s) { root.innerHTML = ''; root.dataset.view = ''; document.body.style.overflow = ''; return; }
   let inner = '';
-  if (s.type === 'add') inner = placeForm(null);
+  if (s.type === 'add') inner = placeForm(null, s.draft);
   else if (s.type === 'edit') inner = placeForm(state.places.find((x) => x.id === s.id));
   else if (s.type === 'settings') {
     if (!state.couple) { closeSheet(); return; } // 방에서 나간 뒤
@@ -3326,11 +3547,34 @@ function drawSheet() {
     const note = same && $('#shared-note'), review = sameEdit && $('#my-review'), day = sameEdit && $('#visit-date');
     const edited = (el) => (el && el.value !== el.defaultValue ? el.value : null);
     const keep = { note: edited(note), review: edited(review), day: edited(day), scroll: same ? $('.sheet-body', root).scrollTop : 0 };
+    // 입력칸을 새로 열 때만(같은 칸을 다시 그리는 게 아니면) 이 폰에 남겨 둔 쓰던 내용으로 채움. 별점은 그리기 전에 정해 둠
+    const editId = ro() ? null : editIdOf(p), rKey = editId && draftKey('review', p.id, editId), nKey = ro() ? null : draftKey('note', p.id);
+    let rDraft = null, nDraft = null;
+    if (rKey && !review) {
+      restored.delete(rKey);
+      rDraft = readDraft(rKey);
+      const s = serverReview(p, editId);
+      if (rDraft && typeof rDraft.body === 'string') rDraft = draftReview(rDraft, s);
+      if (rDraft && (typeof rDraft.body !== 'string' || sameReview(rDraft, s))) { dropDraft(rKey); rDraft = null; }
+      if (rDraft) { state.draftRating = Number(rDraft.rating) || 0; restored.set(rKey, reviewMovedOn(rDraft, s) ? ' (그사이 다른 폰에서 내 후기가 바뀌었어요)' : ''); }
+    }
+    if (!ro() && !note) {
+      restored.delete(nKey);
+      nDraft = readDraft(nKey);
+      if (nDraft && (typeof nDraft.text !== 'string' || nDraft.text.trim() === (p.shared_note || '').trim())) { dropDraft(nKey); nDraft = null; }
+      // 쓰기 시작한 뒤 서버 메모가 바뀌었으면(상대가 고침) 그래도 채우되 알려 줘서 고를 수 있게
+      if (nDraft) restored.set(nKey, typeof nDraft.base === 'string' && nDraft.base.trim() !== (p.shared_note || '').trim() ? ' (다른 멤버가 그사이 메모를 바꿨어요)' : '');
+    }
     mountSheet(detailView(p), `detail:${p.id}`);
     root.dataset.edit = String(state.editVisit);
     if (keep.note != null && $('#shared-note')) $('#shared-note').value = keep.note;
     if (keep.review != null && $('#my-review')) $('#my-review').value = keep.review;
     if (keep.day != null && $('#visit-date')) $('#visit-date').value = keep.day;
+    if (nDraft && $('#shared-note')) $('#shared-note').value = nDraft.text;
+    if (rDraft && $('#my-review')) { $('#my-review').value = rDraft.body; if ($('#visit-date')) $('#visit-date').value = rDraft.day; }
+    // 다시 채웠다는 한 줄 (입력칸 안, 다시 그려도 남음)
+    if (restored.has(nKey) && $('#shared-note')) $('#shared-note').insertAdjacentHTML('afterend', draftLine('note', restored.get(nKey)));
+    if (rKey && restored.has(rKey) && $('#my-review')) $('#my-review').insertAdjacentHTML('afterend', draftLine('review', restored.get(rKey)));
     if (keep.scroll) $('.sheet-body', root).scrollTop = keep.scroll;
     showGallery(state.photoIdx); // 다시 그려도 보던 사진 그대로
     return;
@@ -3355,6 +3599,7 @@ function editVisit(p, id) {
   renderSheet();
 }
 function closeSheet() {
+  keepNoteDraft(); keepReviewDraft();
   cancelGoogle();
   state.sheet = null;
   $('#viewer-root').innerHTML = '';
@@ -3438,20 +3683,21 @@ document.addEventListener('click', async (e) => {
       }
       case 'pick-room': if (el.dataset.id !== state.roomId || state.loadedRoom !== el.dataset.id) await switchRoom(el.dataset.id); break;
       case 'room-picker': state.roomId = null; state.loadError = false; applyRoom(); render(); break;
-      case 'retry-load': state.loadError = false; render(); await refresh({ keepSheet: false }); break;
+      case 'retry-load': if (state.authRetry) await bootSession(); else { state.loadError = false; render(); await refresh({ keepSheet: false }); } break;
       case 'leave-room': await leaveRoom(el); break;
       case 'set-color': await setMyColor(el.dataset.color); break;
       case 'auth-mode': authMode = el.dataset.mode; render(); window.scrollTo(0, 0); break;
-      case 'logout': await sb.auth.signOut(); break;
+      case 'logout': dropDrafts(`${DRAFT}${uid()}:`); dropAddForm(); await sb.auth.signOut({ scope: 'local' }); break;
       case 'tab': ui().tab = el.dataset.tab; render(); break;
       case 'cat': ui().category = el.dataset.cat; render(); break;
       case 'sort': ui().sort = el.dataset.sort; render(); break;
       case 'clear-search': $('#q').value = ''; ui().query = ''; $('#list-area').innerHTML = listHtml(); markStampsSeen(); break;
-      case 'open': openSheet('detail', el.dataset.id); if (ro()) loadVisitThumbs(el.dataset.id); break;
-      case 'add': openSheet('add'); break;
+      case 'open': if (state.sheet && state.sheet.type === 'add') { if ($('#place-form').photo.files.length && !confirm('사진은 다시 골라야 해요. 기존 장소를 열까요?')) break; keepAddForm(); addDraft = takeAddForm(); } openSheet('detail', el.dataset.id); if (ro()) loadVisitThumbs(el.dataset.id); break;
+      case 'add': addDraft = takeAddForm(); openSheet('add'); break;
       case 'settings': openSheet('settings'); break;
       case 'close': {
         const s = state.sheet;
+        if (s && s.type === 'add') { dropAddForm(); addDraft = null; }
         if (s && s.type === 'edit') { openSheet('detail', s.id); break; }
         if (s && s.back && goBackSheet()) break; // 넘어온 시트(계정 설정·방 만들기·공개 방 동의)는 원래 시트로
         // 월드컵을 하던 중이면 한 번 물어봄. ✕로 닫으면 그만두는 것 (뒤로 가기로 닫으면 이어서 할 수 있게 남겨 둠)
@@ -3531,28 +3777,59 @@ document.addEventListener('click', async (e) => {
         if (p.status === next) break;
         const { error } = await sb.from('places').update({ status: next }).eq('couple_id', state.roomId).eq('id', p.id);
         if (error) throw error;
-        p.status = next; render(); renderSheet();
-        toast(next === 'visited' ? '다녀온 곳으로 옮겼어요.' : '가고 싶은 곳으로 옮겼어요.');
+        p.status = next;
+        if (next === 'visited') {
+          // 다녀왔어요: 알림(후기 칸을 가림) 대신 방문 입력칸으로 내려 주고, 저장해야 방문이 남는다고 칸 위에 안내.
+          // 예전 방문이 있어도 오늘 방문이 없으면 새 방문 칸을 엶
+          state.justVisited = p.id;
+          if (p.visits.length && !p.visits.some((v) => v.visited_on === today())) { state.editVisit = 'new'; state.draftRating = 0; }
+        }
+        render(); renderSheet();
+        if (next === 'visited') {
+          const card = $('#sheet-root .visit.editing');
+          if (card) card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        } else toast('가고 싶은 곳으로 옮겼어요.');
         break;
       }
       case 'save-note': await busy(el, async () => {
-        const { error } = await sb.from('places').update({ shared_note: $('#shared-note').value.trim() }).eq('couple_id', state.roomId).eq('id', p.id);
-        if (error) throw error;
+        const draft = readDraft(draftKey('note', p.id));
+        let base = draft && typeof draft.base === 'string' ? draft.base : p.shared_note;
+        if (base !== p.shared_note) { if (!confirm('다른 멤버가 메모를 바꿨어요. 지금 입력한 내용으로 저장할까요?')) return; base = p.shared_note; }
+        const { error } = await sb.rpc('save_shared_note', { p_place: p.id, p_body: $('#shared-note').value.trim(), p_base: base });
+        if (error) { await refresh().catch(() => {}); throw error; }
+        dropDraft(draftKey('note', p.id));
         await refresh(); toast('메모를 저장했어요.');
       }); break;
       case 'rate': {
         const n = Number(el.dataset.n);
         state.draftRating = state.draftRating === n ? 0 : n;
+        keepReviewDraft();
         const group = el.closest('.rate-input');
         group.querySelectorAll('.rs').forEach((s, k) => { s.className = `rs ${starCls(state.draftRating, k + 1)}`; });
         group.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', Number(b.dataset.n) === state.draftRating));
         break;
       }
+      case 'drop-draft': {
+        if (el.dataset.kind === 'note') {
+          dropDraft(draftKey('note', p.id));
+          if ($('#shared-note')) $('#shared-note').value = p.shared_note || '';
+        } else {
+          const id = editIdOf(p), s = serverReview(p, id);
+          dropDraft(draftKey('review', p.id, id));
+          if ($('#my-review')) $('#my-review').value = s.body;
+          if ($('#visit-date')) $('#visit-date').value = s.day;
+          state.draftRating = s.rating;
+          paintRating(el.closest('.visit') && el.closest('.visit').querySelector('.rate-input'));
+        }
+        el.closest('.draft-line').remove();
+        break;
+      }
       case 'add-visit': editVisit(p, 'new'); break;
       case 'edit-visit': editVisit(p, el.dataset.visit); break;
-      case 'cancel-visit': editVisit(p, null); break;
+      case 'cancel-visit': dropDraft(draftKey('review', p.id, editIdOf(p))); editVisit(p, null); break;
       case 'save-visit': await busy(el, async () => {
         const sheet = state.sheet;
+        const draftId = editIdOf(p);
         const day = $('#visit-date').value;
         if (!day) { toast('방문 날짜를 골라 주세요.'); return; }
         const body = $('#my-review').value.trim();
@@ -3560,10 +3837,19 @@ document.addEventListener('click', async (e) => {
         // DB에서 장소를 잠근 뒤 같은 날짜 방문을 재사용하고 내 후기를 저장한다.
         // 다른 멤버와 동시에 저장하거나 후기 저장에 실패해도 방문만 남거나 날짜만 바뀌지 않음.
         const v = p.visits.find((x) => x.id === state.editVisit);
-        const { error } = await sb.rpc('save_visit_review', {
-          p_place: p.id, p_day: day, p_visit: v ? v.id : null, p_rating: rating, p_body: body,
+        const draft = readDraft(draftKey('review', p.id, draftId));
+        let base = draft && draft.base ? draft.base : serverReview(p, draftId);
+        if (reviewMovedOn({ base }, serverReview(p, draftId))) {
+          if (!confirm('다른 기기에서 내 후기가 바뀌었어요. 지금 입력한 내용으로 저장할까요?')) return;
+          base = serverReview(p, draftId);
+        }
+        const { data: savedId, error } = await sb.rpc('save_visit_review', {
+          p_place: p.id, p_day: day, p_visit: v ? v.id : null, p_rating: rating, p_body: body, p_base: base,
         });
-        if (error) throw error;
+        if (error) { await refresh().catch(() => {}); throw error; }
+        dropDraft(draftKey('review', p.id, draftId));
+        if (savedId) dropDraft(draftKey('review', p.id, savedId));
+        state.justVisited = null;
         if (state.sheet === sheet) { state.editVisit = null; state.draftRating = 0; }
         await refresh(); toast('방문 기록을 저장했어요.');
       }); break;
@@ -3571,9 +3857,10 @@ document.addEventListener('click', async (e) => {
         const v = p.visits.find((x) => x.id === state.editVisit);
         const mine = v && v.reviews.find((r) => r.author_id === uid());
         if (!mine || !confirm('이 방문의 내 후기를 삭제할까요?')) break;
-        const { error } = await sb.from('reviews').delete().eq('id', mine.id);
+        const { error } = await sb.rpc('trash_item', { p_kind: 'review', p_id: mine.id });
         if (error) throw error;
         state.editVisit = null; state.draftRating = 0;
+        dropDraft(draftKey('review', p.id, v.id));
         await refresh(); toast('후기를 삭제했어요.');
         break;
       }
@@ -3581,22 +3868,21 @@ document.addEventListener('click', async (e) => {
         const v = p.visits.find((x) => x.id === state.editVisit);
         if (!v || !confirm(`${fmtDay(v.visited_on)} 방문 기록을 삭제할까요?${v.reviews.length ? ' 내 후기도 함께 지워져요.' : ''}`)) break;
         // 다른 멤버 후기가 그새 달렸으면 DB가 막아서 지워진 행이 없음
-        const { data, error } = await sb.from('visits').delete().eq('id', v.id).select('id');
+        const { data, error } = await sb.rpc('trash_item', { p_kind: 'visit', p_id: v.id });
         if (error) throw error;
         state.editVisit = null; state.draftRating = 0;
         await refresh();
-        toast(data.length ? '방문 기록을 삭제했어요.' : '다른 멤버의 후기가 있는 방문은 지울 수 없어요.');
+        toast(data ? '방문 기록을 삭제했어요.' : '다른 멤버의 후기가 있는 방문은 지울 수 없어요.');
         break;
       }
       case 'delete-place': {
-        if (!confirm(`${josa(p.name, '을', '를')} 삭제할까요? 방문 기록과 멤버들의 후기도 함께 지워져요.`)) break;
-        // 사진 권한은 장소 존재 여부로 확인하므로 장소보다 먼저 지움 (사진 표 줄은 장소와 같이 지워짐)
-        if (p.photos.length) await sb.storage.from(BUCKET).remove(p.photos.flatMap((x) => [x.path, x.thumb_path]).filter(Boolean)); // 썸네일도 같이
+        if (!confirm(`${josa(p.name, '을', '를')} 삭제할까요? 사진·방문·후기도 화면에서 사라지고 서버에서 3일 뒤 영구 삭제돼요.`)) break;
         const sheet = state.sheet;
-        const { error } = await sb.from('places').delete().eq('couple_id', state.roomId).eq('id', p.id);
+        const { error } = await sb.rpc('trash_item', { p_kind: 'place', p_id: p.id });
         if (error) throw error;
         if (state.sheet === sheet) { state.sheet = null; renderSheet(); } // 그사이 다른 화면을 열었으면 그건 두고
-        await refresh(); toast('장소를 삭제했어요.');
+        dropDrafts(`${DRAFT}${uid()}:${state.roomId}:review:${p.id}:`); dropDraft(draftKey('note', p.id));
+        await refresh(); toast('장소를 삭제했어요. 서버에서 3일 뒤 영구 삭제돼요.');
         break;
       }
       case 'remove-photo': {
@@ -3635,6 +3921,9 @@ document.addEventListener('scroll', (e) => {
 }, true);
 
 document.addEventListener('input', (e) => {
+  if (e.target.id === 'shared-note') keepNoteDraft();
+  if (e.target.id === 'my-review') keepReviewDraft();
+  if (e.target.closest && e.target.closest('#place-form')) { checkDup(e.target.closest('#place-form')); keepAddForm(); }
   if (e.target.id === 'q') { ui().query = e.target.value; $('#list-area').innerHTML = listHtml(); markStampsSeen(); }
   // 공개 방 둘러보기 검색: 받은 목록을 이 폰에서만 거르고 목록만 다시 그림 (입력 중인 커서 그대로)
   if (e.target.id === 'explore-q' && state.explore) { state.explore.query = e.target.value; $('#explore-list').innerHTML = exploreListHtml(); }
@@ -3668,6 +3957,7 @@ document.addEventListener('paste', (e) => {
 });
 
 document.addEventListener('change', async (e) => {
+  if (e.target.id === 'visit-date') keepReviewDraft();
   const t = e.target;
   if (ro()) return; // 읽기 전용: 사진 올리기·카테고리 이름 바꾸기 없음
   // 방 만들기: 개인/공개 고르기, '이해했어요' 체크
@@ -3839,6 +4129,7 @@ document.addEventListener('submit', async (e) => {
         const r = files.length ? await addPhotos({ id: data.id, photos: [] }, files, (k, n) => { btn.textContent = `사진 올리는 중 ${k}/${n}`; }) : null;
         if (sameContext()) state.tab = f.status.value;
         await refresh({ keepSheet: !stillOpen() });
+        dropAddForm();
         if (stillOpen()) openSheet('detail', data.id);
         toast(r && (r.error || r.skipped) ? `장소를 추가했어요. ${photoResultText(r)}` : '장소를 추가했어요.', r && (r.error || r.skipped) ? 6000 : 2200);
       }
@@ -3884,8 +4175,10 @@ document.addEventListener('submit', async (e) => {
 
 // 다른 앱에 갔다 돌아오면 다른 멤버가 바꾼 내용을 다시 불러옴
 document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { keepNoteDraft(); keepReviewDraft(); keepAddForm(); flushDrafts(); }
   // 공개 방을 둘러보는 중이면 그 방 JSON만 다시 받음 (내 방 불러오기 대신)
   // 지도 앱에 다녀올 때마다 받지 않게, 마지막으로 받은 지 5분이 지났을 때만 (서버가 사진 한도를 세므로)
+  if (document.visibilityState === 'visible' && state.authRetry) bootSession().catch(() => {});
   if (document.visibilityState === 'visible' && state.user && state.visit) {
     if (state.visit.status === 'ok' && Date.now() - (state.visit.loadedAt || 0) > 5 * 60e3) loadVisit(true);
   }
@@ -3893,8 +4186,24 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && $('#place-form')) warmGoogle(); // 구글 지도에서 링크를 복사해 돌아온 참
 });
 
+window.addEventListener('pagehide', () => { keepNoteDraft(); keepReviewDraft(); keepAddForm(); flushDrafts(); });
+
+const isNetErr = (e) => !!e && (e.name === 'AuthRetryableFetchError' || e.status === 0 || /Failed to fetch|NetworkError|Load failed/i.test(e.message || ''));
+async function bootSession() {
+  let data, error;
+  try { ({ data, error } = await sb.auth.getSession()); }
+  catch { state.authRetry = true; state.loadError = true; render(); return; }
+  if (!data.session && isNetErr(error)) { state.authRetry = true; state.loadError = true; render(); return; }
+  state.authRetry = false;
+  state.user = data.session ? data.session.user : null;
+  if (state.user) { try { await loadAll(); state.loadError = false; } catch (err) { state.loadError = true; toast(friendly(err)); } }
+  render();
+}
+window.addEventListener('online', () => { if (state.authRetry) bootSession().catch(() => {}); else if (state.user && state.loadError) refresh().catch(() => {}); });
+
 /* ---------- 시작 ---------- */
 (async function start() {
+  sharedText = takeShare(); cleanDrafts();
   // 화면을 연 채로 새로고침했으면 그때 쌓였던 기록 위치에서 맨 처음 자리로 돌아감 (새로고침하면 화면은 닫혀 있으니까)
   if (history.state && history.state.ourPlaces) { skipPops++; history.go(-history.state.ourPlaces); }
   // 공개 방 보기 링크 /r/<key>: 키는 이 탭의 sessionStorage에 두고 주소는 '/'로 (로그인하고 첫 불러오기가 끝나면 엶, §4.12)
@@ -3908,6 +4217,8 @@ document.addEventListener('visibilitychange', () => {
   if (!configured) { render(); return; }
   sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
+      if (uid()) dropDrafts(`${DRAFT}${uid()}:`); dropAddForm();
+      state.authRetry = false;
       loadGen++; // 로그아웃 전에 시작한 불러오기는 버림
       Object.assign(state, {
         user: null, rooms: [], allMembers: [], roomsLoaded: false, roomId: null, couple: null, members: [], loadedRoom: null, loadError: false,
@@ -3925,12 +4236,7 @@ document.addEventListener('visibilitychange', () => {
       state.user = session.user;
     }
   });
-  const { data } = await sb.auth.getSession();
-  state.user = data.session ? data.session.user : null;
-  if (state.user) {
-    try { await loadAll(); } catch (err) { state.loadError = true; toast(friendly(err)); }
-  }
-  render();
+  await bootSession();
   if (state.user && pendingKey()) takePending(); // 로그인한 채로 /r/<key>를 열었으면 그 공개 방
   else if (state.user) publicNotice();
 })();

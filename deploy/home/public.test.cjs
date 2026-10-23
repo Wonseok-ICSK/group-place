@@ -90,6 +90,7 @@ function fakeSupabase({ over = {} } = {}) {
     },
     'POST /rest/v1/rpc/public_room_list': (c) => (isAdmin(c.headers) ? { status: 200, body: db.list } : deny),
     'POST /rest/v1/rpc/public_room_view': (c) => (isAdmin(c.headers) ? { status: 200, body: db.rooms.get(c.body.p_key) ?? null } : deny),
+    'POST /rest/v1/rpc/maintenance_photo_active': (c) => (isAdmin(c.headers) ? { status: 200, body: true } : deny),
     // 사진 바이트: Storage처럼 Last-Modified(업로드 시각)·ETag를 붙여 줌 → 서버가 버려야 함. 없는 파일은 Storage처럼 400
     'GET /storage/v1/object/authenticated/place-photos/:path': (c) => {
       if (!isAdmin(c.headers)) return deny;
@@ -325,6 +326,14 @@ test('S5 썸네일: 방 응답은 장소마다 대표 하나만, 이 서버의 1
 });
 
 // ---------- S5b 사진 넘기기 (/api/public/img) ----------
+test('V031 공개 사진: 메모리 캐시가 있어도 휴지통으로 이동한 사진은 재요청 시 404', async () => {
+  let active=true;
+  const {get}=setup({over:{'POST /rest/v1/rpc/maintenance_photo_active':()=>({status:200,body:active})}});
+  const room=await get(ROOM_URL), url=room.json.places[0].photos[0].thumb_url;
+  assert.equal((await get(url,{token:''})).status,200);
+  active=false;
+  assert.equal((await get(url,{token:''})).status,404);
+});
 test('S5b 사진: 서명 주소로 받으면 내용 종류·길이만 붙여 넘김(Last-Modified·ETag 없음), 로그인 토큰 없이, secret key로 저장소에서 받음', async () => {
   const { get, sb, api, t } = setup();
   const room = await get(ROOM_URL);

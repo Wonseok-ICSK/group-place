@@ -14,7 +14,7 @@
   <img alt="PWA" src="https://img.shields.io/badge/PWA-홈_화면_앱-1f6f5c">
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Auth·Postgres·Storage-3ecf8e">
   <img alt="Node" src="https://img.shields.io/badge/Node-20+-339933">
-  <img alt="Version" src="https://img.shields.io/badge/version-v0.2.3-1f6f5c">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.3.1-1f6f5c">
   <img alt="Status" src="https://img.shields.io/badge/status-MVP_시험_중-d9822b">
 </p>
 
@@ -26,6 +26,13 @@
 </p>
 
 > 화면은 예시 데이터로 찍었습니다. 사진은 예시용으로 생성한 이미지이고, 실제 사용자 정보는 들어 있지 않습니다.
+
+## v0.3.1
+
+삭제한 기록은 사용자 화면에서 바로 사라지고 서버 비공개 보관함에 3일 보관한 뒤 정리합니다.
+서버 PC에 DB·사진을 매일 08:30 / 18:30(한국 시간) 백업합니다. 원본 앱 v2.0.0의 지도 공유 받기,
+초안 복원, 중복·다른 탭 검색 안내, 방문 입력 개선도 반영했습니다.
+기존 프로젝트는 **`stability.sql` 다음 `maintenance.sql` 실행 후 배포**하세요([적용·백업·되돌리기](docs/release-v0.3.1.md)).
 
 ## v0.2.3 안정화
 

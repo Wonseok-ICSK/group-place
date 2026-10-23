@@ -42,6 +42,8 @@ globalThis.fetch = async (url, init = {}) => {
     case 'POST /rest/v1/rpc/groups_schema_version': return json(200, 1);
     case 'POST /rest/v1/rpc/public_rooms_version': return json(200, 1);
     case 'POST /rest/v1/rpc/stability_schema_version': return json(200, 1);
+    case 'POST /rest/v1/rpc/maintenance_version': return json(200, 1);
+    case 'POST /rest/v1/rpc/maintenance_photo_active': return json(200, true);
     case 'GET /auth/v1/user': return h.authorization === 'Bearer at.' + U1 + '.sig' ? json(200, { id: U1 }) : json(403, {});
     case 'POST /rest/v1/rpc/public_room_list':
       return json(200, [{ key: ${JSON.stringify(KEY)}, name: '서울 라멘 지도', description: '', member_count: 1, colors: ['teal'], place_count: 1,
