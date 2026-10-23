@@ -14,7 +14,7 @@
   <img alt="PWA" src="https://img.shields.io/badge/PWA-installable-1f6f5c">
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Auth·Postgres·Storage-3ecf8e">
   <img alt="Node" src="https://img.shields.io/badge/Node-20+-339933">
-  <img alt="Version" src="https://img.shields.io/badge/version-v0.2.1-1f6f5c">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.2.3-1f6f5c">
   <img alt="Status" src="https://img.shields.io/badge/status-MVP_testing-d9822b">
 </p>
 
@@ -26,6 +26,14 @@
 </p>
 
 > The UI is in Korean. Screenshots use sample data; the photos are generated examples and contain no real user information.
+
+## v0.2.3 stability update
+
+The app is in a small colleague test. This update guards saves across room switches, warns about duplicate places,
+retries failed thumbnails, enforces the ten-photo limit in the database, saves visits and reviews atomically,
+and checks configured features through `/readyz` before accepting a deployment.
+Run **`supabase/stability.sql` before deploying** ([upgrade and rollback](docs/release-v0.2.3.md), Korean).
+Favorites stay for now, with removal planned later. Password recovery is deferred until a future email system ([future ideas](docs/future-ideas.md), Korean).
 
 ## New in v0.2.0: public rooms
 
@@ -99,13 +107,16 @@ flowchart LR
 | Public rooms | `deploy/home/public.cjs` | `GET /api/public/rooms…` (signed-in users only; allowlist filter, cache, rate limits, daily photo budgets); photos are relayed by the server (`/api/public/img`) so storage headers never reveal upload times and `/r/<public key>`. Enabled only with `PUBLIC_ROOMS=on` |
 | Maps | `api/place.js` | Google Maps link → place name and address (signed-in users only) |
 | Database | `supabase/schema.sql` → `friends-keepalive.sql` → `friends-signup.sql` → `groups.sql` → `colors.sql` → `public.sql` | Tables, functions, grants, RLS, photo storage, multi-room rules, member colors, public rooms. Run in this order (roll back in reverse: `public_rollback.sql` → `colors_rollback.sql` → `groups_rollback.sql`) |
+| Stability SQL | `supabase/stability.sql`, `stability_rollback.sql` | Required after `public.sql`: database photo limit and atomic visit/review saves. roll it back before `public_rollback.sql` |
 | Deploy | `deploy/home/install.sh`, `deploy.ps1`, `*.service`, `*.timer` | One release per commit, automatic rollback on a failed health check, a daily keepalive for the free Supabase project |
 
 Design docs (Korean): [groups](docs/groups-design.md) · [public rooms](docs/public-rooms-design.md) · [public room ideation](docs/ideation-public-rooms.md) · [plan and decisions](docs/plan.md)
 
+Latest changes and deferred decisions (Korean): [V0.2.3 upgrade and rollback](docs/release-v0.2.3.md) · [future ideas and backup options](docs/future-ideas.md)
+
 ## Self-hosting
 
-1. **Supabase**: create a project and run the `supabase/` files above one by one in the SQL Editor (`schema.sql` → … → `public.sql`). Under Authentication, **turn off "Allow new users to sign up"** (accounts are created by the server through the admin API after it checks an invite code). Set the Site URL to your app's address.
+1. **Supabase**: create a project and run the `supabase/` files above one by one in the SQL Editor (`schema.sql` → … → `public.sql` → `stability.sql`). Under Authentication, **turn off "Allow new users to sign up"** (accounts are created by the server through the admin API after it checks an invite code). Set the Site URL to your app's address.
 2. **Server** (Ubuntu, Node 20+), from the repository root:
    ```powershell
    pwsh -File deploy/home/deploy.ps1 -Target <ssh target> -SupabaseUrl https://<project id>.supabase.co -SupabaseKey sb_publishable_... -PublicOrigin https://<app address> -LoginIdDomain id.<your domain>
@@ -132,14 +143,14 @@ Design docs (Korean): [groups](docs/groups-design.md) · [public rooms](docs/pub
 ## Development
 
 ```bash
-node --test deploy/home/*.test.cjs          # 112 server tests: signup, join, public room APIs and the photo relay (fake Supabase)
-cd dev/sqltest && npm install && npm test   # 54 SQL tests: PGlite runs schema.sql → … → public.sql and checks grants, limits, colors, public rooms
+node --test deploy/home/*.test.cjs          # signup, join, public APIs, photo relay and readiness (fake Supabase)
+cd dev/sqltest && npm install && npm test   # PGlite grants, limits, atomic saves and client delay/failure regression tests
 node dev/mock/serve.mjs                     # run the UI against a fake Supabase (dev/mock/shoot.py takes screenshots and checks the read-only view)
 bash scripts/leak-check.sh                  # pre-commit check for secrets and values of other deployments
 git config core.hooksPath .githooks         # run leak-check on every commit
 ```
 
-Build numbers look like `vVERSION-YYMMDD-xxxxx` with five random hex characters (e.g. `v0.2.1-261022-13392`, shown at the bottom of the account screen).
+Build numbers look like `vVERSION-YYMMDD-xxxxx` with five random hex characters (e.g. `v0.2.3-261023-8b7c2`, shown at the bottom of the account screen).
 
 ## Roadmap
 

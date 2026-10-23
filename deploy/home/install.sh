@@ -117,10 +117,10 @@ if [[ -f "$env_file" ]]; then
   p="$(sed -n 's/^PORT=//p' "$env_file")"
   [[ "$p" =~ ^[0-9]{4,5}$ ]] && port="$p"
 fi
-healthy() {  # 설정한 Supabase 주소가 들어간 화면을 실제로 내보내는지
+healthy() {  # 설정한 화면과 가입·공개 방의 SQL 준비 상태까지 확인
   local url body
   url="$(sed -n 's/^SUPABASE_URL=//p' "$env_file")"
-  curl -fsS -m 3 -o /dev/null "http://127.0.0.1:$port/healthz" 2>/dev/null || return 1
+  curl -fsS -m 3 -o /dev/null "http://127.0.0.1:$port/readyz" 2>/dev/null || return 1
   body="$(curl -fsS -m 3 "http://127.0.0.1:$port/" 2>/dev/null)" || return 1
   [[ -n "$url" && "$body" == *"const SUPABASE_URL = '$url';"* ]]
 }

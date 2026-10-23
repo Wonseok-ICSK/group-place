@@ -106,6 +106,7 @@ function fakeSupabase({ over = {} } = {}) {
     },
     'POST /rest/v1/rpc/groups_schema_version': (c) => (isAdmin(c.headers) ? { status: 200, body: 1 } : deny),
     'POST /rest/v1/rpc/public_rooms_version': (c) => (isAdmin(c.headers) ? { status: 200, body: 1 } : deny),
+    'POST /rest/v1/rpc/stability_schema_version': (c) => (isAdmin(c.headers) ? { status: 200, body: 1 } : deny),
     // public.sql §2.6: 공개 방이고 열려 있을 때만 방 이름
     'POST /rest/v1/rpc/space_code_info': (c) => {
       if (!isAdmin(c.headers)) return deny;
@@ -1088,6 +1089,7 @@ test('verifySecretKey: 맞는 키, 다른 프로젝트 키, 연결 실패, SQL �
   assert.deepEqual(good.paths(), [
     'GET /auth/v1/admin/users', 'POST /rest/v1/rpc/space_code_open', 'POST /rest/v1/rpc/join_couple_for', 'POST /rest/v1/rpc/groups_schema_version',
     'POST /rest/v1/rpc/public_rooms_version',
+    'POST /rest/v1/rpc/stability_schema_version',
   ]);
   assert.equal(good.db.members.size, 0); // 확인만 하고 아무도 넣지 않음
   const wrong = fakeSupabase();
@@ -1353,6 +1355,16 @@ test('S13 verifySecretKey: public.sql을 안 돌렸으면(public_rooms_version �
   assert.equal((await s.verifySecretKey({ supabaseUrl: SUPA, secretKey: SECRET, fetchImpl: denied.fetchImpl })).retry, false);
   const zero = fakeSupabase({ over: { 'POST /rest/v1/rpc/public_rooms_version': () => ({ status: 200, body: 0 }) } });
   assert.equal((await s.verifySecretKey({ supabaseUrl: SUPA, secretKey: SECRET, fetchImpl: zero.fetchImpl })).ok, false);
+});
+
+test('V023 verifySecretKey: stability.sql 미적용·권한 오류는 준비 실패, 일시 장애는 재시도', async () => {
+  for (const [status, expectedRetry] of [[404, false], [403, false], [503, true]]) {
+    const fake = fakeSupabase({ over: { 'POST /rest/v1/rpc/stability_schema_version': () => ({ status, body: {} }) } });
+    const result = await s.verifySecretKey({ supabaseUrl: SUPA, secretKey: SECRET, fetchImpl: fake.fetchImpl });
+    assert.equal(result.ok, false);
+    assert.equal(result.retry, expectedRetry);
+    if (status === 404) assert.match(result.reason, /stability\.sql/);
+  }
 });
 
 test('S13 문구: needAck·nickIsId가 index.html friendly() 문구와 글자까지 같음', (t) => {

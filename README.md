@@ -14,7 +14,7 @@
   <img alt="PWA" src="https://img.shields.io/badge/PWA-홈_화면_앱-1f6f5c">
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Auth·Postgres·Storage-3ecf8e">
   <img alt="Node" src="https://img.shields.io/badge/Node-20+-339933">
-  <img alt="Version" src="https://img.shields.io/badge/version-v0.2.1-1f6f5c">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.2.3-1f6f5c">
   <img alt="Status" src="https://img.shields.io/badge/status-MVP_시험_중-d9822b">
 </p>
 
@@ -26,6 +26,13 @@
 </p>
 
 > 화면은 예시 데이터로 찍었습니다. 사진은 예시용으로 생성한 이미지이고, 실제 사용자 정보는 들어 있지 않습니다.
+
+## v0.2.3 안정화
+
+소규모 동료 테스트 중입니다. 저장 도중 방 전환 보호, 일반 장소 추가 시 중복 확인, 썸네일 실패 후 재시도,
+사진 10장 DB 제한, 같은 날 방문·후기의 원자적 저장, 배포 준비 상태(`/readyz`) 확인을 보완했습니다.
+기존 프로젝트는 **`supabase/stability.sql`을 먼저 실행한 뒤 배포**하세요([적용·되돌리기](docs/release-v0.2.3.md)).
+찜은 현재 유지하며 향후 제거 방향입니다. 비밀번호 찾기는 추후 메일 시스템 도입 시 함께 검토합니다([향후 아이디어](docs/future-ideas.md)).
 
 ## v0.2.0 새로 생긴 것: 공개 방
 
@@ -99,13 +106,16 @@ flowchart LR
 | 공개 방 | `deploy/home/public.cjs` | `GET /api/public/rooms…`(로그인한 사람만, 허용 목록 필터·캐시·횟수 제한·사진 하루 한도), 사진은 서버가 받아 넘김(`/api/public/img`, 저장소 헤더의 업로드 시각을 버림), `/r/<공개 키>`. `PUBLIC_ROOMS=on`일 때만 켬 |
 | 지도 | `api/place.js` | 구글 지도 링크 → 장소 이름·주소 (로그인한 사람만) |
 | DB | `supabase/schema.sql` → `friends-keepalive.sql` → `friends-signup.sql` → `groups.sql` → `colors.sql` → `public.sql` | 표, 함수, 권한, RLS, 사진 저장소, 여러 방·5명 규칙, 멤버 색, 공개 방. 순서대로 실행(되돌리기는 거꾸로: `public_rollback.sql` → `colors_rollback.sql` → `groups_rollback.sql`) |
+| 안정화 DB | `supabase/stability.sql`, `stability_rollback.sql` | `public.sql` 이후 필수. 사진 10장 제한·방문/후기 저장 함수. `public_rollback.sql` 전에는 이것부터 되돌림 |
 | 배포 | `deploy/home/install.sh`, `deploy.ps1`, `*.service`, `*.timer` | 커밋 단위 릴리스, 실패하면 이전 릴리스로 되돌림, 하루 한 번 무료 프로젝트 깨우기 |
 
 설계 문서: [그룹 기능](docs/groups-design.md) · [공개 방](docs/public-rooms-design.md) · [공개 방 아이디어](docs/ideation-public-rooms.md) · [계획과 결정](docs/plan.md)
 
+최신 변경과 보류 결정: [V0.2.3 적용·되돌리기](docs/release-v0.2.3.md) · [향후 아이디어·백업 비교](docs/future-ideas.md)
+
 ## 직접 설치하기
 
-1. **Supabase**: 새 프로젝트를 만들고 SQL Editor에서 `supabase/` 파일을 위 순서대로 하나씩 실행합니다(`schema.sql` → … → `public.sql`). Authentication에서 **Allow new users to sign up은 끕니다**(가입은 서버가 초대 코드를 확인한 뒤 관리자 API로 만듭니다). Site URL에는 앱 주소를 넣습니다.
+1. **Supabase**: 새 프로젝트를 만들고 SQL Editor에서 `supabase/` 파일을 위 순서대로 하나씩 실행합니다(`schema.sql` → … → `public.sql` → `stability.sql`). Authentication에서 **Allow new users to sign up은 끕니다**(가입은 서버가 초대 코드를 확인한 뒤 관리자 API로 만듭니다). Site URL에는 앱 주소를 넣습니다.
 2. **서버**(Ubuntu, Node 20+): 저장소 맨 위 폴더에서
    ```powershell
    pwsh -File deploy/home/deploy.ps1 -Target <ssh 대상> -SupabaseUrl https://<프로젝트 ID>.supabase.co -SupabaseKey sb_publishable_... -PublicOrigin https://<앱 주소> -LoginIdDomain id.<도메인>
@@ -132,14 +142,14 @@ flowchart LR
 ## 개발
 
 ```bash
-node --test deploy/home/*.test.cjs          # 서버 시험 112개: 가입·참여·공개 방 API·사진 넘기기 (가짜 Supabase)
-cd dev/sqltest && npm install && npm test   # SQL 시험 54개: PGlite로 schema.sql → … → public.sql 실행, 권한·제한·색·공개 방 확인
+node --test deploy/home/*.test.cjs          # 가입·참여·공개 방 API·사진·배포 준비 상태 (가짜 Supabase)
+cd dev/sqltest && npm install && npm test   # PGlite SQL·권한·제한·원자적 저장, 화면 지연·실패 회귀 시험
 node dev/mock/serve.mjs                     # 가짜 Supabase로 화면 띄우기 (dev/mock/shoot.py로 화면 캡처와 읽기 전용 화면 자동 확인)
 bash scripts/leak-check.sh                  # 커밋 전 비밀 값·다른 배포 값 검사
 git config core.hooksPath .githooks         # 커밋할 때 leak-check 자동 실행
 ```
 
-빌드 번호는 `v버전-배포일(YYMMDD)-무작위 5자`로 씁니다(예: `v0.2.1-261022-13392`, 계정 설정 맨 아래에 보임).
+빌드 번호는 `v버전-배포일(YYMMDD)-무작위 5자`로 씁니다(예: `v0.2.3-261023-8b7c2`, 계정 설정 맨 아래에 보임).
 
 ## 다음에 만들 것
 

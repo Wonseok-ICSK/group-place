@@ -357,6 +357,7 @@
       if (row.champion_id && row.champion_id === row.runner_up_id) return check(table, 'cup_results_places_check');
     }
     if (table === 'place_photos' && others.some((x) => x.path === row.path)) return unique('place_photos_path_key');
+    if (table === 'place_photos' && !old && others.filter((x) => x.place_id === row.place_id).length >= 10) return raise('photo_limit');
     if (table === 'couple_members') {
       const n = String(row.display_name ?? '').trim();
       if ([...n].length < 1 || [...n].length > 20) return check(table, 'couple_members_display_name_check');
@@ -648,6 +649,25 @@
   }
   const RPC = {
     groups_schema_version: () => 1,
+    save_visit_review({ p_place, p_day, p_visit, p_rating, p_body }) {
+      const place = db.places.find((p) => p.id === p_place);
+      if (!uid()) throw raise('not_authenticated');
+      if (!place || !isMember(place.couple_id)) throw raise('not_member');
+      const body = String(p_body || '').trim();
+      if (!p_day || [...body].length > 3000) throw raise('invalid_review');
+      if (p_rating != null && (p_rating < 0.5 || p_rating > 5 || p_rating * 2 !== Math.trunc(p_rating * 2))) throw check('reviews', 'reviews_rating_check');
+      let visit = p_visit ? db.visits.find((v) => v.id === p_visit && v.place_id === p_place)
+        : db.visits.find((v) => v.place_id === p_place && v.visited_on === p_day);
+      if (p_visit && !visit) throw raise('visit_gone');
+      if (visit && db.visits.some((v) => v !== visit && v.place_id === p_place && v.visited_on === p_day)) throw unique('visits_place_day_key');
+      if (!visit) { visit = { ...DEFAULTS.visits(), place_id: p_place, visited_on: p_day, created_by: uid() }; db.visits.push(visit); }
+      visit.visited_on = p_day;
+      const mine = db.reviews.find((r) => r.visit_id === visit.id && r.author_id === uid());
+      if (p_rating == null && !body) db.reviews = db.reviews.filter((r) => r !== mine);
+      else if (mine) Object.assign(mine, { rating: p_rating, body, updated_at: nowIso() });
+      else db.reviews.push({ ...DEFAULTS.reviews(), place_id: p_place, visit_id: visit.id, author_id: uid(), rating: p_rating, body });
+      return visit.id;
+    },
     create_couple({ p_display_name, p_couple_name }) {
       if (!uid()) throw raise('not_authenticated');
       if (roomCount(uid()) >= MAX_ROOMS) throw raise('too_many_rooms');

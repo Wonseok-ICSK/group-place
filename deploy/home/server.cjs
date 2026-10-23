@@ -149,9 +149,9 @@ function sendText(res, status, text, extra = {}) {
   res.end(text);
 }
 
-function sendJson(res, status, body, extra = {}) {
+function sendJson(res, status, body, extra = {}, head = false) {
   res.writeHead(status, { ...SECURITY, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...extra });
-  res.end(JSON.stringify(body));
+  res.end(head ? undefined : JSON.stringify(body));
 }
 
 const server = http.createServer((req, res) => {
@@ -178,6 +178,14 @@ const server = http.createServer((req, res) => {
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') return sendText(res, 405, 'GET만 받아요', { allow: 'GET, HEAD' });
   if (pathname === '/healthz') return sendText(res, 200, 'ok');
+  if (pathname === '/readyz') {
+    // 의도적으로 가입·공개 방을 끈 배포는 준비 완료. 설정된 기능은 실제 SQL 확인이 끝나야 완료.
+    const ready = (!SECRET_KEY || signupReady) && (!PUBLIC.rooms || publicReady);
+    return sendJson(res, ready ? 200 : 503, {
+      ok: ready, signup: { enabled: !!SECRET_KEY, ready: signupReady },
+      publicRooms: { enabled: PUBLIC.rooms, ready: publicReady },
+    }, ready ? {} : { 'retry-after': '5' }, req.method === 'HEAD');
+  }
   // 공개 방 보기 링크: 형식이 맞으면 지금 화면(스위치와 상관없이, 꺼져 있으면 화면이 안내). 다른 /r/…는 404
   if (pagesLib.isRoomLink(pathname)) {
     res.writeHead(200, { ...SECURITY, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache', 'content-length': currentPage.length });

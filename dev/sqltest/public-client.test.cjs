@@ -48,8 +48,8 @@ test('C1. PUBLIC_ROOMS_ENABLED 한 줄, PUBLIC_ACK_VERSION = public_ack_version(
   assert.ok(PUBLIC_SQL.includes("check (public_key ~ '^[a-km-np-z2-9]{10}$')"));
 });
 
-test('C2. APP_VERSION은 v0.2.1-261022-<소문자 16진수 5자>', () => {
-  assert.match(constValue('APP_VERSION'), /^'v0\.2\.1-261022-[0-9a-f]{5}'$/);
+test('C2. APP_VERSION은 v0.2.3-261023-<소문자 16진수 5자>', () => {
+  assert.match(constValue('APP_VERSION'), /^'v0\.2\.3-261023-[0-9a-f]{5}'$/);
 });
 
 test('C3. 읽기 전용 구간·VISIT_ACTIONS에 초대 코드·코드 복사·코드 다시 만들기·찜 단추가 없음, VISIT_ACTIONS는 설계 §4.2 목록', () => {

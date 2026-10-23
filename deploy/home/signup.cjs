@@ -263,6 +263,12 @@ async function verifySecretKey({ supabaseUrl, secretKey, fetchImpl = fetch }) {
   if (r.status === 404) return { ok: false, retry: false, reason: '친구용 프로젝트에 supabase/public.sql을 먼저 실행해 주세요' };
   if (r.status === 401 || r.status === 403) return { ok: false, retry: false, reason: 'secret key로 공개 방 버전을 확인할 수 없어요 (권한)' };
   if (!(r.ok && typeof r.json === 'number' && r.json >= 1)) return { ok: false, retry: true, reason: `공개 방 버전 응답 ${r.status}` };
+  try {
+    r = await call(fetchImpl, `${supabaseUrl}/rest/v1/rpc/stability_schema_version`, { method: 'POST', headers, body: {} });
+  } catch { return down; }
+  if (r.status === 404) return { ok: false, retry: false, reason: '현재 버전용 supabase/stability.sql을 먼저 실행해 주세요' };
+  if (r.status === 401 || r.status === 403) return { ok: false, retry: false, reason: 'secret key로 안정화 버전을 확인할 수 없어요 (권한)' };
+  if (!(r.ok && typeof r.json === 'number' && r.json >= 1)) return { ok: false, retry: true, reason: `안정화 버전 응답 ${r.status}` };
   return { ok: true };
 }
 

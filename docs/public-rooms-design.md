@@ -1,7 +1,10 @@
 # 공개 방 설계와 API 계약 (v0.2.0)
 
+현재 앱은 **V0.2.3**이다. 공개 방의 기본 계약은 이 문서를 유지하고, 사진 중계는 V0.2.1 보완을 따른다.
+최신 빌드·사진 10장 DB 제한·원자적 방문/후기 저장·`/readyz`와 추가 SQL은 [V0.2.3 릴리스](release-v0.2.3.md)가 우선한다.
+
 작성 2026-10-22. 대상: `docs/plan.md` 결정 12–14(공개 방)와 `docs/ideation-public-rooms.md`의 추천 범위, 그리고 그 문서 맨 위 **최종 결정**.
-최종 결정이 아이디어 문서 본문과 다르면 최종 결정을 따른다. 버전은 `APP_VERSION = 'v0.2.0-261022-<무작위 소문자 16진수 5자>'`(배포 때 다시 만듦).
+최종 결정이 아이디어 문서 본문과 다르면 최종 결정을 따른다. 현재 버전은 `APP_VERSION = 'v0.2.3-261023-<무작위 소문자 16진수 5자>'`(배포 때 다시 만듦).
 
 이 문서는 병렬로 일하는 빌더(SQL·서버·화면·가짜 Supabase·시험·문서)가 같이 지키는 **계약**이다. 마지막의 [API 계약](#9-api-계약-요약)이 기준이고,
 본문은 이유와 세부 동작을 적는다. 계약을 바꿔야 하면 이 문서부터 고친다.
@@ -226,7 +229,7 @@ using (bucket_id = 'place-photos'
 
 **`public_room_list()`** — 배열, 원소 키는 정확히 이 9개:
 ```json
-[{ "key": "k7m2p9xa4c", "name": "서울 라멘 지도", "description": "둘이 먹어 본 서울 라멘집",
+[{ "key": "k7m2p9xa4c", "name": "서울 라멘 지도", "description": "함께 가 본 서울 라멘집",
    "member_count": 2, "colors": ["teal", "#8b5e3c"],
    "place_count": 32, "visited_count": 18, "review_count": 41, "active": "week" }]
 ```
@@ -579,7 +582,7 @@ popstate: `'visit'` → `closeVisit()`, `'explore'` → `closeExplore()`. 둘러
 
 `roomFormHtml('create', …)`에 `PUBLIC_ROOMS_ENABLED`일 때만 공개 범위 카드를 더한다(방 이름 칸 아래, 닉네임 칸 위):
 - 라디오 두 장(전체 너비, 선택 영역 44px 이상, `name="visibility"`): (●) **개인 방** "멤버만 볼 수 있어요"(기본) / ( ) **공개 방** "앱을 쓰는 누구나 둘러볼 수 있어요". 아래 `.hint` "만든 뒤에는 바꿀 수 없어요."
-- 공개를 고르면(그 폼만 다시 그리지 않고 칸을 펼침): 방 이름 placeholder "예: 서울 라멘 지도", 소개 칸(`name="description"`, maxlength 60, placeholder "예: 둘이 먹어 본 서울 라멘집 모음", 선택),
+- 공개를 고르면(그 폼만 다시 그리지 않고 칸을 펼침): 방 이름 placeholder "예: 서울 라멘 지도", 소개 칸(`name="description"`, maxlength 60, placeholder "예: 함께 가 본 서울 라멘집 모음", 선택),
   안내 상자 "공개 방에서는 장소·메모·사진·후기·별점·닉네임을 앱을 쓰는 누구나 볼 수 있어요. 방문 날짜는 월까지만 보여요. 아이디·초대 코드·찜은 보이지 않아요. 화면 캡처는 막을 수 없어요.",
   "공개 방 닉네임에는 실명 대신 별명을 추천해요.", [공개 방 안내 보기](`data-action="public-guide"`), 체크 `name="ack"` "이해했어요". 버튼 글자 "공개 방 만들기", 체크 전에는 `disabled`.
 - 폼을 처음 그릴 때 `sb.rpc('public_create_status')`를 한 번 부른다. `allowed: false`면 공개 카드를 `aria-disabled`·회색으로 두고 이유 한 줄:
@@ -695,7 +698,7 @@ if (/invalid_visibility/.test(m)) return '공개 범위를 다시 골라 주세�
 
 ### 4.16 버전
 
-`const APP_VERSION = 'v0.2.0-261022-<5자>';`(소문자 16진수 5자, 배포 때 다시 만듦). README 배지 `version-v0.2.0`.
+`const APP_VERSION = 'v0.2.3-261023-<5자>';`(소문자 16진수 5자, 배포 때 다시 만듦). README 배지 `version-v0.2.3`.
 
 ---
 
@@ -773,7 +776,7 @@ if (/invalid_visibility/.test(m)) return '공개 범위를 다시 골라 주세�
 | # | 확인할 것 |
 |---|---|
 | C1 | `const PUBLIC_ROOMS_ENABLED = false;`가 정확히 한 줄, `PUBLIC_ACK_VERSION`이 `public.sql`의 `public_ack_version()` 값과 같음, `PUBLIC_KEY_RE`가 SQL의 키 check와 같은 글자 모음 |
-| C2 | `APP_VERSION`이 `^v0\.2\.0-261022-[0-9a-f]{5}$` |
+| C2 | `APP_VERSION`이 `^v0\.2\.3-261023-[0-9a-f]{5}$` |
 | C3 | 읽기 전용 화면 함수(`viewExplore`, `visitBand` 등 `/* readOnly */` 표시 구간)와 `VISIT_ACTIONS`에 `invite_code`·`copy-code`·`regen-code`·`toggle-fav`가 없음. `VISIT_ACTIONS`가 §4.2 목록과 같음 |
 | C4 | `/api/public/` 응답을 화면에 넣는 곳이 모두 `esc(`·`safeUrl(`를 거침(정규식으로 `${` 뒤 `.name|.description|.shared_note|.body|.address|.map_url|.thumb_url` 직접 삽입이 없음) |
 | C5 | `addPhotos`에 `Date.now()` 경로가 없고 `/t/` 썸네일 경로가 있음, `delete-place`·`deletePhoto`가 `thumb_path`도 지움 |
@@ -875,7 +878,7 @@ C3은 `readOnly` 구간에 `state.couple`도 없는지 보고, C4는 HTML 태그
 `EXPLORE_HINT_KEY = 'group-place:explore-hint'`, `NOTICE_KEY = 'group-place:notice-v020'`, `VISIT_ACTIONS`(§4.2), 상태 `state.explore`·`state.visit`,
 화면 `viewExplore`, 시트 `copy`(`back: 'detail'`)·`public-ack`·`public-guide`, 뒤로 가기 층 `'explore'`·`'visit'`, 클래스 `.badge.pub`·`.visit-band`·`.photo-ph`·`.note-text`,
 `data-action`: `explore` `explore-back` `explore-open` `explore-retry` `visit-close` `visit-retry` `visit-self` `share-link` `copy-open` `copy-room` `copy-status` `copy-save` `copy-create`
-`ack-accept` `public-guide` `regen-code`, 폼 `room-desc-form`, 폼 칸 `visibility` `description` `ack`, 경로 `/r/<key>`, `APP_VERSION = 'v0.2.0-261022-<5자>'`.
+`ack-accept` `public-guide` `regen-code`, 폼 `room-desc-form`, 폼 칸 `visibility` `description` `ack`, 경로 `/r/<key>`, `APP_VERSION = 'v0.2.3-261023-<5자>'`.
 
 ---
 

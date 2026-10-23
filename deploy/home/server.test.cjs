@@ -34,12 +34,14 @@ globalThis.fetch = async (url, init = {}) => {
   const admin = h.apikey === SECRET;
   const route = (init.method || 'GET') + ' ' + u.pathname;
   if (process.env.FAKE_NO_PUBLIC_SQL && route === 'POST /rest/v1/rpc/public_rooms_version') return json(404, { code: 'PGRST202' });
+  if (process.env.FAKE_NO_STABILITY_SQL && route === 'POST /rest/v1/rpc/stability_schema_version') return json(404, { code: 'PGRST202' });
   switch (route) {
     case 'GET /auth/v1/admin/users': return admin ? json(200, { users: [] }) : json(401, {});
     case 'POST /rest/v1/rpc/space_code_open': return json(200, false);
     case 'POST /rest/v1/rpc/join_couple_for': return json(400, { message: 'not_authenticated' });
     case 'POST /rest/v1/rpc/groups_schema_version': return json(200, 1);
     case 'POST /rest/v1/rpc/public_rooms_version': return json(200, 1);
+    case 'POST /rest/v1/rpc/stability_schema_version': return json(200, 1);
     case 'GET /auth/v1/user': return h.authorization === 'Bearer at.' + U1 + '.sig' ? json(200, { id: U1 }) : json(403, {});
     case 'POST /rest/v1/rpc/public_room_list':
       return json(200, [{ key: ${JSON.stringify(KEY)}, name: '서울 라멘 지도', description: '', member_count: 1, colors: ['teal'], place_count: 1,
@@ -224,4 +226,29 @@ test('server: PUBLIC_ROOMS 기본(off)·public.sql 없음이면 화면 상수 fa
     assert.equal(api.headers['retry-after'], '60');
     assert.equal((await req(s.port, '/api/join', { method: 'POST' })).status, 503);
   } finally { s.child.kill(); await s.exited; cleanup(dir); }
+});
+
+test('server: readyz는 의도적인 기능 끄기와 설정한 기능의 SQL 미적용을 구분', async () => {
+  const dir = makeRelease();
+  for (const [env, expected] of [
+    [{}, 200],
+    [{ PUBLIC_ROOMS: 'on' }, 503],
+    [{ SUPABASE_SECRET_KEY: SECRET, PUBLIC_ROOMS: 'on' }, 200],
+    [{ SUPABASE_SECRET_KEY: SECRET, PUBLIC_ROOMS: 'on', FAKE_NO_STABILITY_SQL: '1' }, 503],
+  ]) {
+    const s = await start(dir, env, /초대 코드로 가입: (켬|꺼 둠)/);
+    try {
+      assert.equal((await req(s.port, '/healthz')).status, 200);
+      const r = await req(s.port, '/readyz');
+      assert.equal(r.status, expected);
+      assert.equal(JSON.parse(r.body).ok, expected === 200);
+      assert.equal(r.headers['cache-control'], 'no-store');
+      assert.ok(!r.body.includes(SECRET) && !r.body.includes(SUPA));
+      const head = await req(s.port, '/readyz', { method: 'HEAD' });
+      assert.equal(head.status, expected);
+      assert.equal(head.body, '');
+      if (env.FAKE_NO_STABILITY_SQL) assert.match(s.log(), /stability\.sql/);
+    } finally { s.child.kill(); await s.exited; }
+  }
+  cleanup(dir);
 });
