@@ -223,6 +223,23 @@ textarea.input{resize:vertical;min-height:84px;line-height:1.6}
 
 .empty-state{padding:48px 8px;text-align:center;color:var(--muted)}
 .empty-state strong{display:block;color:var(--ink);font-size:17px;margin-bottom:6px}
+/* 목록을 옆으로 밀어 탭 넘기기 (v0.4.1, 원래 앱에서 가져옴): 세로 스크롤·두 손가락 확대는 브라우저가, 가로 움직임은 앱이 받음.
+   빈 탭도 밀 수 있게 높이를 둠. 미는 동안 목록이 화면 밖으로 나가도 페이지가 옆으로 넓어지지 않게 main에서 자름 */
+#list-area{touch-action:pan-y pinch-zoom;min-height:55vh}
+/* 확대해서 볼 때는 손가락 하나로 옆으로 옮기는 것도 브라우저에 맡김. pan-y가 확대 화면의 가로 이동까지 막아서 */
+.zoomed #list-area{touch-action:auto}
+.list-main{overflow-x:clip}
+#list-area.settle{transition:transform .18s ease,opacity .18s ease}
+#list-area.enter-next{animation:list-in-next .22s ease}
+#list-area.enter-prev{animation:list-in-prev .22s ease}
+@keyframes list-in-next{from{transform:translateX(48px);opacity:0}}
+@keyframes list-in-prev{from{transform:translateX(-48px);opacity:0}}
+/* 밀 때 옆에 나오는 다음 탭 이름. 넘어갈 만큼 밀면 진해짐 */
+.swipe-hint{position:fixed;top:50%;z-index:6;transform:translateY(-50%);padding:8px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line);
+  color:var(--muted);font-size:14px;font-weight:700;opacity:0;pointer-events:none;transition:background .12s,color .12s;white-space:nowrap}
+.swipe-hint.left{left:12px}.swipe-hint.right{right:12px}
+.swipe-hint.ready{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+@media (prefers-reduced-motion:reduce){#list-area.settle{transition:none}#list-area.enter-next,#list-area.enter-prev{animation:none}}
 
 .fab{
   position:fixed;z-index:6;right:max(var(--gutter), calc(50% - 280px + var(--gutter)));
@@ -686,7 +703,7 @@ const PUBLIC_ROOMS_ENABLED = false; // 공개 방 둘러보기 (GET /api/public/
 
 const BUCKET = 'place-photos';
 // 계정 설정 맨 아래에 보이는 빌드 번호 'v버전-배포일(YYMMDD)-무작위 5자(16진수)'. 배포할 때마다 새로 만듦
-const APP_VERSION = 'v0.4.0-261026-2e43c';
+const APP_VERSION = 'v0.4.1-261026-197a6';
 
 /* 공개 방 (docs/public-rooms-design.md §4) */
 const PUBLIC_ACK_VERSION = 1;            // 동의 문구 버전. DB public_ack_version()과 같아야 함 (시험이 비교)
@@ -1714,7 +1731,7 @@ function viewMain() {
       ${head}
       <div class="tabs" role="tablist">${tabBtn('want_to_go', '가고 싶은 곳', want)}${tabBtn('visited', '다녀온 곳', visited)}${r ? '' : tabBtn('fav', '찜', fav)}</div>
     </div></div>
-    <main class="wrap">
+    <main class="wrap list-main">
       ${r ? visitNotesHtml() : inviteBand()}
       <div class="tools">
         <div class="search"><label class="sr" for="q">검색</label>${ICON.search}<input class="input" id="q" type="search" placeholder="이름, 주소, 메모, 후기 검색" value="${esc(u.query)}"><button type="button" class="search-clear" data-action="clear-search" aria-label="검색어 지우기">${ICON.close}</button></div>
@@ -1723,6 +1740,7 @@ function viewMain() {
       </div>
       <div id="list-area">${listHtml()}</div>
     </main>
+    <div class="swipe-hint" id="swipe-hint" aria-hidden="true"></div>
     ${r ? '' : `<button class="btn fab" data-action="add">${ICON.plus}장소 추가</button>`}`;
 }
 
@@ -3867,6 +3885,7 @@ function goBackSheet() {
 /* ---------- 렌더링 ---------- */
 let screen = 'loading';
 function render() {
+  swipe = null; // 새로 그리면 밀던 목록이 문서에서 빠져 touchend가 안 옴 (새 목록·힌트는 제자리 모습으로 그려짐)
   const app = $('#app');
   if (!configured) { screen = 'config'; app.innerHTML = viewConfig(); return; }
   if (state.authRetry) { screen = 'loading'; app.innerHTML = viewLoading(); return; }
@@ -4411,6 +4430,101 @@ document.addEventListener('scroll', (e) => {
     if (c) c.textContent = `${Math.round(t.scrollLeft / Math.max(1, t.clientWidth)) + 1} / ${t.children.length}`;
   }
 }, true);
+
+/* ---------- 목록을 옆으로 밀어 탭 넘기기 (v0.4.1, 원래 앱 v2.1.0에서 가져옴) ----------
+   내 방은 가고 싶은 곳 ↔ 다녀온 곳 ↔ 찜, 공개 방 둘러보기(읽기 전용)는 찜 탭이 없어서 가고 싶은 곳 ↔ 다녀온 곳만.
+   너무 쉽게 넘어가지 않게:
+   - 화면 양쪽 가장자리(안드로이드 뒤로 가기 제스처 자리)에서 시작한 건 무시
+   - 처음 12px 움직임이 확실히 가로(세로의 1.6배 넘게)일 때만 받음. 세로로 시작했으면 그 손가락은 끝까지 스크롤로 둠
+   - 손을 뗄 때 목록 폭의 30% 넘게 밀었어야 넘어감 (덜 밀면 제자리로). 양 끝 탭에서 바깥쪽으로는 살짝만 움직이고 안 넘어감
+   - 시트(상세·룰렛·월드컵…)가 열려 있을 때, 두 손가락일 때, 확대해서 보는 중일 때, 입력 칸·가로로 스크롤되는 상자 위에서는 안 함
+   넘길 때는 그 탭 단추를 누른 것과 같은 길(click 위임의 'tab')로 가서 검색어·카테고리·개수·스크롤이 탭을 누를 때와 같음.
+   읽기 전용에서도 허용 목록(VISIT_ACTIONS)에 원래 있는 'tab'만 거치니 아무것도 쓰지 않음 */
+const SWIPE = { edge: 28, lock: 12, ratio: 1.6, commit: 0.3 };
+let swipe = null, swipeAt = 0;
+// 지금 보이는 탭 줄 순서 그대로 (읽기 전용이면 viewMain이 찜 탭을 그리지 않아서 둘)
+const swipeTabs = () => [...document.querySelectorAll('.top .tabs [data-action=tab][data-tab]')].map((b) => b.dataset.tab);
+// 손가락 아래가 입력 칸이거나, 목록 안에서 가로로 스크롤되는 상자면 그쪽 움직임에 맡김
+function swipeBlocked(el, area) {
+  if (el.closest('input, textarea, select, [contenteditable]')) return true;
+  for (let n = el; n && n !== area; n = n.parentElement) {
+    if (n.scrollWidth > n.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return true;
+  }
+  return false;
+}
+function swipeEnd(go) {
+  const s = swipe;
+  swipe = null;
+  const hint = $('#swipe-hint');
+  if (hint) hint.style.opacity = '0';
+  if (!s || s.mode !== 'x') return;
+  swipeAt = Date.now(); // 민 손가락이 카드를 누른 걸로 치지 않게 (바로 뒤 click 무시)
+  const next = s.next && go && Math.abs(s.dx) >= s.w * SWIPE.commit ? s.next : null;
+  const btn = next && $(`.top .tabs [data-action=tab][data-tab="${next}"]`);
+  if (btn) btn.click(); // 탭 단추를 누른 것과 똑같이: ui().tab을 바꾸고 render (그 사이 await가 없어 여기서 다 그려짐)
+  const area = $('#list-area');
+  if (btn && area && area !== s.area) {
+    area.classList.add(s.dx < 0 ? 'enter-next' : 'enter-prev');
+    area.addEventListener('animationend', () => area.classList.remove('enter-next', 'enter-prev'), { once: true });
+    return;
+  }
+  // 덜 밀었거나 끝 탭: 제자리로
+  s.area.classList.add('settle');
+  s.area.style.transform = ''; s.area.style.opacity = '';
+  setTimeout(() => s.area.classList.remove('settle'), 200);
+}
+// touch-action은 손가락이 닿을 때 정해져서, 확대가 끝난 뒤 다음 동작부터 적용됨
+if (window.visualViewport) {
+  const markZoom = () => document.documentElement.classList.toggle('zoomed', visualViewport.scale > 1.01);
+  visualViewport.addEventListener('resize', markZoom);
+  markZoom();
+}
+document.addEventListener('touchstart', (e) => {
+  if (swipe) {
+    if (e.touches.length > 1) swipeEnd(false); // 밀던 중에 두 번째 손가락이 닿음: 목록은 제자리로
+    else { // 끝을 못 받은 지난 밀기(그 사이 목록이 새로 그려져 손가락 아래 카드가 문서에서 빠짐): 지금 탭이 안 묻히게 swipeAt은 그대로
+      const s = swipe; swipe = null;
+      const hint = $('#swipe-hint'); if (hint) hint.style.opacity = '0';
+      if (s.area.isConnected) { s.area.style.transform = ''; s.area.style.opacity = ''; }
+    }
+  }
+  const area = e.target.closest && e.target.closest('#list-area');
+  if (!area || e.touches.length !== 1 || state.sheet || (screen !== 'main' && screen !== 'visit')) return;
+  if (window.visualViewport && visualViewport.scale > 1.01) return; // 두 손가락으로 확대해서 옆으로 움직여 보는 중
+  const t = e.touches[0];
+  if (t.clientX < SWIPE.edge || t.clientX > innerWidth - SWIPE.edge) return;
+  if (swipeBlocked(e.target, area)) return;
+  area.classList.remove('settle');
+  swipe = { area, x: t.clientX, y: t.clientY, dx: 0, mode: null, w: area.clientWidth, tabs: swipeTabs(), next: null };
+}, { passive: true });
+document.addEventListener('touchmove', (e) => {
+  if (!swipe) return;
+  // 두 손가락이 됐거나 그 사이 시트가 열렸으면 그만. 화면·목록이 새로 그려지면 이 손가락의 touchmove는 문서에서 빠진 카드로만 가서
+  // 여기까지 안 옴 (render()와 다음 touchstart가 정리). isConnected는 혹시 올 때를 위한 것
+  if (e.touches.length !== 1 || state.sheet || !swipe.area.isConnected) { swipeEnd(false); return; }
+  const t = e.touches[0], dx = t.clientX - swipe.x, dy = t.clientY - swipe.y;
+  if (!swipe.mode) {
+    if (Math.abs(dx) < SWIPE.lock && Math.abs(dy) < SWIPE.lock) return;
+    swipe.mode = Math.abs(dx) > Math.abs(dy) * SWIPE.ratio ? 'x' : 'y';
+  }
+  if (swipe.mode !== 'x') return;
+  const i = swipe.tabs.indexOf(ui().tab);
+  swipe.next = (i >= 0 && swipe.tabs[i + (dx < 0 ? 1 : -1)]) || null;
+  swipe.dx = dx;
+  const p = Math.min(Math.abs(dx) / (swipe.w * SWIPE.commit), 1);
+  swipe.area.style.transform = `translateX(${swipe.next ? dx : dx * 0.2}px)`;
+  swipe.area.style.opacity = swipe.next ? String(1 - p * 0.35) : '';
+  const hint = $('#swipe-hint');
+  if (hint) {
+    hint.className = `swipe-hint ${dx < 0 ? 'right' : 'left'}${swipe.next && p >= 1 ? ' ready' : ''}`;
+    hint.textContent = swipe.next ? (dx < 0 ? `${TAB_NAMES[swipe.next]} →` : `← ${TAB_NAMES[swipe.next]}`) : '';
+    hint.style.opacity = swipe.next ? String(0.35 + p * 0.65) : '0';
+  }
+}, { passive: true });
+document.addEventListener('touchend', () => swipeEnd(true), { passive: true });
+document.addEventListener('touchcancel', () => swipeEnd(false), { passive: true });
+// 민 직후의 click은 목록 안이면 버림 (카드가 열리지 않게). 탭 단추는 목록 밖이라 위 btn.click()은 그대로 감
+document.addEventListener('click', (e) => { if (Date.now() - swipeAt < 250 && e.target.closest && e.target.closest('#list-area')) { e.preventDefault(); e.stopPropagation(); } }, true);
 
 document.addEventListener('input', (e) => {
   if (e.target.id === 'shared-note') keepNoteDraft();

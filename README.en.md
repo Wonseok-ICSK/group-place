@@ -14,7 +14,7 @@
   <img alt="PWA" src="https://img.shields.io/badge/PWA-installable-1f6f5c">
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Auth·Postgres·Storage-3ecf8e">
   <img alt="Node" src="https://img.shields.io/badge/Node-20+-339933">
-  <img alt="Version" src="https://img.shields.io/badge/version-v0.4.0-1f6f5c">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.4.1-1f6f5c">
   <img alt="Status" src="https://img.shields.io/badge/status-MVP_testing-d9822b">
 </p>
 
@@ -26,6 +26,14 @@
 </p>
 
 > The UI is in Korean. Screenshots use sample data; the photos are generated examples and contain no real user information.
+
+## v0.4.1: swipe between tabs
+
+On a phone, swipe the place list sideways to move between the want-to-go, visited and favorites tabs (ported from the original app).
+The list has to travel more than 30% of its width before the tab changes; while you drag, the next tab's name shows at the side
+and turns solid once letting go will switch. Vertical scrolling, the category chip row and photo swiping work as before, and
+nothing switches while a sheet such as place details is open. Read-only public room views switch between want-to-go and visited only.
+No database (SQL) changes.
 
 ## New in v0.4.0: roulette
 
@@ -166,7 +174,7 @@ bash scripts/leak-check.sh                  # pre-commit check for secrets and v
 git config core.hooksPath .githooks         # run leak-check on every commit
 ```
 
-Build numbers look like `vVERSION-YYMMDD-xxxxx` with five random hex characters (e.g. `v0.4.0-261026-2e43c`, shown at the bottom of the account screen).
+Build numbers look like `vVERSION-YYMMDD-xxxxx` with five random hex characters (e.g. `v0.4.1-261026-197a6`, shown at the bottom of the account screen).
 
 ## Roadmap
 

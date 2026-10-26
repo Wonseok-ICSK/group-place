@@ -14,7 +14,7 @@
   <img alt="PWA" src="https://img.shields.io/badge/PWA-홈_화면_앱-1f6f5c">
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Auth·Postgres·Storage-3ecf8e">
   <img alt="Node" src="https://img.shields.io/badge/Node-20+-339933">
-  <img alt="Version" src="https://img.shields.io/badge/version-v0.4.0-1f6f5c">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.4.1-1f6f5c">
   <img alt="Status" src="https://img.shields.io/badge/status-MVP_시험_중-d9822b">
 </p>
 
@@ -26,6 +26,13 @@
 </p>
 
 > 화면은 예시 데이터로 찍었습니다. 사진은 예시용으로 생성한 이미지이고, 실제 사용자 정보는 들어 있지 않습니다.
+
+## v0.4.1: 목록을 옆으로 밀어 탭 넘기기
+
+휴대폰에서 장소 목록을 옆으로 밀면 가고 싶은 곳 ↔ 다녀온 곳 ↔ 찜 탭으로 넘어갑니다(원래 앱에서 가져온 기능).
+목록 폭의 30% 넘게 밀어야 넘어가고, 미는 동안 옆에 다음 탭 이름이 보였다가 넘어갈 만큼 밀면 진해집니다.
+세로 스크롤, 카테고리 칩 줄, 사진 넘기기는 그대로이고, 장소 상세 같은 창이 열려 있을 때는 넘어가지 않습니다.
+공개 방 둘러보기에서는 가고 싶은 곳 ↔ 다녀온 곳만 넘어갑니다. DB 변경(SQL)은 없습니다.
 
 ## v0.4.0 새로 생긴 것: 룰렛
 
@@ -164,7 +171,7 @@ bash scripts/leak-check.sh                  # 커밋 전 비밀 값·다른 배�
 git config core.hooksPath .githooks         # 커밋할 때 leak-check 자동 실행
 ```
 
-빌드 번호는 `v버전-배포일(YYMMDD)-무작위 5자`로 씁니다(예: `v0.4.0-261026-2e43c`, 계정 설정 맨 아래에 보임).
+빌드 번호는 `v버전-배포일(YYMMDD)-무작위 5자`로 씁니다(예: `v0.4.1-261026-197a6`, 계정 설정 맨 아래에 보임).
 
 ## 다음에 만들 것
 

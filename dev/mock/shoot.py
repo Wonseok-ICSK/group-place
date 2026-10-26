@@ -1,12 +1,15 @@
 """화면 확인용 스크린샷 (가짜 Supabase, 바깥 네트워크 없음).
 
 필요: Python Playwright(pip install playwright), Microsoft Edge(기본, channel="msedge") 또는 --chromium(playwright install chromium)
-사용: python dev/mock/shoot.py [--out dev/screens] [--port 8099] [--chromium] [--only all|base|public|roulette]
+사용: python dev/mock/shoot.py [--out dev/screens] [--port 8099] [--chromium] [--only all|base|public|roulette|swipe]
   - 30번대 장면은 v0.2.0 공개 방(둘러보기, 읽기 전용, 내 방에 담기, 동의, 초대 코드 다시 만들기). 읽기 전용 장면은 M4 자동 확인
     (초대 코드·copy-code·regen-code·찜이 화면에 없음, 허용 목록 밖 단추를 강제로 눌러도 쓰기 없음, 가로 스크롤 없음). 실패하면 종료 코드 1
   - dev/mock/serve.mjs가 안 떠 있으면 직접 띄우고 끝나면 끔 (node 필요)
   - 50번대 장면은 v0.4.0 룰렛(고르기, 원판 도는 중·결과, 이름 넘기기, 후보 부족, 공유, 1280x800). 원판은 움직임을 켜고 찍고,
     바늘 아래 칸이 뽑힌 칸인지·움직임 줄이기면 바로 결과인지·닫으면 타이머가 멈추는지도 확인(실패하면 종료 코드 1)
+  - 70번대 장면은 v0.4.1 목록을 옆으로 밀어 탭 넘기기. 손가락은 CDP 터치로 움직이고(원래 앱 W1~W12와 같은 경우),
+    읽기 전용은 두 탭만·쓰기 없음, 칩 줄·사진 줄은 그쪽만 움직이는지, 미는 도중 화면이 새로 그려져도 다음 탭에 카드가 열리는지,
+    확대해서 보는 중에는 목록 위에서도 화면이 옆으로 옮겨지는지도 확인(실패하면 종료 코드 1)
   - 휴대폰 크기 390x844, 기기 배율 2, 밝은 화면과 어두운 화면
   - 127.0.0.1 말고 다른 곳으로 가는 요청은 모두 막고 report.json에 남김
   - 확인 창(confirm)은 헤드리스 스크린샷에 안 찍혀서, 문구를 받아 같은 글로 화면 위에 다시 그려 찍음(표시해 둠)
@@ -924,6 +927,262 @@ def run_roulette(sh):
     p.context.close()
 
 
+# v0.4.1 목록을 옆으로 밀어 탭 넘기기. Playwright에는 손가락을 끌고 다니는 API가 없어서(tap만 있음)
+# CDP Input.dispatchTouchEvent로 손가락을 직접 움직임 (has_touch·is_mobile 화면, 브라우저가 실제로 세로 스크롤·가로 스크롤을 함)
+class Finger:
+    def __init__(self, page):
+        self.page = page
+        self.cdp = page.context.new_cdp_session(page)
+
+    def send(self, kind, pts):
+        self.cdp.send('Input.dispatchTouchEvent', {'type': kind, 'touchPoints': [{'x': x, 'y': y, 'id': i} for i, (x, y) in enumerate(pts)]})
+
+    # (x0,y0)에서 (x1,y1)까지 steps번에 나눠 움직이고 뗌. hold: 떼기 직전에 부를 함수(힌트 읽기·스크린샷)
+    def drag(self, x0, y0, x1, y1, steps=12, hold=None):
+        self.send('touchStart', [(x0, y0)])
+        for k in range(1, steps + 1):
+            self.send('touchMove', [(x0 + (x1 - x0) * k / steps, y0 + (y1 - y0) * k / steps)])
+            self.page.wait_for_timeout(12)
+        got = hold() if hold else None
+        self.send('touchEnd', [])
+        self.page.wait_for_timeout(350)
+        return got
+
+
+SW_TAB_JS = "() => { const b = document.querySelector('.top .tabs [role=tab][aria-selected=true]'); return b ? b.dataset.tab : null; }"
+# 손가락을 대고 있는 동안의 힌트·목록·페이지 폭
+SW_HOLD_JS = r"""
+() => { const h = document.querySelector('#swipe-hint'), a = document.querySelector('#list-area');
+  return { text: h ? h.textContent : null, ready: !!h && h.classList.contains('ready'), shown: !!h && Number(h.style.opacity) > 0,
+    tf: a ? a.style.transform : null, docScrollWidth: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }; }
+"""
+SW_AREA_JS = "() => { const a = document.querySelector('#list-area'); return { tf: a.style.transform, op: a.style.opacity }; }"
+# 목록 안이면서 화면에 보이는 높이 (내 방·읽기 전용 모두 목록 위에 띠·검색 칸이 있어서 위치가 다름)
+SW_LIST_Y_JS = "() => { const r = document.querySelector('#list-area').getBoundingClientRect(); return Math.round(Math.max(r.top + 40, Math.min(520, r.bottom - 40, innerHeight - 120))); }"
+# 새 목록이 미끄러져 들어올 때의 애니메이션 이름 모으기 (움직임 줄이기면 하나도 없어야 함)
+SW_ANIM_JS = "() => { window.__swAnims = []; document.addEventListener('animationstart', (e) => window.__swAnims.push(e.animationName), true); }"
+# 공개 방 읽기 전용에서 쓰기 호출 수 (M4의 FORCE_CLICK_JS와 같은 기준)
+SW_WRITES_JS = r"""
+(before) => window.__mock.calls.slice(before).filter((c) => (c.kind === 'from' && c.op !== 'select') || c.kind === 'rpc' || (c.kind === 'storage' && c.op !== 'sign')).length
+"""
+
+
+def sw_center(p, selector):
+    b = p.locator(selector).first.bounding_box()
+    return b['x'] + b['width'] / 2, b['y'] + b['height'] / 2
+
+
+def run_swipe(sh):
+    """v0.4.1 목록 밀어 탭 넘기기 (원래 앱 tests/ui/swipe.mjs의 W1~W12와 같은 경우 + 읽기 전용·칩 줄·사진 줄·미는 도중 다시 그려짐·확대 중). 390x844 터치 화면"""
+    tab = lambda p: p.evaluate(SW_TAB_JS)  # noqa: E731
+    hold = lambda p: (lambda: p.evaluate(SW_HOLD_JS))  # noqa: E731
+
+    # 70) 내 방: 덜 밀기(20%) → 제자리, 45% → 다녀온 곳(힌트 진해짐) → 찜 → 끝에서 안 넘어감 → 오른쪽으로 다녀온 곳
+    name = '70-swipe-hint-short'
+    p = sh.new_page('mock=picker&go=A')
+    p.wait_for_selector('button.place')
+    p.evaluate(SW_ANIM_JS)
+    f = Finger(p)
+    y = p.evaluate(SW_LIST_Y_JS)
+    h = f.drag(260, y, 190, y, hold=lambda: (sh.shot(p, name, keep_toast=True), p.evaluate(SW_HOLD_JS))[1])
+    a = p.evaluate(SW_AREA_JS)
+    sh.check(name, 'W4 short-stays', tab(p) == 'want_to_go' and h['shown'] and not h['ready'] and not a['tf'] and not a['op'], {'tab': tab(p), 'hint': h, 'area': a})
+    name = '70b-swipe-hint-ready'
+    h = f.drag(300, y, 140, y, hold=lambda: (sh.shot(p, name, keep_toast=True), p.evaluate(SW_HOLD_JS))[1])
+    sh.check(name, 'W1 switch-visited', tab(p) == 'visited' and h['shown'] and h['ready'] and h['text'] == '다녀온 곳 →', {'tab': tab(p), 'hint': h})
+    sh.shot(p, '71-swipe-switched-visited')
+    f.drag(300, y, 140, y)
+    sh.check(name, 'W2 switch-fav', tab(p) == 'fav', {'tab': tab(p)})
+    h = f.drag(300, y, 140, y, hold=hold(p))
+    sh.check(name, 'W7 no-wrap-at-fav', tab(p) == 'fav' and not h['shown'] and h['tf'] == 'translateX(-32px)', {'tab': tab(p), 'hint': h})
+    name = '70c-swipe-hint-right'
+    h = f.drag(90, y, 250, y, hold=lambda: (sh.shot(p, name, keep_toast=True), p.evaluate(SW_HOLD_JS))[1])
+    sh.check(name, 'W3 back-to-visited', tab(p) == 'visited' and h['ready'] and h['text'] == '← 다녀온 곳', {'tab': tab(p), 'hint': h})
+    sh.check(name, 'no-sideways-page-while-dragging', h['docScrollWidth'] <= h['viewport'], h)
+    anims = p.evaluate('() => window.__swAnims')
+    sh.check(name, 'reduced-motion-no-slide', not [x for x in anims if x.startswith('list-in')], {'anims': anims})
+    # W12 세로 스크롤은 그대로 (다녀온 곳 목록), W5 비스듬히(세로에 가까움)는 안 넘어감
+    before = p.evaluate('() => scrollY')
+    f.drag(200, 700, 205, 300, steps=16)
+    after = p.evaluate('() => scrollY')
+    sh.check(name, 'W12 vertical-scroll', after > before and tab(p) == 'visited', {'before': before, 'after': after, 'tab': tab(p)})
+    p.evaluate('() => scrollTo(0, 0)')
+    p.wait_for_timeout(200)
+    f.drag(300, 650, 160, 450)
+    sh.check(name, 'W5 diagonal-stays', tab(p) == 'visited', {'tab': tab(p)})
+    # W6 화면 가장자리(28px 안)에서 시작한 건 무시
+    f.drag(386, y, 200, y)
+    f.drag(4, y, 200, y)
+    sh.check(name, 'W6 edge-start-ignored', tab(p) == 'visited', {'tab': tab(p)})
+    # W7 가고 싶은 곳에서 오른쪽으로도 안 넘어감
+    p.click('[data-action=tab][data-tab=want_to_go]')
+    p.wait_for_timeout(200)
+    f.drag(90, y, 300, y)
+    sh.check(name, 'W7 no-wrap-at-want', tab(p) == 'want_to_go', {'tab': tab(p)})
+    # 카테고리 칩 줄을 옆으로 밀면 칩만 움직이고 탭은 그대로 (위 W5의 비스듬한 끌기가 페이지를 내렸으니 맨 위로 올리고)
+    p.evaluate('() => scrollTo(0, 0)')
+    p.wait_for_timeout(200)
+    cx, cy = sw_center(p, '.chips')
+    room = p.evaluate("() => { const c = document.querySelector('.chips'); return c.scrollWidth - c.clientWidth; }")
+    f.drag(330, cy, 60, cy)
+    left = p.evaluate("() => document.querySelector('.chips').scrollLeft")
+    sh.check(name, 'chips-scroll-not-tabs', tab(p) == 'want_to_go' and (left > 0 if room > 0 else True), {'tab': tab(p), 'chipsScrollLeft': left, 'chipsRoom': room})
+    sh.check(name, 'no-console-errors', not p.errors, p.errors)
+    p.context.close()
+
+    # 72) 카드 위에서 밀기(W8·W9), 검색어·카테고리 그대로(W10), 상세가 열려 있으면 안 함(W11), 사진 줄은 사진만 넘어감
+    name = '72-swipe-card-search-sheet'
+    p = sh.new_page('mock=picker&go=A')
+    p.wait_for_selector('button.place')
+    f = Finger(p)
+    p.click('[data-action=tab][data-tab=visited]')
+    p.wait_for_timeout(200)
+    x, cy = sw_center(p, '#list-area .place')
+    f.drag(x + 80, cy, x - 90, cy)
+    s = p.evaluate("() => ({ sheet: !!document.querySelector('.detail-name') })")
+    sh.check(name, 'W8 card-not-opened', not s['sheet'] and tab(p) == 'fav', {'sheet': s['sheet'], 'tab': tab(p)})
+    p.wait_for_timeout(300)
+    x, cy = sw_center(p, '#list-area .place')
+    p.touchscreen.tap(x, cy)
+    p.wait_for_timeout(400)
+    opened = p.locator('.sheet .detail-name').count() == 1
+    sh.check(name, 'W9 tap-opens', opened, {'opened': opened})
+    p.click('.sheet-head [data-action=close]')
+    p.wait_for_timeout(200)
+    p.click('[data-action=tab][data-tab=want_to_go]')
+    p.click('.chips [data-action=cat][data-cat="전체"]')
+    p.evaluate("() => { const q = document.querySelector('#q'); q.value = '서울'; q.dispatchEvent(new Event('input', { bubbles: true })); q.blur(); }")
+    p.wait_for_timeout(150)
+    y = p.evaluate(SW_LIST_Y_JS)
+    f.drag(300, y, 140, y)
+    w10 = p.evaluate("() => ({ q: document.querySelector('#q').value, cat: document.querySelector('.chips [aria-pressed=true]').dataset.cat })")
+    sh.check(name, 'W10 search-stays', tab(p) == 'visited' and w10['q'] == '서울' and w10['cat'] == '전체', {'tab': tab(p), **w10})
+    sh.shot(p, '72a-swipe-search-kept')  # 확인 이름(name)과 다르게: shot은 그 이름의 report를 새로 씀
+    p.click('button.place:has-text("골목 끝 칼국수")')
+    p.wait_for_selector('.sheet .detail-name')
+    p.wait_for_timeout(300)
+    gx, gy = sw_center(p, '#gallery')
+    f.drag(gx + 120, gy, gx - 120, gy)
+    p.wait_for_timeout(500)
+    g = p.evaluate("() => ({ left: document.querySelector('#gallery').scrollLeft, sheet: !!document.querySelector('.sheet .detail-name') })")
+    sh.check(name, 'photo-strip-scrolls-not-tabs', g['left'] > 0 and g['sheet'] and tab(p) == 'visited', {**g, 'tab': tab(p)})
+    sh.shot(p, '72b-swipe-photo-strip-in-sheet')
+    f.drag(300, 700, 120, 700)
+    s = p.evaluate("() => !!document.querySelector('.sheet .detail-name')")
+    sh.check(name, 'W11 sheet-open-no-switch', s and tab(p) == 'visited', {'sheet': s, 'tab': tab(p)})
+    sh.check(name, 'no-console-errors', not p.errors, p.errors)
+    p.context.close()
+
+    # 73) 어두운 화면 + 움직임 켬: 넘어갈 만큼 민 모습, 새 목록이 미끄러져 들어옴
+    name = '73-dark-swipe-hint-ready'
+    p = sh.new_page('mock=picker&go=A', dark=True, motion=True)
+    p.wait_for_selector('button.place')
+    p.evaluate(SW_ANIM_JS)
+    f = Finger(p)
+    y = p.evaluate(SW_LIST_Y_JS)
+    h = f.drag(300, y, 140, y, hold=lambda: (sh.shot(p, name, keep_toast=True), p.evaluate(SW_HOLD_JS))[1])
+    anims = p.evaluate('() => window.__swAnims')
+    sh.check(name, 'slide-in', tab(p) == 'visited' and h['ready'] and 'list-in-next' in anims, {'tab': tab(p), 'hint': h, 'anims': anims})
+    f.drag(90, y, 250, y)
+    anims = p.evaluate('() => window.__swAnims')
+    sh.check(name, 'slide-in-prev', tab(p) == 'want_to_go' and 'list-in-prev' in anims, {'tab': tab(p), 'anims': anims})
+    sh.shot(p, '73b-dark-swipe-back')
+    sh.check(name, 'no-console-errors', not p.errors, p.errors)
+    p.context.close()
+
+    # 74) 공개 방 읽기 전용: 가고 싶은 곳 ↔ 다녀온 곳만(찜 없음), 쓰기 없음, 카드 안 열림
+    name = '74-visit-swipe'
+    p = sh.new_page('mock=picker', path='/r/k7m2p9xa4c')
+    p.wait_for_selector('.visit-band')
+    p.wait_for_selector('button.place')
+    f = Finger(p)
+    before = p.evaluate('() => window.__mock.calls.length')
+    y = p.evaluate(SW_LIST_Y_JS)
+    start = tab(p)
+    h = f.drag(300, y, 120, y, hold=hold(p))
+    sh.check(name, 'end-tab-visited-no-fav', start == 'visited' and tab(p) == 'visited' and not h['shown'] and h['tf'] == 'translateX(-36px)', {'start': start, 'tab': tab(p), 'hint': h})
+    h = f.drag(90, y, 260, y, hold=lambda: (sh.shot(p, '74a-visit-swipe-hint', keep_toast=True), p.evaluate(SW_HOLD_JS))[1])
+    sh.check(name, 'switch-want', tab(p) == 'want_to_go' and h['ready'] and h['text'] == '← 가고 싶은 곳', {'tab': tab(p), 'hint': h})
+    sh.check(name, 'no-sideways-page-while-dragging', h['docScrollWidth'] <= h['viewport'], h)
+    sh.shot(p, '74b-visit-swiped-want')
+    f.drag(90, y, 260, y)
+    sh.check(name, 'end-tab-want', tab(p) == 'want_to_go', {'tab': tab(p)})
+    x, cy = sw_center(p, '#list-area .place')
+    f.drag(x + 80, cy, x - 90, cy)
+    opened = p.locator('.sheet .detail-name').count()
+    sh.check(name, 'card-not-opened-switch-visited', tab(p) == 'visited' and not opened, {'tab': tab(p), 'opened': opened})
+    writes = p.evaluate(SW_WRITES_JS, before)
+    sh.check(name, 'no-writes', writes == 0, {'writes': writes})
+    sh.m4(p, name)
+    sh.check(name, 'no-console-errors', not p.errors, p.errors)
+    p.context.close()
+
+    # 75) 미는 도중 화면이 새로 그려짐: 손가락 아래 카드가 문서에서 빠져 그 손가락의 touchmove·touchend가 document까지 안 옴.
+    #     손을 떼고 1초 뒤 카드를 짧게(60ms) 한 번 누르면 바로 열려야 함 (끝을 못 받은 밀기가 다음 탭의 click을 버리면 안 됨)
+    name = '75-swipe-redraw-then-tap'
+    p = sh.new_page('mock=picker&go=A')
+    p.wait_for_selector('button.place')
+    f = Finger(p)
+
+    def cut_swipe(redraw_js):
+        x, cy = sw_center(p, '#list-area .place')
+        f.send('touchStart', [(x + 80, cy)])
+        for k in range(1, 13):
+            if k == 6:
+                p.evaluate(redraw_js)  # 60px 민 때
+            f.send('touchMove', [(x + 80 - 12 * k, cy)])
+            p.wait_for_timeout(12)
+        f.send('touchEnd', [])
+        p.wait_for_timeout(1000)
+        left = p.evaluate(SW_AREA_JS)
+        x, cy = sw_center(p, '#list-area .place')
+        f.send('touchStart', [(x, cy)])
+        p.wait_for_timeout(60)
+        f.send('touchEnd', [])
+        p.wait_for_timeout(400)
+        return {'leftover': left, 'after': p.evaluate(SW_AREA_JS), 'opened': p.locator('.sheet .detail-name').count() == 1, 'tab': tab(p)}
+
+    r = cut_swipe('() => render()')
+    sh.check(name, 'redraw-mid-swipe-first-tap-opens', r['opened'] and r['tab'] == 'want_to_go' and not r['after']['tf'], r)
+    sh.shot(p, '75a-swipe-redraw-tap-opened')
+    if r['opened']:
+        p.click('.sheet-head [data-action=close]')
+        p.wait_for_timeout(300)
+    # 목록 안만 새로 그려짐(검색어를 칠 때처럼 #list-area는 그대로): 비켜 있던 목록은 다음 손가락이 닿을 때 제자리로
+    r = cut_swipe("() => { document.querySelector('#list-area').innerHTML = listHtml(); }")
+    sh.check(name, 'list-refresh-mid-swipe-tap-resets-and-opens', r['opened'] and r['tab'] == 'want_to_go' and not r['after']['tf'] and not r['after']['op'], r)
+    sh.check(name, 'no-console-errors', not p.errors, p.errors)
+    p.context.close()
+
+    # 76) 확대해서 보는 중(배율 2): 목록 위에서 손가락 하나로 옆으로 밀면 화면이 옆으로 옮겨지고 탭은 그대로.
+    #     배율을 1로 돌리면 다시 밀어서 넘어감
+    name = '76-swipe-zoomed-pan'
+    p = sh.new_page('mock=picker&go=A')
+    p.wait_for_selector('button.place')
+    f = Finger(p)
+    vv_js = "() => ({ scale: visualViewport.scale, left: visualViewport.offsetLeft, zoomed: document.documentElement.classList.contains('zoomed') })"
+    f.cdp.send('Emulation.setPageScaleFactor', {'pageScaleFactor': 2})
+    p.wait_for_timeout(400)
+    z0 = p.evaluate(vv_js)
+    # 확대된 화면 안에서 목록이 보이는 높이 (손가락 좌표는 확대된 화면 기준)
+    zy = p.evaluate("() => { const r = document.querySelector('#list-area').getBoundingClientRect(), v = visualViewport;"
+                    " return Math.round((Math.min(r.top + 60, v.offsetTop + v.height - 20) - v.offsetTop) * v.scale); }")
+    f.drag(300, zy, 100, zy)
+    z1 = p.evaluate(vv_js)
+    opened = p.locator('.sheet').count()
+    sh.check(name, 'zoomed-one-finger-pans-page', z0['zoomed'] and z1['left'] > 0 and tab(p) == 'want_to_go' and not opened,
+             {'before': z0, 'after': z1, 'tab': tab(p), 'sheet': opened, 'y': zy})
+    sh.shot(p, '76a-swipe-zoomed-panned', keep_toast=True)
+    f.cdp.send('Emulation.setPageScaleFactor', {'pageScaleFactor': 1})
+    p.wait_for_timeout(400)
+    z2 = p.evaluate(vv_js)
+    y = p.evaluate(SW_LIST_Y_JS)
+    f.drag(300, y, 140, y)
+    sh.check(name, 'unzoomed-swipe-switches', not z2['zoomed'] and tab(p) == 'visited', {'viewport': z2, 'tab': tab(p)})
+    sh.check(name, 'no-console-errors', not p.errors, p.errors)
+    p.context.close()
+
+
 def main():
     try:
         sys.stdout.reconfigure(encoding='utf-8')  # Windows 콘솔(cp1252 등)에서도 한글 출력
@@ -933,7 +1192,8 @@ def main():
     ap.add_argument('--out', default=str(ROOT / 'dev' / 'screens'))
     ap.add_argument('--port', type=int, default=8099)
     ap.add_argument('--chromium', action='store_true', help='Edge 대신 Playwright Chromium')
-    ap.add_argument('--only', choices=['all', 'base', 'public', 'roulette'], default='all', help='base = v0.1.x 장면, public = 공개 방 장면(30번대), roulette = 룰렛 장면(50번대)')
+    ap.add_argument('--only', choices=['all', 'base', 'public', 'roulette', 'swipe'], default='all',
+                    help='base = v0.1.x 장면, public = 공개 방 장면(30번대), roulette = 룰렛 장면(50번대), swipe = 목록 밀어 탭 넘기기(70번대)')
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -955,6 +1215,8 @@ def main():
                     run_public(sh)
                 if a.only in ('all', 'roulette'):
                     run_roulette(sh)
+                if a.only in ('all', 'swipe'):
+                    run_swipe(sh)
             finally:
                 sh.report['_blocked_requests'] = sh.blocked
                 sh.report['_m4_failures'] = sh.m4_fail
