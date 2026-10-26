@@ -21,6 +21,7 @@
      &pub=paused    방 하나 응답이 photos_paused·truncated (사진 멈춤 띠)
      &pub=error|empty|gone  공개 API 502 / 빈 목록 / 방 404
      &notice=1      '새 기능: 공개 방' 한 번 알림을 보이게 (기본은 본 것으로 해 둠: 장면마다 5초 알림이 가리지 않게)
+     &many=1        B '회사 점심 모임'에 가고 싶은 맛집 12곳을 더 넣음 (룰렛 이름 넘기기는 후보 13곳 이상일 때)
      &delay=40      응답 지연(ms)
    개발자 도구에서 window.__mock: db(데이터), calls(부른 기록), warnings(방 조건 빠진 조회 등)
    ===================================================================== */
@@ -29,6 +30,7 @@
   const params = new URLSearchParams(location.search);
   const SCENE = params.get('mock') || 'picker';
   const PUB = params.get('pub') || '';
+  const MANY = params.get('many') === '1';
   const DELAY = Math.max(0, Number(params.get('delay') ?? 40) || 0);
   const DOMAIN = 'mock.invalid'; // serve.mjs가 index.html의 LOGIN_ID_DOMAIN도 이 값으로 바꿈
   const BUCKET = 'place-photos';
@@ -209,6 +211,11 @@
     });
     place('salad', 'B', { name: '빌딩 뒤 샐러드 바', category: '맛집', by: 'taeo', created: '2026-10-02 12:00' });
     place('donkatsu', 'B', { name: '돈가스 골목 2호점', category: '맛집', fav: true, by: 'jiwoo', created: '2026-10-08 12:00' });
+    if (MANY) { // 룰렛 이름 넘기기 확인용 (B의 가고 싶은 맛집이 14곳이 됨)
+      ['사거리 김치찌개', '2층 순댓국집', '점심 특선 초밥', '골목 제육볶음', '뚝배기 불고기', '회사 뒤 우동집', '마라탕 새로 생긴 곳',
+        '수제버거 트럭', '생선구이 정식', '비빔밥 한 그릇', '오므라이스 키친', '콩나물국밥 24시']
+        .forEach((name, i) => place(`lunch${i}`, 'B', { name, category: '맛집', by: ['mina', 'jiwoo', 'taeo'][i % 3], created: `2026-10-${String(10 + i).padStart(2, '0')} 12:00` }));
+    }
 
     // C: 미나 혼자인 공개 방 (메인에 둘러보기 링크·초대 코드 두 줄 띠, 내 정보에 '공개 방' 묶음)
     room('C', '제주 여행 준비', 'C9D1E6F0', '2026-10-01 22:00', { key: 'c9jeju2xyz', desc: '제주에서 가 보고 싶은 바다·오름 모음' });

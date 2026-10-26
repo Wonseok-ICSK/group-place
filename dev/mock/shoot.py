@@ -1,16 +1,19 @@
 """화면 확인용 스크린샷 (가짜 Supabase, 바깥 네트워크 없음).
 
 필요: Python Playwright(pip install playwright), Microsoft Edge(기본, channel="msedge") 또는 --chromium(playwright install chromium)
-사용: python dev/mock/shoot.py [--out dev/screens] [--port 8099] [--chromium] [--only all|base|public]
+사용: python dev/mock/shoot.py [--out dev/screens] [--port 8099] [--chromium] [--only all|base|public|roulette]
   - 30번대 장면은 v0.2.0 공개 방(둘러보기, 읽기 전용, 내 방에 담기, 동의, 초대 코드 다시 만들기). 읽기 전용 장면은 M4 자동 확인
     (초대 코드·copy-code·regen-code·찜이 화면에 없음, 허용 목록 밖 단추를 강제로 눌러도 쓰기 없음, 가로 스크롤 없음). 실패하면 종료 코드 1
   - dev/mock/serve.mjs가 안 떠 있으면 직접 띄우고 끝나면 끔 (node 필요)
+  - 50번대 장면은 v0.4.0 룰렛(고르기, 원판 도는 중·결과, 이름 넘기기, 후보 부족, 공유, 1280x800). 원판은 움직임을 켜고 찍고,
+    바늘 아래 칸이 뽑힌 칸인지·움직임 줄이기면 바로 결과인지·닫으면 타이머가 멈추는지도 확인(실패하면 종료 코드 1)
   - 휴대폰 크기 390x844, 기기 배율 2, 밝은 화면과 어두운 화면
   - 127.0.0.1 말고 다른 곳으로 가는 요청은 모두 막고 report.json에 남김
   - 확인 창(confirm)은 헤드리스 스크린샷에 안 찍혀서, 문구를 받아 같은 글로 화면 위에 다시 그려 찍음(표시해 둠)
 끝나면 out/report.json: 장면마다 콘솔 오류, 가로로 넘친 요소, 잘린 글자(…), 확인 창 문구, 방 조건이 빠진 조회 경고
 """
 import argparse
+import base64
 import json
 import socket
 import subprocess
@@ -131,11 +134,19 @@ class Shooter:
         self.report = {}
         self.blocked = []
         self.m4_fail = 0
+        self.checks_fail = 0
 
-    def new_page(self, scene, dark=False, path='/', width=390, height=844):
+    def check(self, name, what, ok, detail=None):
+        self.report.setdefault(name, {}).setdefault('checks', {})[what] = {'ok': bool(ok), 'detail': detail}
+        self.checks_fail += 0 if ok else 1
+        print(f'  {name}  {what}: {"통과" if ok else "실패 " + json.dumps(detail, ensure_ascii=False)}')
+
+    # motion=True: 움직임 줄이기를 끔 (룰렛이 실제로 도는 모습). mobile=False: PC 화면(마우스, 터치 없음)
+    def new_page(self, scene, dark=False, path='/', width=390, height=844, motion=False, mobile=True):
         ctx = self.browser.new_context(
-            viewport={'width': width, 'height': height}, device_scale_factor=2, is_mobile=True, has_touch=True,
-            locale='ko-KR', timezone_id='Asia/Seoul', color_scheme='dark' if dark else 'light', reduced_motion='reduce',
+            viewport={'width': width, 'height': height}, device_scale_factor=2, is_mobile=mobile, has_touch=mobile,
+            locale='ko-KR', timezone_id='Asia/Seoul', color_scheme='dark' if dark else 'light',
+            reduced_motion='no-preference' if motion else 'reduce',
         )
 
         def route(r):
@@ -676,6 +687,243 @@ def run_public(sh):
     p.context.close()
 
 
+# 룰렛: 바늘 끝 바로 아래(원판 위쪽 테두리 안)의 칸이 뽑힌 칸(.win)인지. 결과 카드 이름과 같은 칸인지도.
+# 도는 원판(svg)의 상자는 기울면 커지므로 잘라 두는 둥근 틀(.rl-face, 돌지 않음) 기준으로 잼
+POINTER_JS = r"""
+() => {
+  const disc = document.querySelector('.rl-disc'), face = document.querySelector('.rl-face');
+  if (!disc || !face) return { ok: false, why: 'no wheel' };
+  const b = face.getBoundingClientRect();
+  const x = b.left + b.width / 2, y = b.top + b.height * (25 / 300);
+  const el = document.elementFromPoint(x, y);
+  const g = el && el.closest('g');
+  const name = document.querySelector('.rl-result h3 b');
+  return { ok: !!g && g.classList.contains('win'), slice: g ? g.getAttribute('class') : null,
+    label: g && g.querySelector('text') ? g.querySelector('text').textContent : null, winner: name ? name.textContent : null,
+    transform: disc.style.transform, hit: el ? `${el.tagName}.${el.getAttribute('class') || ''}` : null, at: [Math.round(x), Math.round(y)] };
+}
+"""
+# 도는 동안 시트가 옆으로 밀리는지(가로 스크롤이 생기는지) 50ms마다 재 둠
+OVERFLOW_WATCH_JS = r"""
+() => { window.__rlOver = 0; clearInterval(window.__rlWatch);
+  window.__rlWatch = setInterval(() => { const b = document.querySelector('.sheet-body');
+    if (b) window.__rlOver = Math.max(window.__rlOver, b.scrollWidth - b.clientWidth, document.documentElement.scrollWidth - innerWidth); }, 50); }
+"""
+# 공유: 공유 창(그림+글)을 흉내 내 받은 파일을 돌려줌 → 결과 그림을 파일로 저장해 눈으로 확인
+SHARE_FILES_JS = r"""
+() => new Promise((resolve) => {
+  Object.defineProperty(navigator, 'canShare', { configurable: true, value: (d) => !!(d && d.files && d.files.length) });
+  Object.defineProperty(navigator, 'share', { configurable: true, value: async (d) => {
+    const f = d.files && d.files[0];
+    const url = f ? await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); }) : null;
+    resolve({ title: d.title, text: d.text, type: f && f.type, name: f && f.name, size: f && f.size, url });
+  } });
+  document.querySelector('[data-action=roulette-share]').click();
+})
+"""
+# 공유 창이 없는 PC: 클립보드 복사 (ok=false면 복사도 실패 → 고를 수 있는 글)
+SHARE_COPY_JS = r"""
+(ok) => {
+  for (const k of ['share', 'canShare']) Object.defineProperty(navigator, k, { configurable: true, value: undefined });
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t) => { if (!ok) throw new Error('denied'); window.__copied = t; } } });
+  document.querySelector('[data-action=roulette-share]').click();
+}
+"""
+
+
+def open_roulette(p):
+    p.click('.top [data-action=roulette]')
+    p.wait_for_selector('.sheet #sheet-title:text-is("룰렛")')
+
+
+# 단추 가운데를 마우스로 두 번 누름. 첫 누름으로 화면이 바뀐 뒤 그 자리에 무엇이 있는지(두 번째 누름이 간 곳)도 돌려줌
+def dblclick_center(p, selector):
+    loc = p.locator(selector).first
+    loc.scroll_into_view_if_needed()
+    b = loc.bounding_box()
+    x, y = b['x'] + b['width'] / 2, b['y'] + b['height'] / 2
+    p.mouse.dblclick(x, y)
+    under = p.evaluate("([x, y]) => { const e = document.elementFromPoint(x, y); const a = e && e.closest('[data-action]');"
+                       " return a ? a.dataset.action : (e ? e.tagName : null); }", [x, y])
+    return {'at': [round(x), round(y)], 'nowUnder': under}
+
+
+def run_roulette(sh):
+    """v0.4.0 룰렛 장면 (docs/roulette-design.md). 원판은 후보 12곳 이하, 이름 넘기기는 13곳 이상(&many=1의 B 방)"""
+    for dark in (False, True):
+        n = 6 if dark else 5  # 어두운 화면은 60번대
+        d = 'dark-' if dark else ''
+        # 50) 고르기: 처음엔 가고 싶은 곳만 → 다녀온 곳도 넣기 + 한 곳 빼기
+        p = sh.new_page('mock=picker&go=A', dark=dark, motion=True)
+        p.wait_for_selector('.top .title')
+        open_roulette(p)
+        sh.shot(p, f'{n}0-{d}roulette-setup')
+        p.click('#rl-visited')
+        p.wait_for_selector('#rl-visited:checked')
+        p.click('[data-action=roulette-skip] >> nth=3')
+        p.wait_for_selector('.rl-cand.off')
+        sh.shot(p, f'{n}0b-{d}roulette-setup-visited')
+        # 51) 원판이 도는 중 → 52) 결과 (바늘 아래 칸 = 뽑힌 칸)
+        p.evaluate(OVERFLOW_WATCH_JS)
+        p.click('[data-action=roulette-spin]')
+        p.wait_for_selector('.rl-disc')
+        p.wait_for_timeout(1100)
+        sh.shot(p, f'{n}1-{d}roulette-wheel-spinning', keep_toast=True)
+        p.wait_for_selector('#rl-result', timeout=6000)
+        sh.shot(p, f'{n}2-{d}roulette-wheel-result')
+        over = p.evaluate('() => { clearInterval(window.__rlWatch); return window.__rlOver; }')
+        sh.check(f'{n}1-{d}roulette-wheel-spinning', 'no-sideways-scroll', over <= 1, {'maxOverflowPx': over})
+        r = p.evaluate(POINTER_JS)
+        sh.check(f'{n}2-{d}roulette-wheel-result', 'pointer', r['ok'] and r['label'] and r['winner'] and (r['label'].rstrip('…') in r['winner']), r)
+        if not dark:
+            # 다시 돌리기: 같은 후보(9곳)로 한 번 더, 끝나면 다시 바늘 확인
+            p.wait_for_timeout(500)  # 결과가 막 나온 뒤 잠깐(RL_SETTLE_MS)은 결과 단추를 무시
+            p.click('#rl-again')
+            p.wait_for_selector('#rl-result', state='detached')
+            p.wait_for_selector('#rl-result', timeout=6000)
+            r = p.evaluate(POINTER_JS)
+            sh.check('52-roulette-wheel-result', 'pointer-again', r['ok'], r)
+            # 이 장소 열기 → 상세(‹) → 뒤로 오면 결과 그대로
+            p.wait_for_timeout(500)
+            p.click('[data-action=roulette-open]')
+            p.wait_for_selector('.sheet .detail-name')
+            back = p.get_attribute('.sheet-head [data-action=close]', 'aria-label')
+            p.click('.sheet-head [data-action=close]')
+            p.wait_for_selector('#rl-result')
+            sh.check('52-roulette-wheel-result', 'open-and-back', back == '뒤로', {'closeLabel': back})
+            # 결과 카드는 지금 장소 값으로: 상세에서 상태를 바꾸고(다녀왔어요 ↔ 가고 싶은 곳) 돌아오면 카드도 바뀜
+            was_visited = '다녀온 곳' in p.inner_text('.rl-result .rl-sub')
+            p.click('[data-action=roulette-open]')
+            p.wait_for_selector('.sheet .detail-name')
+            p.click(f'[data-action=set-status][data-status={"want_to_go" if was_visited else "visited"}]')
+            p.wait_for_selector(f'[data-action=set-status][data-status={"want_to_go" if was_visited else "visited"}][aria-pressed=true]')
+            p.click('.sheet-head [data-action=close]')
+            p.wait_for_selector('#rl-result')
+            sub = p.inner_text('.rl-result .rl-sub')
+            sh.check('52-roulette-wheel-result', 'live-after-edit', ('가고 싶은 곳' if was_visited else '다녀온 곳') in sub, {'wasVisited': was_visited, 'sub': sub})
+            # 이 장소 열기 → 정보 수정 → ✕ → 상세는 여전히 ‹(뒤로) → ‹ 누르면 결과
+            p.click('[data-action=roulette-open]')
+            p.wait_for_selector('.sheet .detail-name')
+            p.click('.sheet [data-action=edit]')
+            p.wait_for_selector('.sheet #place-form')
+            p.click('.sheet-head [data-action=close]')
+            p.wait_for_selector('.sheet .detail-name')
+            back = p.get_attribute('.sheet-head [data-action=close]', 'aria-label')
+            sheet_back = p.evaluate('() => state.sheet && state.sheet.back')
+            p.click('.sheet-head [data-action=close]')
+            p.wait_for_selector('#rl-result')
+            step = p.evaluate('() => state.roulette && state.roulette.step')
+            sh.check('52-roulette-wheel-result', 'edit-and-back', back == '뒤로' and sheet_back == 'roulette' and step == 'result',
+                     {'closeLabel': back, 'sheetBack': sheet_back, 'step': step})
+            # 57) 공유: 그림+글 → 글 복사 → 복사도 안 되면 고를 수 있는 글
+            got = p.evaluate(SHARE_FILES_JS)
+            if got.get('url'):
+                (sh.out / '57-roulette-share-card.png').write_bytes(base64.b64decode(got['url'].split(',', 1)[1]))
+            lines = (got.get('text') or '').split('\n')
+            sh.check('57-roulette-share-card', 'share-files', got.get('type') == 'image/png' and (got.get('size') or 0) > 10000
+                     and got.get('title') == '룰렛 결과' and lines[0].startswith('🎯 룰렛으로 정했어요: ') and lines[-1].startswith('https://'),
+                     {k: v for k, v in got.items() if k != 'url'})
+            p.wait_for_timeout(300)
+            p.evaluate(SHARE_COPY_JS, True)
+            p.wait_for_selector('#toast.show')
+            sh.shot(p, '57b-roulette-share-copied', keep_toast=True)
+            copied = p.evaluate('() => window.__copied || ""')
+            sh.check('57b-roulette-share-copied', 'clipboard', copied == got.get('text'), {'copied': copied})
+            p.evaluate(SHARE_COPY_JS, False)
+            p.wait_for_selector('#rl-share-text')
+            p.evaluate("() => document.activeElement && document.activeElement.blur()")
+            sh.scroll_to(p, '.rl-actions')
+            sh.shot(p, '57c-roulette-share-text')
+        p.context.close()
+
+        # 53) 이름 넘기기 (후보 14곳) → 54) 결과
+        p = sh.new_page('mock=picker&go=B&many=1', dark=dark, motion=True)
+        p.wait_for_selector('.top .title')
+        open_roulette(p)
+        if not dark:
+            sh.shot(p, '50c-roulette-setup-many')
+        p.click('[data-action=roulette-spin]')
+        p.wait_for_selector('.rl-ticker')
+        p.wait_for_timeout(1300)
+        sh.shot(p, f'{n}3-{d}roulette-ticker-spinning', keep_toast=True)
+        p.wait_for_selector('#rl-result', timeout=7000)
+        sh.shot(p, f'{n}4-{d}roulette-ticker-result')
+        same = p.evaluate("() => document.querySelector('#rl-tick-name').textContent === document.querySelector('.rl-result h3 b').textContent")
+        sh.check(f'{n}4-{d}roulette-ticker-result', 'ticker-stops-on-winner', same)
+        p.context.close()
+
+        # 55) 후보 부족: 목록에서 '카페'를 고른 채로 열면 룰렛도 카페(가고 싶은 곳 1곳) → 돌리기 꺼짐
+        p = sh.new_page('mock=picker&go=A', dark=dark)
+        p.wait_for_selector('.top .title')
+        p.click('.chips [data-action=cat][data-cat="카페"]')
+        open_roulette(p)
+        sh.shot(p, f'{n}5-{d}roulette-not-enough')
+        sh.check(f'{n}5-{d}roulette-not-enough', 'spin-disabled', p.is_disabled('[data-action=roulette-spin]')
+                 and p.get_attribute('[data-action=roulette-cat][aria-pressed=true]', 'data-cat') == '카페')
+        p.context.close()
+
+    # 움직임 줄이기: 돌리지 않고 바로 결과 / 돌아가는 중에 닫으면 타이머가 멈춰 결과가 다시 뜨지 않음
+    p = sh.new_page('mock=picker&go=A')
+    p.wait_for_selector('.top .title')
+    open_roulette(p)
+    p.click('[data-action=roulette-spin]')
+    try:
+        p.wait_for_selector('#rl-result', timeout=400)
+        quick = True
+    except Exception:
+        quick = False
+    sh.check('58-roulette-reduced-motion', 'instant-result', quick and not p.locator('.rl-ticker, .sheet-body button:text-is("돌리는 중…")').count())
+    p.context.close()
+    # 두 번 누르기(390x844 휴대폰): 바로 결과가 나와도 두 번째 누름이 같은 자리에 새로 그려진 단추를 누르지 않음
+    p = sh.new_page('mock=picker&go=A')
+    p.wait_for_selector('.top .title')
+    open_roulette(p)
+    dbl_spin = dblclick_center(p, '[data-action=roulette-spin]')
+    p.wait_for_timeout(300)
+    dbl_spin['step'] = p.evaluate('() => state.roulette.step')
+    dbl_spin['card'] = p.locator('#rl-result').count()
+    sh.check('58-roulette-reduced-motion', 'double-click-spin', dbl_spin['step'] == 'result' and dbl_spin['card'] == 1, dbl_spin)
+    p.wait_for_timeout(600)
+    dbl_setup = dblclick_center(p, '[data-action=roulette-setup]')
+    p.wait_for_timeout(300)
+    dbl_setup['step'] = p.evaluate('() => state.roulette.step')
+    sh.check('58-roulette-reduced-motion', 'double-click-setup', dbl_setup['step'] == 'setup', dbl_setup)
+    p.context.close()
+    # 같은 확인을 실제로 도는 화면에서: 후보 다시 고르기를 두 번 눌러도 다시 돌지 않음('spin'이 아니라 'setup')
+    p = sh.new_page('mock=picker&go=A', motion=True)
+    p.wait_for_selector('.top .title')
+    open_roulette(p)
+    p.click('[data-action=roulette-spin]')
+    p.wait_for_selector('#rl-result', timeout=7000)
+    p.wait_for_timeout(600)
+    dbl_setup = dblclick_center(p, '[data-action=roulette-setup]')
+    p.wait_for_timeout(300)
+    dbl_setup['step'] = p.evaluate('() => state.roulette.step')
+    sh.check('58-roulette-reduced-motion', 'double-click-setup-motion', dbl_setup['step'] == 'setup', dbl_setup)
+    p.context.close()
+    p = sh.new_page('mock=picker&go=A', motion=True)
+    p.wait_for_selector('.top .title')
+    open_roulette(p)
+    p.click('[data-action=roulette-spin]')
+    p.wait_for_selector('.rl-disc')
+    p.wait_for_timeout(500)
+    p.keyboard.press('Escape')
+    p.wait_for_timeout(4300)
+    reopened = p.evaluate("() => document.querySelector('#sheet-root').innerHTML.length")
+    sh.check('58-roulette-reduced-motion', 'close-stops-timers', reopened == 0 and not p.errors, {'sheetHtml': reopened, 'console': p.errors})
+    p.context.close()
+
+    # 59) PC 1280x800 결과
+    p = sh.new_page('mock=picker&go=A', width=1280, height=800, mobile=False)
+    p.wait_for_selector('.top .title')
+    open_roulette(p)
+    p.click('#rl-visited')
+    p.click('[data-action=roulette-spin]')
+    p.wait_for_selector('#rl-result')
+    sh.shot(p, '59-desktop-roulette-result')
+    p.context.close()
+
+
 def main():
     try:
         sys.stdout.reconfigure(encoding='utf-8')  # Windows 콘솔(cp1252 등)에서도 한글 출력
@@ -685,7 +933,7 @@ def main():
     ap.add_argument('--out', default=str(ROOT / 'dev' / 'screens'))
     ap.add_argument('--port', type=int, default=8099)
     ap.add_argument('--chromium', action='store_true', help='Edge 대신 Playwright Chromium')
-    ap.add_argument('--only', choices=['all', 'base', 'public'], default='all', help='base = v0.1.x 장면, public = 공개 방 장면(30번대)')
+    ap.add_argument('--only', choices=['all', 'base', 'public', 'roulette'], default='all', help='base = v0.1.x 장면, public = 공개 방 장면(30번대), roulette = 룰렛 장면(50번대)')
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -705,16 +953,19 @@ def main():
                     run(sh)
                 if a.only in ('all', 'public'):
                     run_public(sh)
+                if a.only in ('all', 'roulette'):
+                    run_roulette(sh)
             finally:
                 sh.report['_blocked_requests'] = sh.blocked
                 sh.report['_m4_failures'] = sh.m4_fail
+                sh.report['_check_failures'] = sh.checks_fail
                 (out / 'report.json').write_text(json.dumps(sh.report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\n')
                 browser.close()
     finally:
         if server:
             server.terminate()
-    print(f'끝: {out}  (막은 바깥 요청 {len(sh.blocked)}개, M4 실패 {sh.m4_fail}개)')
-    return 1 if sh.m4_fail else 0
+    print(f'끝: {out}  (막은 바깥 요청 {len(sh.blocked)}개, M4 실패 {sh.m4_fail}개, 확인 실패 {sh.checks_fail}개)')
+    return 1 if sh.m4_fail or sh.checks_fail else 0
 
 
 if __name__ == '__main__':

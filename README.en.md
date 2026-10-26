@@ -14,7 +14,7 @@
   <img alt="PWA" src="https://img.shields.io/badge/PWA-installable-1f6f5c">
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Auth·Postgres·Storage-3ecf8e">
   <img alt="Node" src="https://img.shields.io/badge/Node-20+-339933">
-  <img alt="Version" src="https://img.shields.io/badge/version-v0.3.1-1f6f5c">
+  <img alt="Version" src="https://img.shields.io/badge/version-v0.4.0-1f6f5c">
   <img alt="Status" src="https://img.shields.io/badge/status-MVP_testing-d9822b">
 </p>
 
@@ -26,6 +26,14 @@
 </p>
 
 > The UI is in Korean. Screenshots use sample data; the photos are generated examples and contain no real user information.
+
+## New in v0.4.0: roulette
+
+Can't decide where to go next? Tap the **roulette** button at the top of the main screen (next to the trophy), pick a category,
+and the app picks one of your want-to-go places at random. Turn on "include visited places" to add places you have been to,
+and untick any place you want to leave out this time. Up to 12 candidates spin on a wheel; more than that flick past as names
+until one stops (devices set to reduce motion get the result straight away). Results are not saved; **Share** sends a result
+card and a map link to KakaoTalk or any other app. The roulette is not shown in read-only public room views. No database (SQL) changes.
 
 ## v0.3.1
 
@@ -77,6 +85,7 @@ Limits: each person can own one public room, create at most one every 7 days (de
 - Places: name, category, map link, address, shared memo, up to 10 photos. Pasting a Naver Maps share text or a Google Maps link fills in the name and address.
 - Three lists (want to go / visited / favorites), search with a clear (✕) button, category filters and sorting.
 - Every visit has a date and a rating (0.5 steps) and review per member. A "place world cup" picks your favorite visited place, stamped in each member's color.
+- The roulette picks where to go next from your want-to-go places (optionally visited ones too), by category, and shares the result.
 
 **Accounts**
 - Username + password, no email. Sign up with a one-time admin code (`W-XXXX-XXXX`) or a room's 8-character invite code. Wrong codes are limited to 5 per hour per network (successful attempts don't count).
@@ -157,7 +166,7 @@ bash scripts/leak-check.sh                  # pre-commit check for secrets and v
 git config core.hooksPath .githooks         # run leak-check on every commit
 ```
 
-Build numbers look like `vVERSION-YYMMDD-xxxxx` with five random hex characters (e.g. `v0.2.3-261023-8b7c2`, shown at the bottom of the account screen).
+Build numbers look like `vVERSION-YYMMDD-xxxxx` with five random hex characters (e.g. `v0.4.0-261026-2e43c`, shown at the bottom of the account screen).
 
 ## Roadmap
 
